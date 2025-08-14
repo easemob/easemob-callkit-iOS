@@ -27,6 +27,10 @@ open class Call1v1VideoViewController: UIViewController {
         return imageView
     }()
     
+    public lazy var navigationBlur: UIImageView = {
+        UIImageView(frame: self.view.bounds).contentMode(.scaleAspectFill).backgroundColor(.clear)
+    }()
+    
     public lazy var navigationBar: CallNavigationBar = {
         createNavigationBar()
     }()
@@ -176,9 +180,9 @@ open class Call1v1VideoViewController: UIViewController {
     private func setupViews() {
         // 确保视图层级正确
         self.micView.isHidden = true
-        self.view.addSubViews([self.background, self.navigationBar, self.bottomView, self.micView])
+        self.view.addSubViews([self.background, self.navigationBlur, self.navigationBar, self.bottomView, self.micView])
         self.background.addSubViews([self.callView, self.floatView])
-        
+        self.navigationBlur.image = UIImage(named: "mask", in: .callBundle, with: nil)
         // 确保floatView在最上层
         self.background.bringSubviewToFront(self.floatView)
     }

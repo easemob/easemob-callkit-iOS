@@ -63,7 +63,7 @@ public class Call1v1AudioViewController: UIViewController {
         NotificationCenter.default.addObserver(forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) {  _ in
             if #available(iOS 17.4, *),CallKitManager.shared.config.enableVOIP {
                 LiveCommunicationManager.shared.endCall()
-                consoleLogInfo("iOS 17.4及以上系统，开启VOIP模式下，应用进入后台会自动挂断通话", type: .error)
+                consoleLogInfo("iOS 17.4及以上系统，开启VOIP模式下，应用进入后台会自动挂断LiveCommunicationManager通话", type: .error)
             }
         }
         
