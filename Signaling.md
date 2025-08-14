@@ -9,7 +9,7 @@
 
 | 信令类型 | Action 标识 | 发送方 | 接收方 | 描述 |
 |------------|------------------|----|-----|-------------|
-| 通话邀请信令 | `CALL_INVITE` | 主叫 | 被叫 | 发起通话邀请，包含：<br/> - `callId`: 通话唯一标识。 <br/> - `channelName`：声网 RTC 频道名称。 <br/> - `callType`：`CallTypeAudio` 为音频通话，`CallTypeVideo` 为视频通话。<br/> - `callerDevId`：主叫设备 ID。<br/>对于群聊通话，该信令还包含以下参数：<br/> - `groupId`：群组 ID。 <br/> - `receiverList`：接收通话邀请的目标用户。|
+| 通话邀请信令 | `CALL_INVITE` | 主叫 | 被叫 | 发起通话邀请，包含：<br/> - `callId`: 通话唯一标识。 <br/> - `channelName`：声网 RTC 频道名称。 <br/> - `callType`：`CallTypeAudio` 为音频通话，`CallTypeVideo` 为视频通话，`CallTypeGroup`为群组通话。<br/> - `callerDevId`：主叫设备 ID。<br/>对于群聊通话，该信令还包含以下参数：<br/> - `groupId`：群组 ID。 <br/> - `receiverList`：接收通话邀请的目标用户。|
 | 响应信令 | `CALL_ALERT` | 被叫 | 主叫 | 通知主叫已收到邀请，包含：<br/> - `callId`：对应的通话 ID。<br/> - `calleeDevId`：被叫设备 ID。 |
 | 确认振铃信令 | `CALL_CONFIRM_RING` | 主叫 | 被叫 | 确认被叫可以开始振铃，包含呼叫状态 `callStatus`：<br/> - `1` 为呼叫有效<br/> - `0` 为呼叫无效 |
 | 应答信令 | `CALL_ANSWER` | 被叫 | 主叫 | 通知主叫是否接听，包含 `callResult` 参数：<br/> - `accept`：接听<br/> - `refuse` 拒绝`<br/> - busy`：忙碌 |
