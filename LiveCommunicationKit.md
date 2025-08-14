@@ -4,6 +4,37 @@
 
 `LiveCommunicationManager` 是一个用于管理 iOS VoIP 通话的单例管理器类。它集成了 Apple 的 PushKit 和 LiveCommunicationKit 框架，提供完整的 VoIP 通话解决方案，包括来电推送、通话管理和音频会话控制。
 
+## 证书设置
+
+```Swift
+    private func setupCallKit() {
+        let options = EMOptions(appkey: appKey)
+        #if DEBUG
+        options.apnsCertName = "EaseIM_APNS_Developer"
+        options.pushKitCertName = "EasemobVoipDev"
+        #else
+        options.apnsCertName = "EaseIM_APNS_Product"
+        options.pushKitCertName = "EasemobVoipPro"
+        #endif
+        EMClient.shared().initializeSDK(with: options)
+        //初始化环信CallKit
+        let config = EaseCallUIKit.CallKitConfig()
+        config.enableVOIP = true//开启voip功能后会自动开启LiveCommunicationKit，需要在develop.apple.com申请证书时勾选
+        config.enablePIPOn1V1VideoScene = true//开启画中画，同时需要开启应用后台摄像头采集权限，详见[PictureInPicture.md](./PictureInPicture.md)。
+        CallKitManager.shared.setup(config)
+    }
+```
+
+![证书管理](./DocumentationImages/createCertification.png)
+
+![添加证书](./DocumentationImages/addCertification)
+
+![开启VOIP](./DocumentationImages/VoIPCertification.png)
+
+![导出证书](./DocumentationImages/requestCertification.png)
+
+![console设置证书](./DocumentationImages/setVoipCer.png)
+
 ## 系统要求
 
 - iOS 17.4 及更高版本

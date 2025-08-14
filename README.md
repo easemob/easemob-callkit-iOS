@@ -233,6 +233,15 @@ class AppDelegate：UIResponder，UIApplicationDelegate {
 相比于上面快速开始的EaseCallUIKit初始化这里多了ChatOptions的参数，主要是对SDK中是否打印log以及是否自动登录，是否默认使用用户属性的开关配置。ChatOptions即IMSDK的Option类，内中有诸多开关属性可参见环信官网IMSDK文档
 ```Swift
     private func setupCallKit() {
+        let options = EMOptions(appkey: appKey)
+        #if DEBUG
+        options.apnsCertName = "EaseIM_APNS_Developer"
+        options.pushKitCertName = "EasemobVoipDev"
+        #else
+        options.apnsCertName = "EaseIM_APNS_Product"
+        options.pushKitCertName = "EasemobVoipPro"
+        #endif
+        EMClient.shared().initializeSDK(with: options)
         //初始化环信CallKit
         let config = EaseCallUIKit.CallKitConfig()
         config.enableVOIP = true//开启voip功能后会自动开启LiveCommunicationKit，需要在develop.apple.com申请证书时勾选
