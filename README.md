@@ -9,7 +9,7 @@
 
 如需体验EaseCallUIKit的完整功能（包含LiveCommunicationKit），您可以扫描以下二维码试用demo。
 
-![Demo](./Documentation/demo.png)
+![Demo](./DocumentationImages/demo.png)
 
 # CallKit 指南
 
