@@ -495,7 +495,14 @@ extension MainViewController: CallServiceListener {
         CallAppearance.backgroundImage = UIImage(named: "chat_background")
 ```
 
-## 2.修改资源原有
+## 2.修改原有资源
+
+主要包含有
+
+- 图片
+- 音频
+- 国际化文件
+
 [资源图](./DocumentationImages/resource_replace.png)
 [资源图1](./DocumentationImages/resource_replace1.png)
 
