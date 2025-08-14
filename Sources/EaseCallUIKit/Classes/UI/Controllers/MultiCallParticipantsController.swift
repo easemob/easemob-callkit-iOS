@@ -11,11 +11,15 @@ import UIKit
 @objc open class MultiCallParticipantsController: UIViewController {
     
     
-    private var doneClosure: (([String]) -> Void)?
+    private var doneClosure: (([String],String,String) -> Void)?
+    
+    private var groupName: String = ""
+    
+    private var groupAvatar: String = ""
     
     public private(set) var groupId = ""
     
-    public var participants: [CallUserProfileProtocol] = []
+    public var participants: [CallProfileProtocol] = []
     
     public var excludeUsers: [String] = []
     
@@ -33,7 +37,7 @@ import UIKit
         UITableView(frame: .zero, style: .plain).delegate(self).dataSource(self).tableFooterView(UIView()).rowHeight(60).backgroundColor(.clear).separatorStyle(.none)
     }()
     
-    @objc required public init(groupId: String,excludeUsers: [String],closure: @escaping ([String]) -> Void) {
+    @objc required public init(groupId: String,excludeUsers: [String],closure: @escaping ([String],String,String) -> Void) {
         self.groupId = groupId
         self.participants.removeAll()
         self.excludeUsers = excludeUsers
@@ -69,6 +73,35 @@ import UIKit
     
         Theme.registerSwitchThemeViews(view: self)
         self.switchTheme(style: Theme.style)
+        if CallKitManager.shared.profileProvider != nil || CallKitManager.shared.profileProviderOC != nil {
+            if CallKitManager.shared.profileProvider != nil {
+                Task {
+                    let profiles = await CallKitManager.shared.profileProvider?.fetchGroupProfiles(profileIds: [groupId])
+                    if let profile = profiles?.first {
+                        if let group = ChatGroup(id: self.groupId) {
+                            self.groupName = profile.nickname
+                            self.groupAvatar = profile.avatarURL
+                        }
+                    }
+                }
+            }
+            if CallKitManager.shared.profileProviderOC != nil {
+                CallKitManager.shared.profileProviderOC?.fetchGroupProfiles(profileIds: [groupId]) { [weak self] profiles in
+                    guard let `self` = self else { return }
+                    if let profile = profiles.first {
+                        if let group = ChatGroup(id: self.groupId) {
+                            self.groupName = profile.nickname
+                            self.groupAvatar = profile.avatarURL
+                        }
+                    }
+                }
+            }
+        } else {
+            if let group = ChatGroup(id: self.groupId) {
+                self.groupName = group.groupName
+                self.groupAvatar = group.groupAvatar
+            }
+        }
     }
     
     @objc open func navigationClick(type: ChatNavigationBarClickEvent,indexPath: IndexPath?) {
@@ -97,7 +130,7 @@ import UIKit
         } else {
             removeAlert += "\(nickNames.first ?? "")"
         }
-        self.doneClosure?(userIds)
+        self.doneClosure?(userIds,self.groupName,self.groupAvatar)
         self.dismiss(animated: true)
     }
 
@@ -182,6 +215,9 @@ extension MultiCallParticipantsController: UITableViewDelegate,UITableViewDataSo
     }
     
     public func tableView(_ tableView: UITableView, willDisplay cell: UITableViewCell, forRowAt indexPath: IndexPath) {
+        if !self.cursor.isEmpty {
+            self.fetchParticipants()
+        }
         var unknownInfoIds = [String]()
         if let profile = self.participants[safe: indexPath.row] {
             if profile.nickname.isEmpty || profile.avatarURL.isEmpty {
@@ -191,7 +227,7 @@ extension MultiCallParticipantsController: UITableViewDelegate,UITableViewDataSo
         
         if CallKitManager.shared.profileProvider != nil,CallKitManager.shared.profileProviderOC == nil {
             Task {
-                if let profiles = await CallKitManager.shared.profileProvider?.fetchProfiles(profileIds: unknownInfoIds) {
+                if let profiles = await CallKitManager.shared.profileProvider?.fetchUserProfiles(profileIds: unknownInfoIds) {
                     for profile in profiles {
                         if let index = self.participants.firstIndex(where: { $0.id == profile.id }) {
                             self.participants[index].nickname = profile.nickname

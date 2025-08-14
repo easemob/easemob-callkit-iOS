@@ -28,10 +28,14 @@ public let kAcceptResult: String = "accept"
 public let kRefuseResult: String = "refuse"
 public let kMsgTypeValue: String = "rtcCallWithAgora"
 public let kExt: String = "ext"
+public let kCallKitGroupExt: String = "callkitGroupInfo"
 public let kCall = "rtcCall"
 public let kCallDuration = "call_duration"
 public let kCallEndReason = "call_end_reason"
 public let kUserInfo = "ease_chat_uikit_user_info"
+public let kPush_payload = "em_push_ext"
+public let kPush_iOS_payload_apns = "em_apns_ext"
+
 public let ringingTimeout: UInt = 30
 public let callTimeout: UInt = 10
 public let updateDuration: UInt = 5

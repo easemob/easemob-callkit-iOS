@@ -11,6 +11,7 @@ import AgoraRtcKit
 
 public class PixelBufferRenderView: DragFloatView {
     public internal(set) var userId: String = ""
+    public var uid : UInt32 = 0
     public var isVideoMuted: Bool = false
     public var isAudioMuted: Bool = false
     private var videoWidth: Int32 = 0

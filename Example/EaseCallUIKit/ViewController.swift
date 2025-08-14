@@ -25,36 +25,19 @@ class ViewController: UIViewController {
     @IBOutlet weak var logButton: UIButton!
 
     
-    lazy var joinInfo: UIButton = {
-        let button = UIButton(type: .custom)
-        button.frame = CGRect(x: 40, y: 100, width: ScreenWidth-80, height: 40)
-        button.setTitle("JoinInfo", for: .normal)
-        button.clipsToBounds = true
-        button.layer.cornerRadius = 4
-        button.setTitleColor(.white, for: .normal)
-        button.titleLabel?.font = UIFont.systemFont(ofSize: 14)
-        button.addTarget(self, action: #selector(getInfo), for: .touchUpInside)
-        return button
-    }()
-    
     override func viewDidLoad() {
         super.viewDidLoad()
         // Do any additional setup after loading the view, typically from a nib.
-        CallKitManager.shared.enablePIPOn1V1VideoScene = true
 //        CallKitManager.shared.currentUserInfo = CallUserProfile()
         self.callTypeSegment.selectedSegmentIndex = 0
         self.callTypeSegment.selectedSegmentTintColor = .systemBlue
-        self.view.addSubview(self.joinInfo)
         
     }
     
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
     }
-    
-    @objc func getInfo() {
-        self.joinInfo.setTitle(CallKitManager.shared.joinChannelName, for: .normal)
-    }
+
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         self.view.endEditing(true)
@@ -77,7 +60,13 @@ class ViewController: UIViewController {
                 self?.showCallToast(toast: "Login failed: \(error.errorDescription ?? "")")
             } else {
                 self?.showCallToast(toast: "Login successful")
-                CallKitManager.shared.setup()
+                if !userId.isEmpty {
+                    let profile = CallUserProfile()
+                    profile.id = userId
+                    profile.avatarURL = "https://xxxxx"
+                    profile.nickname = "\(userId)昵称"
+                    CallKitManager.shared.currentUserInfo = profile
+                }
                 self?.userIdField.isHidden = true
                 self?.tokenField.isHidden = true
                 self?.loginButton.isHidden = true 
@@ -97,7 +86,7 @@ class ViewController: UIViewController {
             self.showCallToast(toast: "Please enter a valid username or group id")
             return
         }
-        if self.callType != .multiCall {
+        if self.callType != .groupCall {
             CallKitManager.shared.call(with: input, type: self.callType)
         } else {
             CallKitManager.shared.groupCall(groupId: input)

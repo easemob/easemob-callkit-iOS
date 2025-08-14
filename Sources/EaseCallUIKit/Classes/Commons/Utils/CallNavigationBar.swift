@@ -104,7 +104,7 @@ import UIKit
     }()
     
     public private(set) lazy var detail: UILabel = {
-        UILabel(frame: CGRect(x: self.avatar.frame.maxX+4, y: self.titleLabel.frame.maxY, width: self.titleLabel.frame.width, height: 14)).font(UIFont.callTheme.bodyExtraSmall).textColor(UIColor.callTheme.neutralColor5).backgroundColor(.clear)
+        UILabel(frame: CGRect(x: self.avatar.frame.maxX+4, y: self.titleLabel.frame.maxY, width: self.titleLabel.frame.width, height: 14)).font(UIFont.callTheme.titleSmall).textColor(UIColor.callTheme.neutralColor5).backgroundColor(.clear)
     }()
     
     public private(set) lazy var layout: UICollectionViewFlowLayout = {
@@ -256,13 +256,21 @@ import UIKit
     }
     
     @objc open func buttonAction(sender: UIButton) {
+        // 防止多次点击 - 临时禁用按钮
+        sender.isEnabled = false
+        
+        // 延迟重新启用（0.5秒后）
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            sender.isEnabled = true
+        }
+        
         switch sender.tag {
         case 0:
-            self.clickClosure?(.back,nil)
+            self.clickClosure?(.back, nil)
         case 3:
-            self.clickClosure?(.rightTitle,nil)
+            self.clickClosure?(.rightTitle, nil)
         case 4:
-            self.clickClosure?(.cancel,nil)
+            self.clickClosure?(.cancel, nil)
         default:
             break
         }

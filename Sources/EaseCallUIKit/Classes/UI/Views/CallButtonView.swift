@@ -20,9 +20,20 @@
     
     private var containerCornerRadius: CGFloat = 0
     
+    // 存储约束以便动态调整
+    private var labelTopConstraint: NSLayoutConstraint!
+    
+    // iconTitleSpace 设置为可修改的计算属性
+    public var iconTitleSpace: CGFloat = 4
+    
     override init(frame: CGRect) {
         super.init(frame: frame)
         self.containerCornerRadius = frame.width / 2
+    }
+    
+    convenience public init(frame: CGRect, iconTitleSpace: CGFloat = 4) {
+        self.init(frame: frame)
+        self.iconTitleSpace = iconTitleSpace
         setupUI()
     }
     
@@ -47,6 +58,9 @@
         label.translatesAutoresizingMaskIntoConstraints = false
         addSubview(label)
         
+        // 创建标签顶部约束并存储引用
+        labelTopConstraint = label.topAnchor.constraint(equalTo: containerView.bottomAnchor, constant: iconTitleSpace)
+        
         // 约束
         NSLayoutConstraint.activate([
             containerView.topAnchor.constraint(equalTo: topAnchor),
@@ -54,12 +68,12 @@
             containerView.widthAnchor.constraint(equalTo: widthAnchor),
             containerView.heightAnchor.constraint(equalTo: widthAnchor),
             
-            imageView.topAnchor.constraint(equalTo: containerView.topAnchor,constant: 9),
-            imageView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor,constant: -9),
+            imageView.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 9),
+            imageView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -9),
             imageView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 9),
             imageView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -9),
             
-            label.topAnchor.constraint(equalTo: containerView.bottomAnchor, constant: 4),
+            labelTopConstraint, // 使用存储的约束
             label.centerXAnchor.constraint(equalTo: centerXAnchor),
             label.bottomAnchor.constraint(lessThanOrEqualTo: bottomAnchor)
         ])
@@ -67,6 +81,12 @@
         containerView.layer.cornerRadius = self.containerCornerRadius
         self.isUserInteractionEnabled = true
         self.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(buttonTapped)))
+    }
+    
+    // 更新图标与标题之间的间距
+    private func updateIconTitleSpacing() {
+        labelTopConstraint.constant = iconTitleSpace
+        layoutIfNeeded()
     }
     
     @objc private func buttonTapped() {
@@ -87,7 +107,7 @@
         self.data = data
         if allowSelection {
             containerView.backgroundColor = data.isSelected ? UIColor.callTheme.barrageLightColor5:UIColor.callTheme.barrageDarkColor9
-            imageView.image = UIImage(named:  data.isSelected ? data.selectedImageName:data.imageName, in: .callBundle, with: nil)
+            imageView.image = UIImage(named: data.isSelected ? data.selectedImageName:data.imageName, in: .callBundle, with: nil)
             label.text = data.isSelected ? data.selectedTitle:data.title
         } else {
             containerView.backgroundColor = data.color
@@ -96,6 +116,16 @@
         }
     }
     
+    // 便捷方法：设置间距并可选择是否带动画
+    public func setIconTitleSpacing(_ spacing: CGFloat, animated: Bool = false) {
+        if animated {
+            UIView.animate(withDuration: 0.3) {
+                self.iconTitleSpace = spacing
+            }
+        } else {
+            self.iconTitleSpace = spacing
+        }
+    }
 }
 
 @objc public enum CallButtonType: UInt {

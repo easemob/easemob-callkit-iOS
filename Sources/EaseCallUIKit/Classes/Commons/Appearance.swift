@@ -29,7 +29,7 @@ import Foundation
     /// After the neutral special hue is changed, thirteen UIColor objects of the related color series will be changed. The color of UI components that use the relevant color series in the ease chat UIKit will also change accordingly.
     public static var neutralSpecialHue: CGFloat = 220/360.0
     
-    /// EaseChatUIKit‘s language type.
+    /// Language type.
     public static var call_language = EaseCallUIKit.LanguageType.Chinese
     
     /// The corner radius of the avatar image view of ``ChatInputBar``.
@@ -38,5 +38,9 @@ import Foundation
     /// The placeholder image of the avatar image view of ``MessageCell``.
     public static var avatarPlaceHolder: UIImage? = UIImage(named: "default_avatar", in: .callBundle, with: nil)
     
+    /// The bundle that contains the resources of EaseCallUIKit.
+    public static var resourceBundle: Bundle? = nil
     
+    /// The background image of the call interface.
+    public static var backgroundImage : UIImage? = UIImage(named: "bg", in: .callBundle, with: nil)
 }

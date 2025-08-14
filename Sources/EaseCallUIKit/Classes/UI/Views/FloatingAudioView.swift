@@ -149,6 +149,15 @@ public extension FloatingAudioView {
         return window.viewWithTag(floatingViewTag) != nil
     }
     
+    static func getFloatingView() -> FloatingAudioView? {
+        guard let window = UIApplication.shared.call.keyWindow else {
+            consoleLogInfo("Could not find key window for FloatingView", type: .error)
+            return nil
+        }
+        
+        return window.viewWithTag(floatingViewTag) as? FloatingAudioView
+    }
+    
     static func removeFromWindow() {
         guard let window = UIApplication.shared.call.keyWindow else {
             consoleLogInfo("Could not find key window for FloatingView", type: .error)

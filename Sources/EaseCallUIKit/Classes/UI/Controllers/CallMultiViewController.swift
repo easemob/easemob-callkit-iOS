@@ -16,7 +16,7 @@ open class CallMultiViewController: UIViewController {
     
     public lazy var background: UIImageView = {
         let imageView = UIImageView(frame: self.view.bounds)
-        imageView.image = UIImage(named: "bg",in: .callBundle,with: nil)
+        imageView.image = CallAppearance.backgroundImage
         imageView.contentMode = .scaleAspectFill
         return imageView
     }()
@@ -68,15 +68,15 @@ open class CallMultiViewController: UIViewController {
         fatalError("init(coder:) has not been implemented")
     }
     
+    open override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+    }
+    
     open override func viewDidLoad() {
         super.viewDidLoad()
         let state = self.connected
         if state {
-            if let call = CallKitManager.shared.callInfo {
-                GlobalTimerManager.shared.registerListener(self, timerIdentify: "call-\(call.channelName)-answering-timer")
-            }
-        } else {
-            GlobalTimerManager.shared.registerListener(self, timerIdentify: "ringDialogController")
+            self.addCallTimer()
         }
         self.view.addSubViews([self.background, self.navigationBar,self.bottomView,self.callView])
         self.bottomView.updateButtonSelectedStatus(selectedIndex: 3)
@@ -105,16 +105,17 @@ open class CallMultiViewController: UIViewController {
             self?.bottomClick(type: $0)
         }
         CallKitManager.shared.enableLocalVideo(false)
+        NotificationCenter.default.addObserver(forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) {  _ in
+            if #available(iOS 17.4, *),CallKitManager.shared.config.enableVOIP {
+                LiveCommunicationManager.shared.endCall()
+            }
+        }
     }
     
     private func setupNavigationState() {
         if self.role != .callee {
             self.navigationBar.subtitle = "calling".call.localize
-            if let call = CallKitManager.shared.callInfo {
-                call.state = .answering
-                GlobalTimerManager.shared.registerListener(self, timerIdentify: "call-\(call.channelName)-answering-timer")
-                GlobalTimerManager.shared.registerListener(CallKitManager.shared, timerIdentify: "call-\(call.channelName)-answering-timer")
-            }
+            self.addCallTimer()
         } else {
             if let call = CallKitManager.shared.callInfo {
                 switch call.state {
@@ -125,10 +126,7 @@ open class CallMultiViewController: UIViewController {
                     }
                 case .answering:
                     self.navigationBar.subtitle = "Connecting".call.localize
-                    if let call = CallKitManager.shared.callInfo {
-                        GlobalTimerManager.shared.registerListener(self, timerIdentify: "call-\(call.channelName)-answering-timer")
-                        GlobalTimerManager.shared.registerListener(CallKitManager.shared, timerIdentify: "call-\(call.channelName)-answering-timer")
-                    }
+                    self.addCallTimer()
                 default:
                     break
                 }
@@ -136,9 +134,16 @@ open class CallMultiViewController: UIViewController {
         }
     }
     
+    @objc open func addCallTimer() {
+        if let call = CallKitManager.shared.callInfo {
+            GlobalTimerManager.shared.registerListener(self, timerIdentify: "call-\(call.channelName)-answering-timer")
+            GlobalTimerManager.shared.registerListener(CallKitManager.shared, timerIdentify: "call-\(call.channelName)-answering-timer")
+        }
+    }
+    
     @objc open func navigationClick(type: ChatNavigationBarClickEvent,indexPath: IndexPath?) {
         switch type {
-        case .back: self.pop()
+        case .back,.title,.subtitle: self.pop()
         case .rightItems: self.rightAction()
         default:
             break
@@ -146,7 +151,7 @@ open class CallMultiViewController: UIViewController {
     }
     
     @objc open func bottomClick(type: CallButtonType) {
-        guard let currentUserId = ChatClient.shared().currentUsername,let item = CallKitManager.shared.itemsCache[currentUserId] else {
+        guard let currentUserId = ChatClient.shared().currentUsername,let item = CallKitManager.shared.itemsCache[currentUserId],let canvas = CallKitManager.shared.canvasCache[currentUserId] else {
             consoleLogInfo("CallMultiViewController: Current user not found in items cache.", type: .error)
             return
         }
@@ -160,16 +165,20 @@ open class CallMultiViewController: UIViewController {
         case .flip_back: CallKitManager.shared.switchCamera()
         case .flip_front: CallKitManager.shared.switchCamera()
         case .camera_on:
+            CallKitManager.shared.setupLocalVideo()
             CallKitManager.shared.enableLocalVideo(true)
             item.videoMuted = false
+            canvas.updateItem(item)
         case .camera_off:
             CallKitManager.shared.enableLocalVideo(false)
             item.videoMuted = true
+            canvas.updateItem(item)
         case .speaker_on:
             CallKitManager.shared.turnSpeakerOn(on: true)
         case .speaker_off:
             CallKitManager.shared.turnSpeakerOn(on: false)
         case .decline:
+            CallKitManager.shared.callVC = nil
             self.dismiss(animated: true, completion: nil)
             CallKitManager.shared.hangup()
         case .accept:
@@ -183,11 +192,11 @@ open class CallMultiViewController: UIViewController {
             if let call = CallKitManager.shared.callInfo {
                 GlobalTimerManager.shared.removeListener(self, timerIdentify: "call-\(call.channelName)-answering-timer")
             }
+            CallKitManager.shared.callVC = nil
             self.dismiss(animated: true, completion: nil)
             CallKitManager.shared.hangup()
         default: break
         }
-        self.callView.updateItem(item)
     }
     
     @objc open func pop() {
@@ -309,15 +318,7 @@ open class CallMultiViewController: UIViewController {
 
 extension CallMultiViewController: TimerServiceListener {
     public func timeChanged(_ timerIdentify: String, interval seconds: UInt) {
-        if timerIdentify == "ringDialogController" {
-            if seconds >= 30 {
-                if seconds >= ringingTimeout {
-                    GlobalTimerManager.shared.removeListener(self, timerIdentify: "ringDialogController")
-                    CallKitManager.shared.ringTimeout()
-                    self.dismiss(animated: true, completion: nil)
-                }
-            }
-        }
+        
         if let call = CallKitManager.shared.callInfo, timerIdentify == "call-\(call.channelName)-answering-timer" {
             self.updateSeconds(seconds: Int(seconds))
         }

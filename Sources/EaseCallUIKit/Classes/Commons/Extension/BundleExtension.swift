@@ -21,9 +21,12 @@ public extension Bundle {
      This computed property returns the ChatroomResourceBundle. If the ChatroomResourceBundle is already initialized, it returns the existing instance. Otherwise, it initializes the ChatroomResourceBundle with the path of the "ChatRoomResource.bundle" file in the main bundle. If the bundle is not found, it returns the main bundle.
      */
     class var callBundle: Bundle {
-        if CallResourceBundle != nil {
-            return CallResourceBundle!
-        }
+        if CallAppearance.resourceBundle != nil {
+            return CallAppearance.resourceBundle!
+        } else {
+            if CallResourceBundle != nil {
+                return CallResourceBundle!
+            }
 #if COCOAPODS
         return Bundle(for: CallAppearance.self)
     .url(forResource: "CallResource", withExtension: "bundle")
@@ -35,7 +38,9 @@ public extension Bundle {
     .url(forResource: "CallResource", withExtension: "bundle")
     .flatMap(Bundle.init(url:))!
 #else
-        return Bundle(for: Appearance.self)
+        return Bundle(for: CallAppearance.self)
 #endif
+        }
     }
 }
+

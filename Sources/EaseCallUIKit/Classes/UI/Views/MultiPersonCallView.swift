@@ -16,37 +16,23 @@ public class MultiPersonCallView: UIView {
     
     override init(frame: CGRect) {
         super.init(frame: frame)
-        backgroundColor = UIColor.black
         setupViews()
     }
     
     required init?(coder: NSCoder) {
         super.init(coder: coder)
-        backgroundColor = UIColor.black
     }
     
     // MARK: - Public Methods
     func updateWithItems(_ removeUsers: [String] = []) {
         
         // 更新 items cache
-        let items = CallKitManager.shared.itemsCache.values.sorted { $0.index > $1.index }
-        for item in items {
-            CallKitManager.shared.itemsCache[item.userId] = item
-        }
+//        let items = CallKitManager.shared.itemsCache.values.sorted { $0.index > $1.index }
 
         // 1. 找出所有需要删除的视图
-        var viewsInMainView: [CallStreamView] = []
         var viewsInScrollView: [CallStreamView] = []
         let currentUserIds = Set(CallKitManager.shared.itemsCache.keys)
-        
-        // 检查主视图中的 CallStreamView
-        for subview in subviews {
-            if let streamView = subview as? CallStreamView {
-                if !currentUserIds.contains(streamView.item.userId) {
-                    viewsInMainView.append(streamView)
-                }
-            }
-        }
+
         
         // 检查 scrollView 中的 CallStreamView
         if let scrollView = scrollView {
@@ -59,11 +45,13 @@ public class MultiPersonCallView: UIView {
             }
         }
         
-        // 如果没有需要删除的视图，检查是否需要添加新视图
+        // 修改这里的逻辑：只有在确实需要删除用户或者需要重新布局时才调用setupViews
         if removeUsers.isEmpty {
+            // 检查是否有新用户需要添加视图
             setupViews()
             return
         }
+        
         var viewsToRemove: [CallStreamView] = []
         // 2. 判断删除逻辑
         for user in removeUsers {
@@ -80,8 +68,9 @@ public class MultiPersonCallView: UIView {
             // 在展开状态下删除非展开视图
             animateRemovalInExpandedState(viewsToRemove: viewsToRemove, viewsInScrollView: viewsInScrollView)
         } else {
+            viewsToRemove.forEach { $0.removeFromSuperview() }
             // 在常规状态下删除视图
-            animateRemovalInNormalState(viewsToRemove: viewsToRemove)
+            self.setupViews()
         }
         // 不在这里单独设置 displayMode，使用统一方法
         updateAllDisplayModes()
@@ -234,27 +223,6 @@ public class MultiPersonCallView: UIView {
         })
     }
 
-    private func animateRemovalInNormalState(viewsToRemove: [CallStreamView]) {
-        // 从 canvasCache 中移除
-        for view in viewsToRemove {
-            CallKitManager.shared.canvasCache.removeValue(forKey: view.item.userId)
-        }
-        
-        // 淡出动画
-        UIView.animate(withDuration: 0.3, animations: {
-            for view in viewsToRemove {
-                view.alpha = 0
-                view.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
-            }
-        }, completion: { _ in
-            for view in viewsToRemove {
-                view.removeFromSuperview()
-            }
-            
-            // 重新布局剩余的视图
-            self.layoutItemsForNormalState()
-        })
-    }
 
     // 更新 scrollView 中的内容布局
     private func updateScrollViewContent() {
@@ -314,38 +282,28 @@ public class MultiPersonCallView: UIView {
                 streamView.removeFromSuperview()
             }
         }
+        for streamView in CallKitManager.shared.canvasCache.values {
+            streamView.removeFromSuperview()
+        }
         scrollView?.removeFromSuperview()
         scrollView = nil
-        NSLayoutConstraint.deactivate(activeConstraints)
-        activeConstraints.removeAll()
         
-        // Create new item views
-        let items = CallKitManager.shared.itemsCache.values.sorted { $0.index < $1.index }
-        for item in items {
-            let itemView = CallKitManager.shared.canvasCache[item.userId] ?? CallStreamView(item: item)
-            if items.count > 6 {
-                itemView.displayMode = .buttonsOnly
-            } else {
-                if ScreenHeight/ScreenWidth > 1.8,items.count <= 4 {
-                    itemView.displayMode = .all
-                } else {
-                    itemView.displayMode = .buttonsOnly
-                }
-            }
-            itemView.onTap = { [weak self] tappedView in
-                self?.handleItemTap(tappedView)
-            }
-            itemView.onPinchToShrink = { [weak self] view in
-                self?.handlePinchToShrink(view)
-            }
-            itemView.translatesAutoresizingMaskIntoConstraints = false
-            itemView.ensureVisible()
-            addSubview(itemView)
-            
-        }
+        self.addGestureHandlers()
         layoutItemsForNormalState()
         updateAllDisplayModes()
 
+    }
+    
+    private func addGestureHandlers() {
+        for canvas in CallKitManager.shared.canvasCache.values {
+            canvas.onTap = { [weak self] tappedView in
+                self?.handleItemTap(tappedView)
+            }
+            canvas.onPinchToShrink = { [weak self] view in
+                self?.handlePinchToShrink(view)
+            }
+            canvas.translatesAutoresizingMaskIntoConstraints = false
+        }
     }
     
     private func updateAllDisplayModes() {
@@ -357,9 +315,18 @@ public class MultiPersonCallView: UIView {
             }
         } else {
             for view in itemViews {
-                view.displayMode = totalCount > 6 ? .buttonsOnly:.all
+                if totalCount > 6 {
+                    view.displayMode = .buttonsOnly
+                } else {
+                    if ScreenHeight/ScreenWidth > 1.8,totalCount <= 4 {
+                        view.displayMode = .all
+                    } else {
+                        view.displayMode = .buttonsOnly
+                    }
+                }
             }
         }
+        self.addGestureHandlers()
     }
     
     private func handleItemTap(_ tappedView: CallStreamView) {
@@ -450,7 +417,6 @@ public class MultiPersonCallView: UIView {
                 view.widthAnchor.constraint(equalToConstant: size),
                 view.heightAnchor.constraint(equalToConstant: size)
             ]
-            
         case 2:
             // Two views - side by side squares
             let maxSize = min((availableWidth - padding) / 2, availableHeight, 250)
@@ -855,12 +821,10 @@ extension MultiPersonCallView {
         for view in CallKitManager.shared.canvasCache.values {
             view.displayMode = (view == viewToExpand ? .all:.hidden)
             view.item.isExpanded = view == viewToExpand
-            if let userInfo = CallKitManager.shared.getUserInfo(userId: viewToExpand.item.userId) {
-                if viewToExpand.item.userId == userInfo.userAccount {
-                    CallKitManager.shared.engine?.setRemoteVideoStream(userInfo.uid, type: .high)
-                } else {
-                    CallKitManager.shared.engine?.setRemoteVideoStream(userInfo.uid, type: CallKitManager.shared.getStreamRenderQuality(with: UInt(CallKitManager.shared.canvasCache.count)))
-                }
+            if viewToExpand.item.userId == view.item.userId {
+                CallKitManager.shared.engine?.setRemoteVideoStream(UInt(view.item.uid), type: .high)
+            } else {
+                CallKitManager.shared.engine?.setRemoteVideoStream(UInt(view.item.uid), type: CallKitManager.shared.getStreamRenderQuality(with: UInt(CallKitManager.shared.canvasCache.count)))
             }
         }
         
@@ -976,17 +940,17 @@ extension MultiPersonCallView {
 extension MultiPersonCallView {
     
     private func switchExpandedViewWithSmartSpace(from oldView: CallStreamView, to newView: CallStreamView) {
-        // 1. 记录初始状态
+        // 1. Record position of oldView
         let oldExpandedFrame = oldView.frame
         
-        // 2. 获取 newView 在 scrollView 中的位置
+        // 2. Get position of newView
         var newThumbnailFrame: CGRect = .zero
         var newViewOriginalIndex: Int = -1
         
         if let scrollView = scrollView, newView.superview == scrollView {
             newThumbnailFrame = scrollView.convert(newView.frame, to: self)
             
-            // 找出 newView 在 scrollView 中的索引位置
+            // Find the original index of newView in scrollView
             let sortedViews = scrollView.subviews.compactMap { $0 as? CallStreamView }
                 .sorted { $0.item.index < $1.item.index }
             newViewOriginalIndex = sortedViews.firstIndex(of: newView) ?? -1
@@ -995,36 +959,30 @@ extension MultiPersonCallView {
         }
         for view in CallKitManager.shared.canvasCache.values {
             view.displayMode = (view == newView ? .all:.hidden)
-            if let userInfo = CallKitManager.shared.getUserInfo(userId: newView.item.userId) {
-                if newView.item.userId == userInfo.userAccount {
-                    CallKitManager.shared.engine?.setRemoteVideoStream(userInfo.uid, type: .high)
-                } else {
-                    CallKitManager.shared.engine?.setRemoteVideoStream(userInfo.uid, type: CallKitManager.shared.getStreamRenderQuality(with: UInt(CallKitManager.shared.canvasCache.count)))
-                }
+            if newView.item.userId == view.item.userId {
+                CallKitManager.shared.engine?.setRemoteVideoStream(UInt(view.item.uid), type: .high)
+            } else {
+                CallKitManager.shared.engine?.setRemoteVideoStream(UInt(view.item.uid), type: CallKitManager.shared.getStreamRenderQuality(with: UInt(CallKitManager.shared.canvasCache.count)))
             }
         }
-        // 更新状态
+        // update expanded view
         expandedView = newView
         oldView.item.isExpanded = false
         newView.item.isExpanded = true
         
-        // 4. 将 newView 移到主视图
+        // 4. Move newView to the main view if it's in scrollView
         if newView.superview == scrollView {
             newView.removeFromSuperview()
             addSubview(newView)
-            //TODO: - 重新设置渲染放大的view的流为高
-            if let userInfo = CallKitManager.shared.getUserInfo(userId: newView.item.userId) {
-                
-            }
             newView.frame = newThumbnailFrame
         }
         
-        // 5. 计算 oldView 要返回的位置
+        // 5. Calculate the target position for oldView
         let oldViewIndex = oldView.item.index
         var oldViewTargetPosition: Int = 0
         var needsSpaceAnimation = true
         
-        // 计算 oldView 在 scrollView 中应该插入的位置
+        // Calculate the target position for oldView in scrollView
         if let scrollView = scrollView {
             let existingViews = scrollView.subviews.compactMap { $0 as? CallStreamView }
                 .sorted { $0.item.index < $1.item.index }
@@ -1035,38 +993,38 @@ extension MultiPersonCallView {
                 }
             }
             
-            // 判断是否需要空间动画
-            let totalPositions = existingViews.count + 1 // 加上即将回来的 oldView
+            // Whether we need space animation depends on the target position
+            let totalPositions = existingViews.count + 1 // Add going back old view
             if oldViewTargetPosition == totalPositions - 1 {
-                // oldView 要回到最右边，不需要移动其他视图
+                // oldView will be the last one, no need for space animation
                 needsSpaceAnimation = false
             }
         }
         
-        // 6. 准备空间腾挪动画
+        // 6. Ready for move view animation
         var viewsToMove: [(view: CallStreamView, startX: CGFloat, endX: CGFloat)] = []
         let thumbnailSize: CGFloat = 72
         let thumbnailSpacing: CGFloat = 6
         let padding: CGFloat = 12
         
         if let scrollView = scrollView, needsSpaceAnimation {
-            // 获取当前所有缩略图
+            // Get the current stream views in scrollView
             let currentViews = scrollView.subviews.compactMap { $0 as? CallStreamView }
                 .sorted { $0.item.index < $1.item.index }
             
-            // 记录当前位置
+            // Record the current positions of all views
             for (index, view) in currentViews.enumerated() {
                 let currentX = view.frame.origin.x
                 var targetX = currentX
                 
                 if oldViewTargetPosition == 0 {
-                    // oldView 要回到最左边，所有视图都要右移
+                    // oldView will be the first, all views need to move right
                     targetX = padding + CGFloat(index + 1) * (thumbnailSize + thumbnailSpacing)
                 } else if index >= oldViewTargetPosition {
-                    // oldView 要回到中间，只有它右边的视图需要右移
+                    // oldView will be the middle, shift views to the right
                     targetX = padding + CGFloat(index + 1) * (thumbnailSize + thumbnailSpacing)
                 } else {
-                    // 左边的视图保持不动
+                    // The views before oldView stay in place
                     targetX = padding + CGFloat(index) * (thumbnailSize + thumbnailSpacing)
                 }
                 

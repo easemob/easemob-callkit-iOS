@@ -75,7 +75,7 @@ public class Call1v1BottomView: UIView {
     private lazy var speakerButton: CallButtonView = {
         let button = createCallButton(
             data: CallButtonData(
-                title: "Speaker on",
+                title: "Speaker on".call.localize,
                 imageName: "speaker_on",
                 selectedImageName: "speaker_off",
                 color: nil,
@@ -90,7 +90,7 @@ public class Call1v1BottomView: UIView {
         let button = createCallButton(
             data: CallButtonData(
                 title: "End".call.localize,
-                imageName: "phone_hang",
+                imageName: "phone_end",
                 selectedImageName: "",
                 color: UIColor.callTheme.errorColor7
             ),
@@ -120,11 +120,13 @@ public class Call1v1BottomView: UIView {
     private func createCallButton(data: CallButtonData, tag: Int) -> CallButtonView {
         var buttonAllowSelection = true
         var buttonSize = CGSize(width: 50, height: 82)
+        var space = CGFloat(4)
         if tag == declineTag || tag == hangupTag || tag == acceptTag {
             buttonSize = CGSize(width: 70, height: 96)
             buttonAllowSelection = false
+            space = 12
         }
-        let button = CallButtonView(frame: CGRect(origin: .zero, size: buttonSize))
+        let button = CallButtonView(frame: CGRect(origin: .zero, size: buttonSize),iconTitleSpace: space)
         button.allowSelection = buttonAllowSelection
         button.configure(data: data)
         button.translatesAutoresizingMaskIntoConstraints = false

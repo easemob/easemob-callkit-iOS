@@ -8,9 +8,8 @@
 import Foundation
 
 // Profile of the EaseCallUIKit display needed.
-@objc public protocol CallUserProfileProtocol: NSObjectProtocol {
+@objc public protocol CallProfileProtocol: NSObjectProtocol {
     var id: String {set get}
-    var remark: String {set get}
     var selected: Bool {set get}
     var nickname: String {set get}
     var avatarURL: String {set get}
@@ -18,8 +17,7 @@ import Foundation
     func toJsonObject() -> Dictionary<String,Any>?
 }
 
-@objcMembers open class CallUserProfile:NSObject, CallUserProfileProtocol {
-    public var remark: String = ""
+@objcMembers open class CallUserProfile:NSObject, CallProfileProtocol {
     
     public func toJsonObject() -> Dictionary<String, Any>? {
         [kUserInfo:["nickname":self.nickname,"avatarURL":self.avatarURL,"userId":self.id]]
@@ -33,14 +31,6 @@ import Foundation
     public var nickname: String = ""
         
     public var selected: Bool = false
-    
-    public var modifyTime: Int64 = 0
-    
-    public var videoEnabled: Bool = false
-    
-    public var audioEnabled: Bool = false
-    
-    public var isTalking: Bool = false
     
     public override func setValue(_ value: Any?, forUndefinedKey key: String) {
         

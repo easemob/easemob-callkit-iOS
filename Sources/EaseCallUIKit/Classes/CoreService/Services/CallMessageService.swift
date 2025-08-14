@@ -6,11 +6,12 @@
 //
 
 import Foundation
+import AgoraRtcKit
 
 @objc public enum CallType: UInt {
     case singleAudio// 单音频通话
     case singleVideo// 单视频通话
-    case multiCall// 多音频视频通话
+    case groupCall// 群组音频视频通话
 }
 
 @objc public enum CallState: UInt {
@@ -25,6 +26,7 @@ import Foundation
     case cancel // 取消呼叫
     case remoteCancel // 对方取消呼叫
     case refuse // 对方拒绝呼叫
+    case remoteRefuse // 对方拒绝呼叫
     case busy // 忙碌
     case noResponse // 无响应
     case remoteNoResponse // 对方无响应
@@ -32,23 +34,6 @@ import Foundation
     case abnormalEnd // 异常结束
 }
 
-@objc public class CallError: NSError,@unchecked Sendable {
-    @objc public static let domain = "com.easeui.call.error"
-    
-    @objc public static func error(code: Int, message: String) -> CallError {
-        return CallError(domain: CallError.domain, code: code, userInfo: [NSLocalizedDescriptionKey: message])
-    }
-}
-
-@objc public class CallResult: NSObject,@unchecked Sendable {
-    @objc public let callId: String // 通话ID
-    @objc public var callError: CallError? = nil
-    
-    @objc public init(callId: String, error: CallError? = nil) {
-        self.callId = callId
-        self.callError = error
-    }
-}
 
 @objc public class CallInfo: NSObject,@unchecked Sendable {
     @objc public var callId: String // 通话ID
@@ -64,14 +49,14 @@ import Foundation
     @objc public var groupName: String? // 群组名称（如果是群组通话）
     @objc public var groupAvatar: String? // 群组头像（如果是群组通话）
     @objc public var duration: UInt = 0 // 通话时长，默认为0
-    @objc public var inviteMessageId: String = "" // 邀请通话时的消息ID
+    @objc public var inviteMessage: ChatMessage? // 邀请通话时的消息ID  消息对象
     
-    @objc public init(callId: String, callerId: String, callerDeviceId: String, channelName: String, type: CallType, startMessageId: String, extensionInfo: [String: Any]? = nil) {
+    @objc public init(callId: String, callerId: String, callerDeviceId: String, channelName: String, type: CallType, startMessageId: String = "", extensionInfo: [String: Any]? = nil) {
         self.callId = callId
         self.callerId = callerId
         self.callerDeviceId = callerDeviceId
         self.channelName = channelName
-        self.inviteMessageId = startMessageId
+        self.inviteMessage = ChatClient.shared().chatManager?.getMessageWithMessageId(startMessageId)
         self.type = type
         self.extensionInfo = extensionInfo
     }
@@ -98,10 +83,8 @@ import Foundation
     /// Initiates a multi-user call with the specified user IDs and group ID.
     /// - Parameters:
     ///   - groupId: The ID of the group to call.
-    ///   - groupName: Optional name of the group for display purposes.
-    ///   - groupAvatar: Optional avatar URL or image for the group.
     ///   - extensionInfo: Optional additional information to include with the call, such as custom data or metadata.
-    func groupCall(groupId: String, groupName: String?,groupAvatar: String?, extensionInfo: [String : Any]?)
+    func groupCall(groupId: String, extensionInfo: [String : Any]?)
     
     /// Hangs up the current call.
     @objc func hangup()
@@ -111,7 +94,7 @@ import Foundation
     @objc func accept()
 }
 
-@objc protocol CallServiceAction: NSObjectProtocol {
+@objc protocol CallActionService: NSObjectProtocol {
     
     /// Switches the camera for video calls.
     /// This method is typically used to toggle between the front and rear cameras during a video call.
@@ -119,10 +102,6 @@ import Foundation
     
     /// Rejects an incoming call.
     @objc func turnSpeakerOn(on: Bool)
-
-//    @objc func setupLocalVideo()
-//    @objc func setupRemoteVideo(uid: UInt)
-//    @objc func joinChannel()
     
     /// Enables or disables local audio for the call.
     /// - Parameter enable: A Boolean value indicating whether to enable (`true`) or disable (`false`) local audio.
@@ -135,25 +114,40 @@ import Foundation
 
 @objc public protocol CallServiceListener: NSObjectProtocol {
     
-    
     /// Called when a call is received.
     /// - Parameter error: An optional error object providing additional information about the call, if applicable.``CallError``
-    @objc optional func didOccurError(_ error: CallError)
+    @objc optional func didOccurError(error: CallError)
     
-    /// Called when a call is answered.
+    /// Called when a remote user joins the call.
     /// - Parameters:
-    ///   - callId: The ID of the call that was answered.
-    ///   - endReason: The reason for ending the call, such as hangup, cancel, or remote cancel.``CallEndReason``
-    ///   - error: An optional error object providing additional information about the call end, if applicable.``CallError``
-    ///   - duration: The duration of the call in seconds. Defaults to 0.
-    @objc optional func didEndCall(callId: String, endReason: CallEndReason, error: CallError?,duration: UInt)
+    ///   - userId: The ID of the remote user who joined the call.
+    ///   - channelName: The name of the channel where the call is taking place.
+    ///   - type: The type of call that the remote user joined, such as single audio or single video.``CallType``
+    @objc optional func remoteUserDidJoined(userId: String, channelName: String, type: CallType)
     
-    @objc optional func remoteUserDidJoined(item: CallStreamItem)
+    /// Called when a remote user leaves the call.
+    /// - Parameters:
+    ///   - userId: The ID of the remote user who left the call.
+    ///   - channelName: The name of the channel where the call is taking place.
+    ///   - type: The type of call that the remote user left, such as single audio or single video.``CallType``
+    @objc optional func remoteUserDidLeft(userId: String, channelName: String, type: CallType)
     
-    @objc optional func remoteUserDidLeft(userId: String)
+    /// Called when a call is ended.
+    /// - Parameter reason: The reason for ending the call, such as hangup, cancel, or remote cancel.``CallEndReason``
+    /// - Parameter info: Additional information about the call, such as the call ID, caller ID, and channel name.``CallInfo``
+    @objc optional func didUpdateCallEndReason(reason: CallEndReason,info: CallInfo)
     
-    @objc optional func didUpdateCallEndReason(message: ChatMessage)
-
+    /// Called when a call is connected.
+    /// - Parameter engine: The AgoraRtcEngineKit instance used for the call.
+    @objc optional func onRtcEngineCreated(engine: AgoraRtcEngineKit?)
+    
+    /// Called when a call is received.
+    /// - Parameters:
+    ///   - callType: The type of call that was received, such as single audio or single video.``CallType``
+    ///   - userId: The ID of the user who initiated the call.
+    ///   - extensionInfo: Optional additional information about the call, such as custom data or metadata.
+    @objc optional func onReceivedCall(callType: CallType, userId: String, extensionInfo: [String:Any]?)
+    
 }
 
 @objc public protocol TimerServiceListener: NSObjectProtocol {
@@ -171,20 +165,17 @@ import Foundation
     /// - Parameters:
     ///   - listener: An object conforming to the ``TimerServiceListener`` protocol that will receive timer events.
     ///   - timerIdentify: A unique identifier for the timer, used to distinguish between different timers.
-    func replaceTimer(_ listener: TimerServiceListener,
-                      timerIdentify: String)
+    func replaceTimer(_ listener: TimerServiceListener,timerIdentify: String)
     
     /// Adds a listener to receive timer-related events.
     /// - Parameter listener: An object conforming to the ``TimerServiceListener`` protocol that will receive timer events.
     /// - Parameter timerIdentify: A unique identifier for the timer, used to distinguish between different timers.
-    func registerListener(_ listener: TimerServiceListener,
-                          timerIdentify: String)
+    func registerListener(_ listener: TimerServiceListener,timerIdentify: String)
     
     /// Removes a previously added listener from receiving timer-related events.
     /// - Parameter listener: An object conforming to the ``TimerServiceListener`` protocol that will no longer receive timer events.
     /// - Parameter timerIdentify: A unique identifier for the timer, used to distinguish between different timers. 
-    func removeListener(_ listener: TimerServiceListener,
-                        timerIdentify: String)
+    func removeListener(_ listener: TimerServiceListener, timerIdentify: String)
     
 }
 

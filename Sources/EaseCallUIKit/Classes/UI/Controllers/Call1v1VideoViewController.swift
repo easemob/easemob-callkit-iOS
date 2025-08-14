@@ -13,7 +13,7 @@ open class Call1v1VideoViewController: UIViewController {
     // 添加属性来控制是否使用自定义转场
     private var useCustomDismissTransition = false
     
-    // 添加标记来跟踪PiP状态
+    // 添加标记来跟踪PIP状态
     private var isPIPActive = false
     private var isRestoring = false
     
@@ -23,7 +23,7 @@ open class Call1v1VideoViewController: UIViewController {
     
     public lazy var background: UIImageView = {
         let imageView = UIImageView(frame: self.view.bounds).contentMode(.scaleAspectFill).isUserInteractionEnabled(true).tag(1001)
-        imageView.image = UIImage(named: "bg",in: .callBundle,with: nil)
+        imageView.image = CallAppearance.backgroundImage
         return imageView
     }()
     
@@ -61,26 +61,7 @@ open class Call1v1VideoViewController: UIViewController {
         let bigView = PixelBufferRenderView(frame: self.view.bounds).tag(localStreamTag).backgroundColor(.clear).cornerRadius(12)
         bigView.dragEnable = false
         bigView.clickDragViewBlock = { [weak self] dragView in
-            guard let `self` = self,CallKitManager.shared.isVideoExchanged else { return }
-//            consoleLogInfo("click big view exchange stream:\(CallKitManager.shared.exchangeVideoFrame())", type: .debug)
-            CallKitManager.shared.isVideoExchanged = false
-            self.floatView.frame = dragView.frame
-            self.floatView.dragEnable = true
-            self.floatView.isKeepBounds = true
-            self.floatView.freeRect = CGRect(x: 12, y: NavigationHeight+12, width: ScreenWidth - 24, height: ScreenHeight-NavigationHeight-BottomBarHeight-12-96-16)
-            dragView.frame = self.view.bounds
-            dragView.dragEnable = false
-            dragView.isKeepBounds = false
-            self.background.sendSubviewToBack(self.callView)
-            self.background.bringSubviewToFront(self.floatView)
-            self.floatView.isUserInteractionEnabled = true
-            self.callView.isUserInteractionEnabled = false
-            self.floatView.micView.isHidden = false
-            self.callView.micView.isHidden = true
-            self.micView.isHidden = true
-            self.floatView.updateAudioState(self.floatView.isAudioMuted)
-            self.floatView.blurEffectView.isHidden = true
-            self.callView.blurEffectView.isHidden = false
+            self?.callViewClicked(dragView: dragView)
         }
         return bigView
     }()
@@ -91,24 +72,7 @@ open class Call1v1VideoViewController: UIViewController {
         drag.freeRect = CGRect(x: 12, y: NavigationHeight+12, width: ScreenWidth - 24, height: ScreenHeight-NavigationHeight-BottomBarHeight-12-96-16)
         drag.isKeepBounds = true
         drag.clickDragViewBlock = { [weak self] dragView in
-            guard let `self` = self,!CallKitManager.shared.isVideoExchanged else { return }
-            CallKitManager.shared.isVideoExchanged = true
-            self.callView.frame = dragView.frame
-            self.callView.dragEnable = true
-            self.callView.isKeepBounds = true
-            self.callView.freeRect = CGRect(x: 12, y: NavigationHeight+12, width: ScreenWidth - 24, height: ScreenHeight-NavigationHeight-BottomBarHeight-12-96-16)
-            dragView.frame = self.view.bounds
-            dragView.dragEnable = false
-            dragView.isKeepBounds = false
-            self.background.sendSubviewToBack(self.floatView)
-            self.background.bringSubviewToFront(self.callView)
-            self.floatView.isUserInteractionEnabled = false
-            self.callView.isUserInteractionEnabled = true
-            self.floatView.micView.isHidden = true
-            self.callView.micView.isHidden = true
-            self.micView.isHidden = !self.floatView.isAudioMuted
-            self.floatView.blurEffectView.isHidden = false
-            self.callView.blurEffectView.isHidden = true
+            self?.floatViewClicked(dragView: dragView)
         }
         return drag
     }()
@@ -124,6 +88,8 @@ open class Call1v1VideoViewController: UIViewController {
     
     /// Video container view for Picture-in-Picture
     public internal(set) var videoCallbackController: AVPictureInPictureVideoCallViewController?
+    
+    var firstRemoteVideoAppeared = false
         
     @objc public init(role: CallRole) {
         self.role = role
@@ -135,32 +101,48 @@ open class Call1v1VideoViewController: UIViewController {
         fatalError("init(coder:) has not been implemented")
     }
     
+    public override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+    }
+    
+    open override func viewIsAppearing(_ animated: Bool) {
+        super.viewIsAppearing(animated)
+        consoleLogInfo("Call1v1VideoViewController viewIsAppearing role:\(self.role)", type: .debug)
+    }
+    
     open override func viewDidLoad() {
         super.viewDidLoad()
         setupViews()
         
         if self.connected {
-            if let call = CallKitManager.shared.callInfo {
-                GlobalTimerManager.shared.registerListener(self, timerIdentify: "call-\(call.channelName)-answering-timer")
-                GlobalTimerManager.shared.registerListener(CallKitManager.shared, timerIdentify: "call-\(call.channelName)-answering-timer")
+            if let call = CallKitManager.shared.callInfo,call.state == .answering {
+                self.addCallTimer()
             }
         }
         self.setupNavigationState()
-        if let showUserId = (self.role == .caller ? CallKitManager.shared.callInfo?.calleeId : CallKitManager.shared.callInfo?.callerId) {
-            let username = CallKitManager.shared.usersCache[showUserId]?.nickname ?? showUserId
-            let avatarURL = CallKitManager.shared.usersCache[showUserId]?.avatarURL
-            self.navigationBar.title = username
-            self.navigationBar.avatarURL = avatarURL
+        
+        var showUserId = (self.role == .caller ? CallKitManager.shared.callInfo?.calleeId : CallKitManager.shared.callInfo?.callerId) ?? ""
+        if showUserId.isEmpty {
+            showUserId = CallKitManager.shared.callInfo?.inviteMessage?.from ?? showUserId
         }
+        let username = CallKitManager.shared.usersCache[showUserId]?.nickname ?? ""
+        let avatarURL = CallKitManager.shared.usersCache[showUserId]?.avatarURL
+        self.navigationBar.title = username.isEmpty ? showUserId:username
+        self.navigationBar.avatarURL = avatarURL
         self.navigationBar.clickClosure = { [weak self] in
             self?.navigationClick(type: $0, indexPath: $1)
         }
         self.bottomView.didTapButton = { [weak self] in
             self?.bottomClick(type: $0)
         }
-        if CallKitManager.shared.enablePIPOn1V1VideoScene {
+        if CallKitManager.shared.config.enablePIPOn1V1VideoScene {
             self.configPIPViewController()
         }
+        //When the app goes to background, pop the view controller
+        NotificationCenter.default.addObserver(forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.pop()
+        }
+        self.floatView.updateVideoState(true)
     }
     
     private func setupNavigationState() {
@@ -176,9 +158,6 @@ open class Call1v1VideoViewController: UIViewController {
                     }
                 case .answering:
                     self.navigationBar.subtitle = "Connecting".call.localize
-                    if let call = CallKitManager.shared.callInfo {
-                        GlobalTimerManager.shared.registerListener(self, timerIdentify: "call-\(call.channelName)-answering-timer")
-                    }
                 default:
                     break
                 }
@@ -204,6 +183,50 @@ open class Call1v1VideoViewController: UIViewController {
         self.background.bringSubviewToFront(self.floatView)
     }
     
+    func callViewClicked(dragView: DragFloatView) {
+        guard CallKitManager.shared.isVideoExchanged else { return }
+//            consoleLogInfo("click big view exchange stream:\(CallKitManager.shared.exchangeVideoFrame())", type: .debug)
+        CallKitManager.shared.isVideoExchanged = false
+        self.floatView.frame = dragView.frame
+        self.floatView.dragEnable = true
+        self.floatView.isKeepBounds = true
+        self.floatView.freeRect = CGRect(x: 12, y: NavigationHeight+12, width: ScreenWidth - 24, height: ScreenHeight-NavigationHeight-BottomBarHeight-12-96-16)
+        dragView.frame = self.view.bounds
+        dragView.dragEnable = false
+        dragView.isKeepBounds = false
+        self.background.sendSubviewToBack(self.callView)
+        self.background.bringSubviewToFront(self.floatView)
+        self.floatView.isUserInteractionEnabled = true
+        self.callView.isUserInteractionEnabled = false
+        self.floatView.micView.isHidden = false
+        self.callView.micView.isHidden = true
+        self.micView.isHidden = true
+        self.floatView.updateAudioState(self.floatView.isAudioMuted)
+        self.floatView.blurEffectView.isHidden = true
+        self.callView.blurEffectView.isHidden = false
+    }
+    
+    func floatViewClicked(dragView: DragFloatView) {
+        guard !CallKitManager.shared.isVideoExchanged else { return }
+        CallKitManager.shared.isVideoExchanged = true
+        self.callView.frame = dragView.frame
+        self.callView.dragEnable = true
+        self.callView.isKeepBounds = true
+        self.callView.freeRect = CGRect(x: 12, y: NavigationHeight+12, width: ScreenWidth - 24, height: ScreenHeight-NavigationHeight-BottomBarHeight-12-96-16)
+        dragView.frame = self.view.bounds
+        dragView.dragEnable = false
+        dragView.isKeepBounds = false
+        self.background.sendSubviewToBack(self.floatView)
+        self.background.bringSubviewToFront(self.callView)
+        self.floatView.isUserInteractionEnabled = false
+        self.callView.isUserInteractionEnabled = true
+        self.floatView.micView.isHidden = true
+        self.callView.micView.isHidden = true
+        self.micView.isHidden = !self.floatView.isAudioMuted
+        self.floatView.blurEffectView.isHidden = false
+        self.callView.blurEffectView.isHidden = true
+    }
+    
     // 新增：确保floatView正确显示
     func ensureFloatViewVisible() {
         // 移除所有约束
@@ -224,7 +247,7 @@ open class Call1v1VideoViewController: UIViewController {
     
     @objc open func navigationClick(type: ChatNavigationBarClickEvent,indexPath: IndexPath?) {
         switch type {
-        case .back: self.pop()
+        case .back,.title,.subtitle: self.pop()
         default:
             break
         }
@@ -257,10 +280,7 @@ open class Call1v1VideoViewController: UIViewController {
             self.dismiss(animated: true)
         case .accept:
             CallKitManager.shared.accept()
-            if let call = CallKitManager.shared.callInfo {
-                GlobalTimerManager.shared.registerListener(self, timerIdentify: "call-\(call.channelName)-answering-timer")
-                GlobalTimerManager.shared.registerListener(CallKitManager.shared, timerIdentify: "call-\(call.channelName)-answering-timer")
-            }
+            self.addCallTimer()
         case .end:
             handleCallEnd()
             self.dismiss(animated: true)
@@ -288,40 +308,46 @@ open class Call1v1VideoViewController: UIViewController {
     
     // Alternative approach: Modify the pop() function to trigger custom animation before PiP
     @objc open func pop() {
-        if CallKitManager.shared.enablePIPOn1V1VideoScene {
+        if CallKitManager.shared.config.enablePIPOn1V1VideoScene {
+            if #available(iOS 17.4, *),CallKitManager.shared.config.enableVOIP {
+                LiveCommunicationManager.shared.endCall()
+            }
             // If PiP is not active, prepare to enter PiP mode
             let state = CallKitManager.shared.callInfo?.state ?? .idle
-            if !isPIPActive,state == .answering {
-                if self.navigationController != nil {
-                    self.navigationController?.popViewController(animated: true)
-                } else {
-                    // Save current instance to CallKitManager
-                    if CallKitManager.shared.callVC == nil {
-                        CallKitManager.shared.showPIP(vc: self)
-                    }
-                    if CallKitManager.shared.isVideoExchanged {
-                        CallKitManager.shared.isVideoExchanged = false
-                    }
-                    
-                    // Configure transition delegate before starting PiP
-                    self.configurePIPTransition()
-                    
-                    // Create a snapshot of current view for animation.由于不知道画中画的位置变动，只要有变动这个缩小转场动画就会有问题
-//                    createSnapshotAndAnimateToPiP {
-//                        // Start PiP after animation completes
-//                    }
-                    self.pipAction(true)
-                }
-            } else {
-                // Non-PiP dismissal logic remains the same
-                if self.navigationController != nil {
-                    self.navigationController?.popViewController(animated: true)
-                } else {
-                    if CallKitManager.shared.callVC == nil {
-                        self.dismiss(animated: false)
-                        CallKitManager.shared.showMiniAudioView(vc: self)
+            if !isPIPActive {
+                if state == .answering {
+                    if self.navigationController != nil {
+                        self.navigationController?.popViewController(animated: true)
                     } else {
-                        self.dismiss(animated: true)
+                        // Save current instance to CallKitManager
+                        if CallKitManager.shared.callVC == nil {
+                            CallKitManager.shared.showPIP(vc: self)
+                        }
+                        if CallKitManager.shared.isVideoExchanged {//产品协商后画中画是preview对方流而不是自己流，所以开启画中画时默认preview远端流view也就是floatView
+                            CallKitManager.shared.isVideoExchanged = false
+                        }
+                        
+                        // Configure transition delegate before starting PiP
+                        self.configurePIPTransition()
+                        
+                        // Create a snapshot of current view for animation.由于不知道画中画的位置变动，只要有变动这个缩小转场动画就会有问题
+                        //                    createSnapshotAndAnimateToPiP {
+                        //                        // Start PiP after animation completes
+                        //                    }
+                        self.pipAction(true)
+                    }
+                }
+                if state == .dialing || state == .ringing {
+                    // Non-PiP dismissal logic remains the same
+                    if self.navigationController != nil {
+                        self.navigationController?.popViewController(animated: true)
+                    } else {
+                        if CallKitManager.shared.callVC == nil {
+                            self.dismiss(animated: false)
+                            CallKitManager.shared.showMiniAudioView(vc: self)
+                        } else {
+                            self.dismiss(animated: true)
+                        }
                     }
                 }
             }
@@ -456,9 +482,13 @@ open class Call1v1VideoViewController: UIViewController {
         }
     }
     
+    open override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+    }
+    
     deinit {
         // 清理资源
-        if CallKitManager.shared.enablePIPOn1V1VideoScene {
+        if CallKitManager.shared.config.enablePIPOn1V1VideoScene {
             releaseActiveVideoCallSourceView()
         }
     }
@@ -468,6 +498,7 @@ extension Call1v1VideoViewController: TimerServiceListener {
     public func timeChanged(_ timerIdentify: String, interval seconds: UInt) {
         if let call = CallKitManager.shared.callInfo, timerIdentify == "call-\(call.channelName)-answering-timer" {
             self.updateSeconds(seconds: Int(seconds))
+            FloatingAudioView.getFloatingView()?.updateSeconds(seconds: Int(seconds))
         }
     }
     
@@ -484,7 +515,7 @@ extension Call1v1VideoViewController: TimerServiceListener {
 extension Call1v1VideoViewController: AVPictureInPictureControllerDelegate {
     
     func configPIPViewController() {
-        if !AVPictureInPictureController.isPictureInPictureSupported() ||  !CallKitManager.shared.enablePIPOn1V1VideoScene {
+        if !AVPictureInPictureController.isPictureInPictureSupported() ||  !CallKitManager.shared.config.enablePIPOn1V1VideoScene {
             consoleLogInfo("Picture in Picture is not supported on this device.", type: .error)
             return
         }
@@ -509,7 +540,7 @@ extension Call1v1VideoViewController: AVPictureInPictureControllerDelegate {
     }
     
     @objc func releaseActiveVideoCallSourceView() {
-        guard let pipController = pipController,!CallKitManager.shared.enablePIPOn1V1VideoScene else { return }
+        guard let pipController = pipController,!CallKitManager.shared.config.enablePIPOn1V1VideoScene else { return }
         
         if pipController.isPictureInPictureActive {
             pipController.stopPictureInPicture()
@@ -524,7 +555,7 @@ extension Call1v1VideoViewController: AVPictureInPictureControllerDelegate {
     }
     
     @objc func pipAction(_ start: Bool = true) {
-        if !CallKitManager.shared.enablePIPOn1V1VideoScene {
+        if !CallKitManager.shared.config.enablePIPOn1V1VideoScene {
             return
         }
         if start && !isPIPActive {
@@ -535,6 +566,14 @@ extension Call1v1VideoViewController: AVPictureInPictureControllerDelegate {
     }
     
     public func pictureInPictureControllerWillStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+        if !CallKitManager.shared.config.enablePIPOn1V1VideoScene {
+            return
+        } else {
+            consoleLogInfo("Starting Picture in Picture mode.", type: .debug)
+            if #available(iOS 17.4, *),CallKitManager.shared.config.enableVOIP {
+                LiveCommunicationManager.shared.endCall()
+            }
+        }
         guard let vc = pictureInPictureController.contentSource?.activeVideoCallContentViewController else {
             consoleLogInfo("No active video call content view controller found.", type: .error)
             return

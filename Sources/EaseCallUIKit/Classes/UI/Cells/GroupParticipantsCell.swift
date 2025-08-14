@@ -43,7 +43,7 @@ import UIKit
         self.separatorLine.frame = CGRect(x: self.nickName.frame.minX, y: self.contentView.frame.height-0.5, width: self.contentView.frame.width-self.nickName.frame.minX, height: 0.5)
     }
     
-    func refresh(profile: CallUserProfileProtocol,keyword: String) {
+    func refresh(profile: CallProfileProtocol,keyword: String) {
         let nickName = profile.nickname.isEmpty ? profile.id:profile.nickname
         self.nickName.text = nickName
         self.nickName.font = UIFont.callTheme.labelLarge

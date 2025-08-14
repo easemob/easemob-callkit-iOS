@@ -17,11 +17,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
-        let option = ChatSDKOptions(appkey: "easemob#easeim")
+        let option = ChatSDKOptions(appkey: AppKey)
         option.enableConsoleLog = true
-        option.isAutoLogin = false
+        option.isAutoLogin = false//此处只是示例项目，真实使用时参考环信Demo源码，自动登录更方便
         ChatClient.shared().initializeSDK(with: option)
-//        UIApplication.shared.state
+        let config = CallKitConfig()
+        config.enablePIPOn1V1VideoScene = true
+        CallKitManager.shared.setup(config)
         return true
     }
 

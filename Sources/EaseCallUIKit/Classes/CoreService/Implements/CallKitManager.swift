@@ -9,6 +9,7 @@ import Foundation
 import AgoraRtcKit
 import AVKit
 import AVFAudio
+import PushKit
 
 public let CallKitVersion = "1.0.0"
 
@@ -26,13 +27,7 @@ public let CallKitVersion = "1.0.0"
     public var profileProviderOC: CallUserProfileProviderOC?
     
     /// Provider for call token
-    public var tokenProvider: CallTokenProvider?
-    
-    /// Provider for call token in Objective-C
-    public var tokenProviderOC: CallTokenProviderOC?
-    
-    /// Ringtone URL for incoming calls customized.
-    public var ringSoundURL: URL?
+    public private(set) var tokenProvider: CallTokenProvider?
     
     /// Current call information
     public internal(set) var callInfo : CallInfo? = nil
@@ -42,8 +37,9 @@ public let CallKitVersion = "1.0.0"
     /// Cache for call stream views
     public internal(set) var canvasCache: [String: CallStreamView] = [:]
     
+    /// Cache for call stream items
     public internal(set) var itemsCache: [String: CallStreamItem] = [:] {
-        willSet {
+        didSet{
             
         }
     }
@@ -54,191 +50,200 @@ public let CallKitVersion = "1.0.0"
     /// AgoraRtcEngineKit instance
     public private(set) var engine:AgoraRtcEngineKit?
     
+    /// Current call view controller
     public internal(set) var callVC: UIViewController?
     
-    public internal(set) var joinChannelName = ""
+    /// Current user profile information
+    public var currentUserInfo: CallProfileProtocol?
     
-    public var currentUserInfo: CallUserProfileProtocol?
+    /// Current user token for Agora SDK
+    @CallUserDefault("CallKitManager.token", defaultValue: "") public var token: String
     
-    public var token: String?
+    /// Current user RTC UID
+    @CallUserDefault("CallKitManager.currentUserRTCUID", defaultValue: UInt32(0)) public var currentUserRTCUID
     
-    /// Indicates whether to enable Picture-in-Picture mode for 1v1 video calls
-    public var enablePIPOn1V1VideoScene: Bool = false
+    var hadJoinedChannel: Bool = false
     
     /// Last Picture-in-Picture frame
     public internal(set) var lastPIPFrame = CGRect.zero
     
+    /// Indicates whether the call is currently in a video exchange state
     public internal(set) var isVideoExchanged = false
     
-    public internal(set) var alreadyVideoSetup = false
-    
+    /// Popup view for call notifications
     public internal(set) var popup: CallPopupView?
     
-    /// Ringtone player
-    public private(set) lazy var player: AVAudioPlayer? = {
-        var url = URL(fileURLWithPath: "")
-        if let ringPath = self.ringSoundURL {
-            url = ringPath
-        } else {
-            guard let path = Bundle.callBundle.path(forResource: "ring", ofType: "mp3") else {
-                consoleLogInfo("Ringtone bundle file not found", type: .error)
-                return nil
-            }
-            url = URL(fileURLWithPath: path)
-        }
-        if !FileManager.default.fileExists(atPath: url.path) {
-            return nil
-        }
-        let player = try? AVAudioPlayer(contentsOf: url)
-        player?.numberOfLoops = -1
-        player?.prepareToPlay()
-        return player
-    }()
+    /// Application ID for Agora SDK
+    public private(set) var appID: String = ""
     
+    /// The throttler for RTC callbacks
+    let rtcThrottler = RTCCallbackThrottler()
+    
+    public private(set) var config: CallKitConfig = CallKitConfig()
 
     private override init() {
         super.init()
         // Initialize CallKit related services or configurations here
     }
     
-    @objc public func setup() {
-        self.engine = AgoraRtcEngineKit.sharedEngine(withAppId: "c8a78f1878ec4a0d92c6a16d18c8b498", delegate: self)
-        self.engine?.setDefaultAudioRouteToSpeakerphone(true)
-        self.engine?.setVideoFrameDelegate(self)
-        _ = self.player
-        self.prepareRingtone()
+    /// Sets up the CallKitManager with an optional token provider.
+    @objc public func setup(_ config: CallKitConfig? = nil) {
+        ChatClient.shared().add(self, delegateQueue: nil)
         ChatClient.shared().chatManager?.add(self, delegateQueue: .main)
+        if let config = config {
+            self.config = config
+        }
+        if tokenProvider != nil {
+            self.appID = tokenProvider!.getAppId()
+            if self.appID.isEmpty {
+//                return CallError.error(code: ChatErrorCode.invalidAppkey.rawValue, message: "App ID is not set. Please configure the App ID in CallTokenProvider.")
+            }
+            
+//            self.tokenProvider = tokenProvider
+//            if let currentUserId = ChatClient.shared().currentUsername {
+//                tokenProvider?.fetchCallToken { [weak self] uid, token, expiration in
+//                    if let token = token, !token.isEmpty {
+//                        self?.token = token
+//                        self?.tokenExpired = expiration
+//                        self?.currentUserRTCUID = uid
+//                        consoleLogInfo("Call token fetched successfully: \(token)", type: .info)
+//                    } else {
+//                        consoleLogInfo("Failed to fetch call token", type: .error)
+//                    }
+//                }
+//            }
+//            let error = self.setupEngine()
+//            if error != nil {
+//                return error
+//            }
+        }
+        _ = AudioPlayerManager.shared
+        consoleLogInfo("CallKitManager setup completed", type: .info)
         self.checkCameraPermission()
         self.checkMicrophonePermission()
+        if #available(iOS 17.4, *) {
+            LiveCommunicationManager.shared.setupPushKit()
+        }
+//        return nil
+    }
+    
+    @objc public func setupEngine() -> ChatError? {
+        if self.engine != nil {
+            return nil
+        }
+        self.appID = ChatClient.shared().options.appId ?? ""
+        if self.appID.isEmpty {
+            self.appID = "b7eb56ff293b43aa8bd92c23057d08fb"
+        }
+        if self.appID.isEmpty {
+            return ChatError(description: "App ID is not set.", code: .invalidAppkey)
+        } else {
+            self.engine = AgoraRtcEngineKit.sharedEngine(withAppId: self.appID, delegate: self)
+        }
+        for listener in self.listeners.allObjects {
+            listener.onRtcEngineCreated?(engine: self.engine)
+        }
+//        self.engine?.setParameters("{\"che.audio.sf.ainlpToLoadFlag\":1}")
+//        self.engine?.setParameters("{\"che.audio.sf.nlpAlgRoute\":11}")
+//        self.engine?.setParameters("{\"che.audio.agc.enable\":true}")
+//        self.engine?.setParameters("{\"che.audio.agc.targetlevelBov\":3}")
+//        self.engine?.setParameters("{\"che.audio.agc.compressionGain\":18}")
+//        self.engine?.setParameters("{\"che.audio.sf.nsEnable\":1}")
+//        self.engine?.setParameters("{\"che.audio.sf.nsngAlgRoute\":10}")
+//        self.engine?.setParameters("{\"che.audio.sf.nsngPredefAgg\":11}")
+//        self.engine?.setParameters("{\"che.audio.sf.statNsFastNsSpeechTrigThreshold\":50}")
+        self.engine?.enable(inEarMonitoring: true)
+        self.engine?.enableAudioVolumeIndication(618, smooth: 10, reportVad: true)
+        self.engine?.setDefaultAudioRouteToSpeakerphone(true)
+        self.engine?.setVideoFrameDelegate(self)
+        return nil
     }
 
-    /// 检查并请求摄像头权限
+    /// Checks and requests camera permission.
     func checkCameraPermission() {
-        // 检查当前摄像头权限状态
         let status = AVCaptureDevice.authorizationStatus(for: .video)
-        
         switch status {
         case .notDetermined:
-            // 首次请求权限
             AVCaptureDevice.requestAccess(for: .video) { granted in
                 DispatchQueue.main.async {
                     if granted {
-                        print("摄像头权限已授予")
-                        // 权限通过，可初始化摄像头相关功能（如预览层、拍摄等）
+                        consoleLogInfo("The camera permission is granted.", type: .info)
                     } else {
-                        print("摄像头权限被拒绝")
-                        // 提示用户去设置中开启权限
+                        consoleLogInfo("The camera permission is denied, please enable it in settings.", type: .error)
                     }
                 }
             }
         case .authorized:
-            // 已授予权限
-            print("摄像头权限已授权")
+            consoleLogInfo("The camera permission is authorized.", type: .info)
         case .denied, .restricted:
-            // 权限被拒绝或受限制（如家长控制）
-            print("摄像头权限被拒绝，无法使用")
+            // permission denied or restricted
+            consoleLogInfo("The camera permission is denied or restricted.", type: .error)
             // 可引导用户去设置中开启：Settings -> 应用名称 -> 摄像头
         @unknown default:
-            print("未知的摄像头权限状态")
+            consoleLogInfo("Unknown camera permission status", type: .error)
         }
     }
     
-    /// 检查并请求麦克风权限
+    /// Checks and requests microphone permission.
     func checkMicrophonePermission() {
-        // 检查当前麦克风权限状态
         let status = AVCaptureDevice.authorizationStatus(for: .audio)
-        
         switch status {
         case .notDetermined:
             // 首次请求权限
             AVCaptureDevice.requestAccess(for: .audio) { granted in
                 DispatchQueue.main.async {
                     if granted {
-                        print("麦克风权限已授予")
-                        // 权限通过，可初始化麦克风相关功能（如录音）
+                        consoleLogInfo("The microphone permission is granted.", type: .info)
                     } else {
-                        print("麦克风权限被拒绝")
-                        // 提示用户去设置中开启权限
+                        consoleLogInfo("The microphone permission is denied, please enable it in settings.", type: .error)
                     }
                 }
             }
         case .authorized:
-            // 已授予权限
-            print("麦克风权限已授权")
+            consoleLogInfo("The microphone permission is authorized.", type: .info)
         case .denied, .restricted:
-            // 权限被拒绝或受限制
-            print("麦克风权限被拒绝，无法使用")
+            consoleLogInfo("The microphone permission is denied or restricted, please enable it in settings.", type: .error)
             // 引导用户去设置中开启：Settings -> 应用名称 -> 麦克风
         @unknown default:
-            print("未知的麦克风权限状态")
+            consoleLogInfo("Unknown microphone permission status", type: .error)
         }
     }
     
+    /// Tears down the CallKitManager, releasing resources and stopping the player.Notice that this method should be called when the application is about to terminate or when the CallKitManager is no longer needed.
     @objc public func tearDown() {
         self.itemsCache.removeAll()
         self.canvasCache.removeAll()
         self.usersCache.removeAll()
         self.listeners.removeAllObjects()
-        self.player?.stop()
-        self.player = nil
         AgoraRtcEngineKit.destroy()
         do {
             try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         } catch {
             consoleLogInfo("Failed to deactivate audio session: \(error.localizedDescription)", type: .error)
         }
-        self.callVC = nil
+        self.quitCall()
         ChatClient.shared().chatManager?.remove(self)
+        AudioPlayerManager.shared.stopAudio()
     }
     
-    private func prepareRingtone() {
-        do {
-            // Configure audio session
-            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.mixWithOthers])
-            try AVAudioSession.sharedInstance().setActive(true)
-        } catch {
-            consoleLogInfo("Failed to set audio session category: \(error.localizedDescription)", type: .error)
-            return
-        }
-    }
-    
-    func playRingtone() {
-        guard let player = self.player else {
-            consoleLogInfo("Ringtone player is not initialized", type: .error)
-            return
-        }
-        if !player.isPlaying {
-            player.play()
-        }
-    }
-    
-    private func stopRingtone() {
-        guard let player = self.player else {
-            consoleLogInfo("Ringtone player is not initialized", type: .error)
-            return
-        }
-        if player.isPlaying {
-            player.stop()
-        }
-    }
-    
+    /// Quits the current call, stopping any ongoing call and cleaning up resources.
     func ringTimeout() {
         DispatchQueue.main.async {
-            self.stopRingtone()
+            AudioPlayerManager.shared.stopAudio()
             if let call = self.callInfo, call.state == .ringing {
-                for listener in self.listeners.allObjects {
-                    listener.didEndCall?(callId: call.callId, endReason: .noResponse, error: nil, duration: 0)
-                }
-                self.callInfo?.state = .idle
+                self.updateCallEndReason(.noResponse)
             }
         }
     }
     
+    /// Updates the call end reason and notifies listeners.
     func cleanUICache() {
         self.itemsCache.removeAll()
         self.canvasCache.removeAll()
     }
     
+    /// Updates the call end reason and notifies listeners.
+    /// - Parameter vc: The view controller to present the call end reason.
     func showMiniAudioView(vc: UIViewController) {
         self.callVC = vc
         if self.lastPIPFrame == .zero {
@@ -252,8 +257,10 @@ public let CallKitVersion = "1.0.0"
         }
     }
     
+    /// Shows the Picture-in-Picture (PIP) view for 1v1 video calls.
+    /// - Parameter vc: The view controller to present the PIP view.
     func showPIP(vc: UIViewController) {
-        if self.enablePIPOn1V1VideoScene {
+        if self.config.enablePIPOn1V1VideoScene {
             if let pipVC = vc as? Call1v1VideoViewController {
                 self.callVC = pipVC
             } else {
@@ -263,5 +270,101 @@ public let CallKitVersion = "1.0.0"
             consoleLogInfo("PIP is not enabled for 1v1 video calls", type: .info)
         }
     }
+    
+    
+    /// When you logout IM SDK, you should call this method to clean up the user defaults.
+    @objc public func cleanUserDefaults() {
+        self.currentUserRTCUID = 0
+        self.token = ""
+    }
+    
+    private func validateItemsCache() {
+        let currentUserId = ChatClient.shared().currentUsername ?? ""
+        itemsCache = itemsCache.filter { key, item in
+            return item.userId == currentUserId ||
+            item.uid == self.currentUserRTCUID ||
+            key == currentUserId
+        }
+    }
+    
+    private func validateCanvasCache() {
+        let currentUserId = ChatClient.shared().currentUsername ?? ""
+        canvasCache = canvasCache.filter { key, view in
+            return key == currentUserId || view.item.uid == self.currentUserRTCUID || view.item.userId == currentUserId
+        }
+    }
 }
 
+extension CallKitManager: ChatClientListener {
+    public func connectionStateDidChange(_ aConnectionState: ConnectionState) {
+        if aConnectionState == .connected {//IM SDK connected successfully
+            let engineError = self.setupEngine()//Set up Agora engine
+            if let error = engineError {
+                self.handleError(error)
+                consoleLogInfo("Failed to setup engine: \(String(describing: error.errorDescription))", type: .error)
+                return
+            }
+            if self.token.isEmpty {//When the token is empty.First we need to fetch it from the IM SDK.
+                if let currentUserId = ChatClient.shared().currentUsername,!currentUserId.isEmpty {
+                    if self.tokenProvider != nil {
+//                        self.tokenProvider?.fetchCallToken{ [weak self] uid, token, expiration in
+//                            if let token = token, !token.isEmpty {
+//                                self?.token = token
+//                                self?.tokenExpired = expiration
+//                                self?.currentUserRTCUID = uid
+//                                consoleLogInfo("Call token fetched successfully: \(token)", type: .info)
+//                            } else {
+//                                consoleLogInfo("Failed to fetch call token", type: .error)
+//                            }
+//                        }
+                    } else {
+                        self.getRTCTokenFromIMSDK()
+                    }
+                } else {
+                    consoleLogInfo("Current user ID is empty, cannot fetch call token", type: .error)
+                    self.handleError(ChatError(description: "Current user ID is empty, cannot fetch call token", code: .invalidAppkey))
+                }
+            }
+        }
+    }
+    
+    public func userDidForbidByServer() {
+        self.hangup()
+        self.callVC?.dismiss(animated: true)
+    }
+    
+    public func userAccountDidRemoveFromServer() {
+        self.hangup()
+        self.callVC?.dismiss(animated: true)
+    }
+    
+    public func userAccountDidForced(toLogout aError: ChatError?) {
+        if aError != nil {
+            self.hangup()
+            self.callVC?.dismiss(animated: true)
+        }
+    }
+    
+    public func userAccountDidLoginFromOtherDevice(with info: LoginExtensionInfo?) {
+        self.hangup()
+        self.callVC?.dismiss(animated: true)
+    }
+    
+    func getRTCTokenFromIMSDK(_ refreshRTCToken: Bool = false) {
+        ChatClient.shared().getRTCToken(withChannel: nil) { [weak self] uid, token, expiration, error in
+            if let error = error {
+                self?.token = ""
+                self?.handleError(error)
+                consoleLogInfo("Failed to fetch call token: \(String(describing: error.errorDescription))", type: .error)
+            } else {
+                let rtcToken = token ?? ""
+                self?.token = rtcToken
+                self?.currentUserRTCUID = UInt32(uid)
+                if refreshRTCToken {
+                    self?.engine?.renewToken(rtcToken)
+                }
+                consoleLogInfo("Call token fetched successfully: \(String(describing: token))", type: .info)
+            }
+        }
+    }
+}

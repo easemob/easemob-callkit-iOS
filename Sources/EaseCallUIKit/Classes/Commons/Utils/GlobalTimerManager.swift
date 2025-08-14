@@ -54,10 +54,9 @@ extension GlobalTimerManager: TimerService {
     
     public func removeTimeAsSimilarKey(_ timerIdentify: String) {
         timerQueue.sync {
-            guard !self.timerCache.keys.contains(timerIdentify) else {
-                return
+            for key in self.timerCache.keys where key.hasPrefix(timerIdentify) {
+                self.timerCache.removeValue(forKey: key)
             }
-            self.timerCache.removeValue(forKey: timerIdentify)
         }
     }
     

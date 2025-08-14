@@ -11,7 +11,7 @@ public class Call1v1AudioViewController: UIViewController {
     
     public lazy var background: UIImageView = {
         let imageView = UIImageView(frame: self.view.bounds)
-        imageView.image = UIImage(named: "bg",in: .callBundle,with: nil)
+        imageView.image = CallAppearance.backgroundImage
         imageView.contentMode = .scaleAspectFill
         return imageView
     }()
@@ -25,7 +25,7 @@ public class Call1v1AudioViewController: UIViewController {
     }
     
     public lazy var bottomView: Call1v1BottomView = {
-        Call1v1BottomView(frame: CGRect(x: 0, y: ScreenHeight-150-BottomBarHeight, width: ScreenWidth, height: 150+BottomBarHeight)).backgroundColor(.clear)
+        Call1v1BottomView(frame: CGRect(x: 0, y: ScreenHeight-170-BottomBarHeight, width: ScreenWidth, height: 150+BottomBarHeight)).backgroundColor(.clear)
     }()
     
     public private(set) var role: CallRole = .caller
@@ -46,22 +46,32 @@ public class Call1v1AudioViewController: UIViewController {
         self.setupBottomsState()
 
         // Do any additional setup after loading the view.
-        if let showUserId = (self.role == .caller ? CallKitManager.shared.callInfo?.calleeId : CallKitManager.shared.callInfo?.callerId) {
-            let username = CallKitManager.shared.usersCache[showUserId]?.nickname ?? showUserId
-            let avatarURL = CallKitManager.shared.usersCache[showUserId]?.avatarURL
-            self.navigationBar.title = username
-            self.navigationBar.avatarURL = avatarURL
+        var showUserId = (self.role == .caller ? CallKitManager.shared.callInfo?.calleeId : CallKitManager.shared.callInfo?.callerId) ?? ""
+        if showUserId.isEmpty {
+            showUserId = CallKitManager.shared.callInfo?.inviteMessage?.from ?? showUserId
         }
+        let username = CallKitManager.shared.usersCache[showUserId]?.nickname ?? ""
+        let avatarURL = CallKitManager.shared.usersCache[showUserId]?.avatarURL
+        self.navigationBar.title = username.isEmpty ? showUserId:username
+        self.navigationBar.avatarURL = avatarURL
         self.navigationBar.clickClosure = { [weak self] in
             self?.navigationClick(type: $0, indexPath: $1)
         }
         self.bottomView.didTapButton = { [weak self] in
             self?.bottomClick(type: $0)
         }
+        NotificationCenter.default.addObserver(forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) {  _ in
+            if #available(iOS 17.4, *),CallKitManager.shared.config.enableVOIP {
+                LiveCommunicationManager.shared.endCall()
+                consoleLogInfo("iOS 17.4及以上系统，开启VOIP模式下，应用进入后台会自动挂断通话", type: .error)
+            }
+        }
+        
     }
     
     func addCallTimer() {
         if let call = CallKitManager.shared.callInfo {
+            self.updateSeconds(seconds: 1)
             GlobalTimerManager.shared.registerListener(self, timerIdentify: "call-\(call.channelName)-answering-timer")
             GlobalTimerManager.shared.registerListener(CallKitManager.shared, timerIdentify: "call-\(call.channelName)-answering-timer")
         }
@@ -83,10 +93,7 @@ public class Call1v1AudioViewController: UIViewController {
                 case .answering:
                     self.bottomView.setState(.connected)
                     self.navigationBar.subtitle = "Connecting".call.localize
-                    if let call = CallKitManager.shared.callInfo {
-                        GlobalTimerManager.shared.registerListener(self, timerIdentify: "call-\(call.channelName)-answering-timer")
-                        GlobalTimerManager.shared.registerListener(CallKitManager.shared, timerIdentify: "call-\(call.channelName)-answering-timer")
-                    }
+                    self.addCallTimer()
                 default:
                     break
                 }
@@ -96,7 +103,7 @@ public class Call1v1AudioViewController: UIViewController {
     
     @objc open func navigationClick(type: ChatNavigationBarClickEvent,indexPath: IndexPath?) {
         switch type {
-        case .back: self.pop()
+        case .back,.title,.subtitle: self.pop()
         default:
             break
         }
@@ -109,18 +116,17 @@ public class Call1v1AudioViewController: UIViewController {
         case .speaker_on: CallKitManager.shared.turnSpeakerOn(on: true)
         case .speaker_off: CallKitManager.shared.turnSpeakerOn(on: false)
         case .decline:
+            CallKitManager.shared.callVC = nil
             self.dismiss(animated: true, completion: nil)
             CallKitManager.shared.hangup()
         case .accept:
             CallKitManager.shared.accept()
-            if let call = CallKitManager.shared.callInfo {
-                GlobalTimerManager.shared.registerListener(self, timerIdentify: "call-\(call.channelName)-answering-timer")
-                GlobalTimerManager.shared.registerListener(CallKitManager.shared, timerIdentify: "call-\(call.channelName)-answering-timer")
-            }
+            self.addCallTimer()
         case .end:
             if let call = CallKitManager.shared.callInfo {
                 GlobalTimerManager.shared.removeListener(self, timerIdentify: "call-\(call.channelName)-answering-timer")
             }
+            CallKitManager.shared.callVC = nil
             self.dismiss(animated: true, completion: nil)
             CallKitManager.shared.hangup()
         default: break
@@ -171,6 +177,7 @@ extension Call1v1AudioViewController: TimerServiceListener {
     public func timeChanged(_ timerIdentify: String, interval seconds: UInt) {
         if let call = CallKitManager.shared.callInfo, timerIdentify == "call-\(call.channelName)-answering-timer" {
             self.updateSeconds(seconds: Int(seconds))
+            FloatingAudioView.getFloatingView()?.updateSeconds(seconds: Int(seconds))
         }
     }
     

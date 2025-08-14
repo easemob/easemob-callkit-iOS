@@ -18,9 +18,9 @@ public class MultiCallBottomView: UIView {
     private var isExpanded = false
     
     public var buttonData = [
+        CallButtonData(title: "Flip".call.localize, imageName: "flip_back", selectedImageName: "flip_front"),
         CallButtonData(title: "Mic on".call.localize, imageName: "mic_on", selectedImageName: "mic_off",selectedTitle: "Mic off".call.localize),
         CallButtonData(title: "Speaker on".call.localize, imageName: "speaker_on", selectedImageName: "speaker_off", selectedTitle: "Speaker off".call.localize),
-        CallButtonData(title: "Flip".call.localize, imageName: "flip_back", selectedImageName: "flip_front"),
         CallButtonData(title: "Camera on".call.localize, imageName: "camera_on", selectedImageName: "camera_off", selectedTitle: "Camera off".call.localize),
         CallButtonData(title: "End".call.localize, imageName: "phone_hang", selectedImageName: "phone_hang", color: UIColor.callTheme.errorColor7)
     ]
@@ -94,7 +94,7 @@ public class MultiCallBottomView: UIView {
     private func setupButtonViews() {
         // 创建所有按钮视图
         for (index, data) in buttonData.enumerated() {
-            let buttonView = CallButtonView(frame: CGRect(origin: .zero, size: CGSize(width: buttonWidth, height: buttonHeight)))
+            let buttonView = CallButtonView(frame: CGRect(origin: .zero, size: CGSize(width: buttonWidth, height: buttonHeight)),iconTitleSpace: 4)
             if index == 4 {
                 buttonView.allowSelection = false // End Call 按钮不允许选中变化图片文字
             } else {
@@ -128,11 +128,11 @@ public class MultiCallBottomView: UIView {
         case 3:
             type = data.isSelected ? .camera_off : .camera_on
         case 2:
-            type = data.isSelected ? .flip_back : .flip_front
-        case 1:
             type = data.isSelected ? .speaker_off : .speaker_on
-        case 0:
+        case 1:
             type = data.isSelected ? .mic_off : .mic_on
+        case 0:
+            type = data.isSelected ? .flip_back : .flip_front
         default:
             break
         }
@@ -141,7 +141,7 @@ public class MultiCallBottomView: UIView {
     
     private func setupBottomButtons() {
         // Decline 按钮
-        declineButton = CallButtonView(frame: CGRect(origin: .zero, size: CGSize(width: bottomButtonWidth, height: bottomButtonHeight)))
+        declineButton = CallButtonView(frame: CGRect(origin: .zero, size: CGSize(width: bottomButtonWidth, height: bottomButtonHeight)),iconTitleSpace: 12)
         declineButton.allowSelection = false
         declineButton.translatesAutoresizingMaskIntoConstraints = false
         declineButton.configure(data: CallButtonData(title: "Decline".call.localize, imageName: "phone_hang", selectedImageName: "phone_hang", color: UIColor.callTheme.errorColor7))
@@ -152,7 +152,7 @@ public class MultiCallBottomView: UIView {
         addSubview(declineButton)
         
         // Accept 按钮
-        acceptButton = CallButtonView(frame: CGRect(origin: .zero, size: CGSize(width: bottomButtonWidth, height: bottomButtonHeight)))
+        acceptButton = CallButtonView(frame: CGRect(origin: .zero, size: CGSize(width: bottomButtonWidth, height: bottomButtonHeight)),iconTitleSpace: 12)
         acceptButton.allowSelection = false
         acceptButton.translatesAutoresizingMaskIntoConstraints = false
         acceptButton.configure(data: CallButtonData(title: "Accept".call.localize, imageName: "phone_pick", selectedImageName: "phone_pick", color: UIColor.callTheme.secondaryColor4))
@@ -195,12 +195,12 @@ public class MultiCallBottomView: UIView {
         // 底部按钮约束
         NSLayoutConstraint.activate([
             declineButton.centerXAnchor.constraint(equalTo: centerXAnchor, constant: -112),
-            declineButton.topAnchor.constraint(equalTo: topAnchor, constant: buttonHeight+24+20),
+            declineButton.topAnchor.constraint(equalTo: topAnchor, constant: buttonHeight+24),
             declineButton.widthAnchor.constraint(equalToConstant: bottomButtonWidth),
             declineButton.heightAnchor.constraint(equalToConstant: bottomButtonHeight),
             
             acceptButton.centerXAnchor.constraint(equalTo: centerXAnchor, constant: 112),
-            acceptButton.topAnchor.constraint(equalTo: topAnchor, constant: buttonHeight+24+20),
+            acceptButton.topAnchor.constraint(equalTo: topAnchor, constant: buttonHeight+24),
             acceptButton.widthAnchor.constraint(equalToConstant: bottomButtonWidth),
             acceptButton.heightAnchor.constraint(equalToConstant: bottomButtonHeight)
         ])

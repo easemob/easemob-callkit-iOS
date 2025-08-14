@@ -8,7 +8,6 @@
 import UIKit
 
 
-/// https://learn.microsoft.com/en-us/azure/ai-services/translator/language-support#translation 
 public enum LanguageType: Equatable {
     case Chinese
     case Chinese_traditional

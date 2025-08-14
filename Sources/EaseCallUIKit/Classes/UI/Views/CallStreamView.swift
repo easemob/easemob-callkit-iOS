@@ -15,6 +15,8 @@ public class CallStreamView: UIImageView {
     
     public let canvasView = UIView(frame: .zero)
     private let imageView = ImageView(frame: .zero).contentMode(.scaleAspectFill)
+    private let imageCover = UIView(frame: .zero).backgroundColor(.black)
+    private let networkStatusView = UIImageView()
     private let coverView = UIView()
     private let loadingView = UIImageView().contentMode(.scaleAspectFit)
     public let userInfoView = UserInfoView()
@@ -22,6 +24,11 @@ public class CallStreamView: UIImageView {
     var displayMode: UserInfoDisplayMode = .all {
         didSet {
             userInfoView.displayMode = displayMode
+            if self.item.isExpanded {
+                self.networkStatusView.isHidden = false
+            } else {
+                self.networkStatusView.isHidden = displayMode == .hidden
+            }
         }
     }
     
@@ -45,7 +52,7 @@ public class CallStreamView: UIImageView {
         clipsToBounds = true
         self.isUserInteractionEnabled = true
         
-        canvasView.backgroundColor = UIColor.clear
+        canvasView.backgroundColor = UIColor.orange
         canvasView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(canvasView)
         
@@ -55,6 +62,18 @@ public class CallStreamView: UIImageView {
         imageView.isUserInteractionEnabled = false
         imageView.image = CallAppearance.avatarPlaceHolder
         addSubview(imageView)
+        
+        imageCover.translatesAutoresizingMaskIntoConstraints = false
+        imageView.addSubview(imageCover)
+        
+        // Setup network status view
+        networkStatusView.translatesAutoresizingMaskIntoConstraints = false
+        networkStatusView.image = UIImage(named: "network_0", in: .callBundle, with: nil)
+        networkStatusView.contentMode = .scaleAspectFit
+        networkStatusView.backgroundColor = UIColor.callTheme.barrageLightColor5
+        networkStatusView.layer.cornerRadius = 4
+        networkStatusView.clipsToBounds = true
+        imageView.addSubview(networkStatusView)
         
         coverView.backgroundColor = UIColor.black.withAlphaComponent(0.3)
         coverView.translatesAutoresizingMaskIntoConstraints = false
@@ -69,7 +88,7 @@ public class CallStreamView: UIImageView {
         userInfoView.translatesAutoresizingMaskIntoConstraints = false
         userInfoView.isUserInteractionEnabled = false
         addSubview(userInfoView)
-        
+        networkStatusView.isHidden = true
         NSLayoutConstraint.activate([
             canvasView.topAnchor.constraint(equalTo: topAnchor),
             canvasView.leadingAnchor.constraint(equalTo: leadingAnchor),
@@ -79,6 +98,14 @@ public class CallStreamView: UIImageView {
             imageView.leadingAnchor.constraint(equalTo: leadingAnchor),
             imageView.trailingAnchor.constraint(equalTo: trailingAnchor),
             imageView.bottomAnchor.constraint(equalTo: bottomAnchor),
+            networkStatusView.topAnchor.constraint(equalTo: imageView.topAnchor, constant: 8),
+            networkStatusView.trailingAnchor.constraint(equalTo: imageView.trailingAnchor, constant: -8),
+            networkStatusView.widthAnchor.constraint(equalToConstant: 20),
+            networkStatusView.heightAnchor.constraint(equalToConstant: 20),
+            imageCover.topAnchor.constraint(equalTo: imageView.topAnchor),
+            imageCover.leadingAnchor.constraint(equalTo: imageView.leadingAnchor),
+            imageCover.trailingAnchor.constraint(equalTo: imageView.trailingAnchor),
+            imageCover.bottomAnchor.constraint(equalTo: imageView.bottomAnchor),
             coverView.topAnchor.constraint(equalTo: topAnchor),
             coverView.leadingAnchor.constraint(equalTo: leadingAnchor),
             coverView.trailingAnchor.constraint(equalTo: trailingAnchor),
@@ -124,27 +151,67 @@ public class CallStreamView: UIImageView {
     
     func updateItem(_ newItem: CallStreamItem) {
         self.item = newItem
-        
-        self.userInfoView.nickname = CallKitManager.shared.usersCache[newItem.userId]?.nickname ?? item.userId
+        let nickname = CallKitManager.shared.usersCache[newItem.userId]?.nickname ?? newItem.userId
+        if !nickname.isEmpty {
+            self.userInfoView.nickname = nickname
+        } else {
+            self.userInfoView.nickname = newItem.userId
+        }
         self.userInfoView.isAudioMuted = newItem.audioMuted
         let avatarURL = CallKitManager.shared.usersCache[newItem.userId]?.avatarURL ?? ""
         self.imageView.image(with: avatarURL, placeHolder: CallAppearance.avatarPlaceHolder)
+        
         if newItem.videoMuted {
             self.sendSubviewToBack(self.canvasView)
             self.bringSubviewToFront(self.imageView)
-            self.coverView.isHidden = !newItem.waiting
-            if self.coverView.isHidden {
+            self.imageCover.isHidden = false
+            if !newItem.waiting {
                 self.sendSubviewToBack(self.coverView)
             } else {
                 self.bringSubviewToFront(self.coverView)
             }
         } else {
+            self.imageCover.isHidden = true
             self.sendSubviewToBack(self.imageView)
             self.bringSubviewToFront(self.canvasView)
         }
-        self.canvasView.isHidden = newItem.videoMuted
-        self.imageView.isHidden = !newItem.videoMuted
+        
+        self.coverView.isHidden = !newItem.waiting
+        self.imageCover.alpha = newItem.videoMuted ? 0.5 : 0.0
         self.bringSubviewToFront(self.userInfoView)
+    }
+    
+    func updateUserInfo(newItem: CallStreamItem) {
+        self.item = newItem
+        let nickname = CallKitManager.shared.usersCache[newItem.userId]?.nickname ?? newItem.userId
+        if !nickname.isEmpty {
+            self.userInfoView.nickname = nickname
+        } else {
+            self.userInfoView.nickname = newItem.userId
+        }
+    }
+    
+    func updateAudioVolume(_ volume: UInt) {
+        self.userInfoView.isSpeaking = volume > 10 // Adjust threshold as needed
+        coverView.isHidden = true
+        coverView.removeFromSuperview()
+    }
+    
+    func updateNetworkStatus(_ status: CallNetworkStatus) {
+        coverView.isHidden = true
+        coverView.removeFromSuperview()
+        switch status {
+        case .good:
+            networkStatusView.image = UIImage(named: "network_0", in: .callBundle, with: nil)
+        case .poor:
+            networkStatusView.image = UIImage(named: "network_1", in: .callBundle, with: nil)
+        case .bad:
+            networkStatusView.image = UIImage(named: "network_2", in: .callBundle, with: nil)
+        case .unknown:
+            networkStatusView.image = UIImage(named: "network_3", in: .callBundle, with: nil)
+        }
+        
+        self.networkStatusView.isHidden = false
     }
     
     func ensureVisible() {
@@ -152,12 +219,11 @@ public class CallStreamView: UIImageView {
         self.isHidden = false
         self.isOpaque = true
         imageView.alpha = 1.0
-        imageView.isHidden = false
         userInfoView.alpha = 1.0
-        userInfoView.isHidden = false
         // Force layout update
         setNeedsLayout()
         layoutIfNeeded()
+        superview?.layoutIfNeeded()
     }
     
     public override func layoutSubviews() {
@@ -169,15 +235,23 @@ public class CallStreamView: UIImageView {
 
 }
 
+@objc public enum CallNetworkStatus: UInt {
+    case good
+    case poor
+    case bad
+    case unknown
+}
+
 // MARK: - Video Call Item Model
 public class CallStreamItem: NSObject {
-    let userId: String
-    var uid = 0
+    var userId: String
+    var uid = UInt32(0)
     let index: Int
     var isExpanded: Bool = false
     var videoMuted: Bool = true
     var audioMuted: Bool = false
     var waiting: Bool = true
+    var networkStatus: CallNetworkStatus = .unknown
     
     init(userId: String,index: Int, isExpanded: Bool = false) {
         self.userId = userId
@@ -215,6 +289,16 @@ public class UserInfoView: UIView {
     var isAudioMuted: Bool = false {
         didSet {
             updateAudioButton()
+        }
+    }
+    
+    var isSpeaking: Bool = false {
+        didSet {
+            if isSpeaking,!isAudioMuted {
+                audioButton.setImage(UIImage(named: "speaking", in: .callBundle, with: nil), for: .normal)
+            } else {
+                updateAudioButton()
+            }
         }
     }
     

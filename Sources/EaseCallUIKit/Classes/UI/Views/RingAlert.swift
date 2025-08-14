@@ -44,9 +44,9 @@ public class RingAlert: UIView {
     
     private lazy var declineButton: UIButton = {
         let button = UIButton(type: .custom)
-        button.backgroundColor = UIColor.callTheme.errorColor7
-        button.setImage(UIImage(named: "phone_hang", in: .callBundle, with: nil), for: .normal)
-        button.tintColor = .white
+        button.imageView?.contentMode = .scaleAspectFit
+        button.backgroundColor = UIColor.callTheme.errorColor6
+        button.setImage(UIImage(named: "phone_hang_mini", in: .callBundle, with: nil), for: .normal)
         button.layer.cornerRadius = 18
         button.translatesAutoresizingMaskIntoConstraints = false
         button.addTarget(self, action: #selector(declineCall), for: .touchUpInside)
@@ -56,8 +56,8 @@ public class RingAlert: UIView {
     private lazy var acceptButton: UIButton = {
         let button = UIButton(type: .custom)
         button.backgroundColor = UIColor.callTheme.secondaryColor4
-        button.setImage(UIImage(named: "phone_pick", in: .callBundle, with: nil), for: .normal)
-        button.tintColor = .white
+        button.imageView?.contentMode = .scaleAspectFit
+        button.setImage(UIImage(named: "phone_pick_mini", in: .callBundle, with: nil), for: .normal)
         button.layer.cornerRadius = 18
         button.translatesAutoresizingMaskIntoConstraints = false
         button.addTarget(self, action: #selector(acceptCall), for: .touchUpInside)
@@ -101,10 +101,6 @@ public class RingAlert: UIView {
         // Set up constraints
         setupConstraints()
         
-        // Set default values
-        profileImageView.image = UIImage(systemName: "person.circle.fill") // Placeholder
-        usernameLabel.text = NSLocalizedString("Username", comment: "Username label")
-        messageLabel.text = NSLocalizedString("Inviting you to an audio call", comment: "Call invitation message")
     }
     
     private func setupConstraints() {
@@ -142,7 +138,7 @@ public class RingAlert: UIView {
     
     // MARK: - Public Methods
     
-    func refresh(profile: CallUserProfileProtocol, type: CallType) {
+    func refresh(profile: CallProfileProtocol, type: CallType) {
         usernameLabel.text = profile.nickname.isEmpty ? profile.id:profile.nickname
         profileImageView.image(with: profile.avatarURL, placeHolder: CallAppearance.avatarPlaceHolder)
         switch type {
@@ -150,7 +146,7 @@ public class RingAlert: UIView {
             messageLabel.text = "invite_info_audio".call.localize
         case .singleVideo:
             messageLabel.text = "invite_info_video".call.localize
-        case .multiCall:
+        case .groupCall:
             messageLabel.text = "group_invite_info".call.localize
         }
             
@@ -233,7 +229,7 @@ public class CallPopupView: UIView {
     
     private func setupCallCardView() {
         // 呼叫卡片样式
-        callCardView.layer.cornerRadius = 20
+        callCardView.layer.cornerRadius = 12
         callCardView.layer.shadowColor = UIColor.black.cgColor
         callCardView.layer.shadowOpacity = 0.3
         callCardView.layer.shadowOffset = CGSize(width: 0, height: 10)
@@ -262,13 +258,16 @@ public class CallPopupView: UIView {
     
     // MARK: - Animation
     func show() {
+        consoleLogInfo("CallPopupView show", type: .info)
         // 确保视图在最前面
         if let window = UIApplication.shared.call.keyWindow {
             window.addSubview(self)
+        } else {
+            UIApplication.shared.keyWindow?.addSubview(self)
         }
         
-        // 强制初始布局
-        self.layoutIfNeeded()
+//        // 强制初始布局
+//        self.layoutIfNeeded()
         
         // 计算最终位置
         let statusBarHeight: CGFloat
@@ -299,7 +298,7 @@ public class CallPopupView: UIView {
             self.callCardView.transform = .identity
             
             // 应用约束变化
-            self.layoutIfNeeded()
+//            self.layoutIfNeeded()
         }) { _ in
             // 确保布局正确
             self.callCardView.setNeedsLayout()
@@ -343,7 +342,7 @@ public class CallPopupView: UIView {
 extension CallPopupView {
     
     // 配置呼叫者信息
-    func refresh(profile: CallUserProfileProtocol, type: CallType) {
+    func refresh(profile: CallProfileProtocol, type: CallType) {
         callCardView.refresh(profile: profile,type: type)
     }
 }
