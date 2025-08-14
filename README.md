@@ -123,7 +123,7 @@ Classes
 # 运行示例项目
 
 - [注册环信AppKey](https://docs-im-beta.easemob.com/product/enable_and_configure_IM.html#%E8%8E%B7%E5%8F%96%E7%8E%AF%E4%BF%A1%E5%8D%B3%E6%97%B6%E9%80%9A%E8%AE%AF-im-%E7%9A%84%E4%BF%A1%E6%81%AF)
-- [开通RTC功能](./DocumentationImages/open_rtc.png)
+- ![开通RTC功能](./DocumentationImages/open_rtc.png)
 
 - 在Appdelegate.swift 中找到
 ```Swift
