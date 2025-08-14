@@ -40,6 +40,6 @@ TODO: Add long description of the pod here.
   # s.public_header_files = 'Pod/Classes/**/*.h'
   s.frameworks = 'UIKit', 'Foundation', 'Combine', 'AudioToolbox', 'AVFoundation','AVKit', 'CoreMedia', 'CoreVideo', 'CoreGraphics'
   
-  s.dependency 'HyphenateChat','>= 4.15.0'
+  s.dependency 'HyphenateChat','>= 4.16.0'
   s.dependency 'AgoraRtcEngine_iOS/RtcBasic', '~> 4.5.0'
 end
