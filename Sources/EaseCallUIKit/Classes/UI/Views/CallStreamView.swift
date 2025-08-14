@@ -52,7 +52,7 @@ public class CallStreamView: UIImageView {
         clipsToBounds = true
         self.isUserInteractionEnabled = true
         
-        canvasView.backgroundColor = UIColor.orange
+        canvasView.backgroundColor = UIColor.clear
         canvasView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(canvasView)
         
@@ -73,6 +73,7 @@ public class CallStreamView: UIImageView {
         networkStatusView.backgroundColor = UIColor.callTheme.barrageLightColor5
         networkStatusView.layer.cornerRadius = 4
         networkStatusView.clipsToBounds = true
+        networkStatusView.isHidden = true
         imageView.addSubview(networkStatusView)
         
         coverView.backgroundColor = UIColor.black.withAlphaComponent(0.3)
@@ -164,14 +165,12 @@ public class CallStreamView: UIImageView {
         if newItem.videoMuted {
             self.sendSubviewToBack(self.canvasView)
             self.bringSubviewToFront(self.imageView)
-            self.imageCover.isHidden = false
             if !newItem.waiting {
                 self.sendSubviewToBack(self.coverView)
             } else {
                 self.bringSubviewToFront(self.coverView)
             }
         } else {
-            self.imageCover.isHidden = true
             self.sendSubviewToBack(self.imageView)
             self.bringSubviewToFront(self.canvasView)
         }
