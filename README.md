@@ -513,8 +513,9 @@ extension MainViewController: CallServiceListener {
 - 音频
 - 国际化文件
 
-[资源图](./DocumentationImages/resource_replace.png)
-[资源图1](./DocumentationImages/resource_replace1.png)
+![资源图](./DocumentationImages/resource_replace.png)
+
+![资源图1](./DocumentationImages/resource_replace1.png)
 
 
 ## 3.修改业务可配置项
