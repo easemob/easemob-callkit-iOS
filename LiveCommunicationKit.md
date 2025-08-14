@@ -27,7 +27,7 @@
 
 ![证书管理](./DocumentationImages/createCertification.png)
 
-![添加证书](./DocumentationImages/addCertification)
+![添加证书](./DocumentationImages/addCertification.png)
 
 ![开启VOIP](./DocumentationImages/VoIPCertification.png)
 
