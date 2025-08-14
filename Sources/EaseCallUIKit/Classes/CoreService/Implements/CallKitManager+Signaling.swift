@@ -71,17 +71,17 @@ extension CallKitManager: ChatEventsListener {
             if msgType == kMsgTypeValue {
                 if let action = ext[kAction] as? String {
                     switch action {
-                    case kInviteAction://被叫收到邀请
+                    case CALL_INVITE://被叫收到邀请
                         handleInviteAction()
-                    case kAlertAction://主叫收到被叫回复信息判断本次呼叫是否有效
+                    case CALL_ALERT://主叫收到被叫回复信息判断本次呼叫是否有效
                         handleAlertAction()
-                    case kConfirmRingAction://被叫收到主叫的确认振铃事件后弹窗振铃
+                    case CALL_CONFIRM_RING://被叫收到主叫的确认振铃事件后弹窗振铃
                         handleConfirmRingAction()
-                    case kCancelCallAction://被叫收到主叫已经取消呼叫的事件
+                    case CALL_CANCEL://被叫收到主叫已经取消呼叫的事件
                         handleCancelAction()
-                    case kConfirmCalleeAction://确认被叫
+                    case CALL_CONFIRM_CALLEE://确认被叫
                         handleConfirmCalleeAction()
-                    case kAnswerCallAction://主叫收到被叫接受/拒绝/忙碌通话
+                    case CALL_ANSWER://主叫收到被叫接受/拒绝/忙碌通话
                         handleAnswerCallAction()
                     default:
                         consoleLogInfo("Unknown action type: \(action) in message id:\(message.messageId)", type: .error)
@@ -555,7 +555,7 @@ extension CallKitManager: CallMessageService {
     private func sendCallSignaling(userId: String, type: CallType, callId: String, channelName: String, extensionInfo: [String: Any]?) {
         var ext: [String: Any] = [
             kMsgType: kMsgTypeValue,
-            kAction: kInviteAction,
+            kAction: CALL_INVITE,
             kCallId: callId,
             kCallType: type.rawValue,
             kCallerDevId: ChatClient.shared().getDeviceConfig(nil).deviceUUID ?? "",
@@ -816,7 +816,7 @@ extension CallKitManager: CallMessageService {
     ) {
         var ext: [String: Any] = [
             kMsgType: kMsgTypeValue,
-            kAction: kInviteAction,
+            kAction: CALL_INVITE,
             kCallId: callId,
             kCallType: CallType.groupCall.rawValue,
             kCallerDevId: ChatClient.shared().getDeviceConfig(nil).deviceUUID ?? "",
@@ -900,7 +900,7 @@ extension CallKitManager: CallMessageService {
     ) {
         var ext: [String: Any] = [
             kMsgType: kMsgTypeValue,
-            kAction: kInviteAction,
+            kAction: CALL_INVITE,
             kCallId: callId,
             kCallType: CallType.groupCall.rawValue,
             kCallerDevId: ChatClient.shared().getDeviceConfig(nil).deviceUUID ?? "",
@@ -973,7 +973,7 @@ extension CallKitManager: CallMessageService {
         let json = CallKitManager.shared.currentUserInfo?.toJsonObject() ?? [:]
         var ext: [String: Any] = [
             kMsgType: kMsgTypeValue,
-            kAction: kAlertAction,
+            kAction: CALL_ALERT,
             kCallId: callId,
             kCallerDevId: callerDeviceId,
             kCalleeDevId: ChatClient.shared().getDeviceConfig(nil).deviceUUID ?? "",
@@ -1013,7 +1013,7 @@ extension CallKitManager: CallMessageService {
         let json = CallKitManager.shared.currentUserInfo?.toJsonObject() ?? [:]
         var ext: [String: Any] = [
             kMsgType: kMsgTypeValue,
-            kAction: kCancelCallAction,
+            kAction: CALL_CANCEL,
             kCallId: callId,
             kCallerDevId: ChatClient.shared().getDeviceConfig(nil).deviceUUID ?? "",
             kTs: Int(Date().timeIntervalSince1970 * 1000) // Timestamp in milliseconds
@@ -1053,7 +1053,7 @@ extension CallKitManager: CallMessageService {
         let json = CallKitManager.shared.currentUserInfo?.toJsonObject() ?? [:]
         var ext: [String: Any] = [
             kMsgType: kMsgTypeValue,
-            kAction: kConfirmRingAction,
+            kAction: CALL_CONFIRM_RING,
             kCallId: callId,
             kCalleeDevId: calleeDeviceId,
             kCallerDevId: ChatClient.shared().getDeviceConfig(nil).deviceUUID ?? "",
@@ -1092,7 +1092,7 @@ extension CallKitManager: CallMessageService {
         let json = CallKitManager.shared.currentUserInfo?.toJsonObject() ?? [:]
         var ext: [String: Any] = [
             kMsgType: kMsgTypeValue,
-            kAction: kConfirmCalleeAction,
+            kAction: CALL_CONFIRM_CALLEE,
             kCallId: callId,
             kCalleeDevId: calleeDeviceId,
             kCallerDevId: ChatClient.shared().getDeviceConfig(nil).deviceUUID ?? "",
@@ -1132,7 +1132,7 @@ extension CallKitManager: CallMessageService {
 
         var ext: [String: Any] = [
             kMsgType: kMsgTypeValue,
-            kAction: kAnswerCallAction,
+            kAction: CALL_ANSWER,
             kCallId: callId,
             kCalleeDevId: ChatClient.shared().getDeviceConfig(nil).deviceUUID ?? "",
             kCallerDevId: callerDeviceId,
