@@ -38,7 +38,9 @@
   - [5.监听事件和错误](#5监听easecalluikit事件和错误)
 - [自定义](#自定义)
   - [1.修改UI可配置项](#1修改ui可配置项)
-  - [2.修改业务可配置项](#2修改业务可配置项)
+  - [2.修改资源原有](#2修改资源原有)
+  - [3.修改业务可配置项](#3修改业务可配置项)
+  - [4.如果想进一步修改业务逻辑，请源码集成后修改](#4如果想进一步修改业务逻辑请源码集成后修改)
 - [文档](#文档)
 - [设计指南](#设计指南)
 - [贡献](#贡献)
@@ -120,6 +122,7 @@ Classes
 # 运行示例项目
 
 - [注册环信AppKey](https://docs-im-beta.easemob.com/product/enable_and_configure_IM.html#%E8%8E%B7%E5%8F%96%E7%8E%AF%E4%BF%A1%E5%8D%B3%E6%97%B6%E9%80%9A%E8%AE%AF-im-%E7%9A%84%E4%BF%A1%E6%81%AF)
+- [开通RTC功能](./DocumentationImages/open_rtc.png)
 
 - 在Appdelegate.swift 中找到
 ```Swift
@@ -492,7 +495,12 @@ extension MainViewController: CallServiceListener {
         CallAppearance.backgroundImage = UIImage(named: "chat_background")
 ```
 
-## 2.修改业务可配置项
+## 2.修改资源原有
+[资源图](./DocumentationImages/resource_replace.png)
+[资源图1](./DocumentationImages/resource_replace1.png)
+
+
+## 3.修改业务可配置项
 ```Swift
         let config = EaseCallUIKit.CallKitConfig()
         config.enableVOIP = true //开启voip功能后会自动开启LiveCommunicationKit，需要在develop.apple.com申请证书时勾选
@@ -500,6 +508,8 @@ extension MainViewController: CallServiceListener {
         config.ringTimeOut = 30//默认呼叫超时时间
         CallKitManager.shared.setup(config)
 ```
+
+4.如果想进一步修改业务逻辑，请源码集成后修改
 
 # 文档
 
