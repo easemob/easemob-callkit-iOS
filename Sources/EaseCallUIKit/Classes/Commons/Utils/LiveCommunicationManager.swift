@@ -92,7 +92,7 @@ extension LiveCommunicationManager: PKPushRegistryDelegate {
         ChatClient.shared().applicationWillEnterForeground(UIApplication.shared)
         // 处理呼叫到来的逻辑
         handleIncomingCall(payload: payload)
-        Thread.sleep(forTimeInterval: 0.1)
+        Thread.sleep(forTimeInterval: 0.05)
         completion()
     }
     
@@ -116,6 +116,7 @@ extension LiveCommunicationManager: PKPushRegistryDelegate {
         if let msgId = payload.dictionaryPayload["m"] as? String {
             if let message = ChatClient.shared().chatManager?.getMessageWithMessageId(msgId) {
                 if let callInfo = message.callInfo {
+                    callId = callInfo.callId
                     CallKitManager.shared.callInfo = callInfo
                     CallKitManager.shared.callInfo?.inviteMessage = message
                     consoleLogInfo("[LiveCommunicationManager] set callInfo from message: \(callInfo)", type: .debug)
@@ -140,12 +141,7 @@ extension LiveCommunicationManager: PKPushRegistryDelegate {
         } else {
             consoleLogInfo("[LiveCommunicationManager] reuse UUID: \(uuid!.uuidString)", type: .debug)
         }
-        if let liveCallId = uuid {
-            LiveCommunicationManager.shared.reportIncomingCall(uuid: liveCallId, callerName: callerNickname.isEmpty ? callerID:callerNickname)
-        } else {
-            consoleLogInfo("[LiveCommunicationManager] failed to create UUID for incoming call", type: .error)
-            return
-        }
+        LiveCommunicationManager.shared.reportIncomingCall(uuid: uuid!, callerName: callerNickname.isEmpty ? callerID:callerNickname)
     }
 }
 
@@ -182,17 +178,16 @@ extension LiveCommunicationManager: ConversationManagerDelegate
     }
     
     private func joinAction(action: JoinConversationAction) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: {
+        DispatchQueue.main.async {
             UIViewController.currentController?.showCallToast(toast: "Connecting".call.localize)
-            if let call = CallKitManager.shared.callInfo,!call.callId.isEmpty {
-                CallKitManager.shared.accept()
-                action.fulfill()
-            } else {
-                consoleLogInfo("[LiveCommunicationManager] do not have call info", type: .error)
-                action.fail()
-                CallKitManager.shared.quitCall()
-            }
-        })
+        }
+        if let call = CallKitManager.shared.callInfo,!call.callId.isEmpty {
+            CallKitManager.shared.accept()
+            action.fulfill()
+        } else {
+            consoleLogInfo("[LiveCommunicationManager] do not have call info", type: .error)
+            action.fail()
+        }
     }
     
     private func muteAction(action: MuteConversationAction) {

@@ -145,6 +145,7 @@ open class Call1v1VideoViewController: UIViewController {
         //When the app goes to background, pop the view controller
         NotificationCenter.default.addObserver(forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
             self?.pop()
+            consoleLogInfo("iOS 17.4及以上系统，开启VOIP模式下，应用进入后台会自动挂断LiveCommunicationManager通话", type: .error)
         }
         self.floatView.updateVideoState(true)
     }
@@ -495,6 +496,7 @@ open class Call1v1VideoViewController: UIViewController {
         if CallKitManager.shared.config.enablePIPOn1V1VideoScene {
             releaseActiveVideoCallSourceView()
         }
+        CallKitManager.shared.callInfo?.state = .idle
     }
 }
 

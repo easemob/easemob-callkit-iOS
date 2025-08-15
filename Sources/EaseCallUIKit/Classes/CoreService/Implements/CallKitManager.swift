@@ -231,6 +231,7 @@ public let CallKitVersion = "1.0.0"
         DispatchQueue.main.async {
             AudioPlayerManager.shared.stopAudio()
             if let call = self.callInfo, call.state == .ringing {
+                consoleLogInfo("Call ringing timeout, ending call", type: .info)
                 self.updateCallEndReason(.noResponse)
             }
         }

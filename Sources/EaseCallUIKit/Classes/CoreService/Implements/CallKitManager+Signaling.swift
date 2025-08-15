@@ -164,6 +164,7 @@ extension CallKitManager: ChatEventsListener {
                         self.stopConfirmBuildConnectionTimer(callId: callId)
                         self.stopRingTimer(callId: callId)
                         if let call = self.callInfo, call.callId == callId,call.state != .answering {
+                            consoleLogInfo("Call canceled with callId: \(callId)", type: .info)
                             self.updateCallEndReason(.remoteCancel)
                         } else {
                             self.receivedCalls.removeValue(forKey: callId)
@@ -197,11 +198,13 @@ extension CallKitManager: ChatEventsListener {
                                             consoleLogInfo("Failed to join channel with error code: \(success)", type: .error)
                                         }
                                     case kBusyResult:
+                                        consoleLogInfo("Remote user is busy for callId: \(callId)", type: .info)
                                         self.updateCallEndReason(.busy)
                                     default:
                                         break
                                     }
                                 } else {//其它设备处理
+                                    consoleLogInfo("Current device:\(currentDeviceId) Call confirm on other device:\(calleeDevId) messageId:\(message.messageId) ext:\(String(describing: ext))", type: .error)
                                     self.updateCallEndReason(.handleOnOtherDevice)
                                     AudioPlayerManager.shared.stopAudio()
                                 }
@@ -237,6 +240,7 @@ extension CallKitManager: ChatEventsListener {
                                     } else {
                                         AudioPlayerManager.shared.stopAudio()
                                         let endReason = getEndReason(result: result)
+                                        consoleLogInfo("Remote user refuse/busy for callId: \(callId) with reason: \(endReason)", type: .info)
                                         self.updateCallEndReason(endReason)
                                         let result = self.engine?.leaveChannel() ?? 0
                                         consoleLogInfo("Remote user refuse then leave channel result: \(result)", type: .info)
@@ -264,6 +268,7 @@ extension CallKitManager: ChatEventsListener {
         if let currentVC = UIViewController.currentController {
             if currentVC is Call1v1AudioViewController || currentVC is Call1v1VideoViewController {
                 currentVC.dismiss(animated: true)
+                consoleLogInfo("Dismiss current call page:\(currentVC)", type: .info)
                 self.quitCall()
             }
             self.popup?.dismiss()
@@ -275,6 +280,7 @@ extension CallKitManager: ChatEventsListener {
     ///   - reason: The reason for ending the call.``CallEndReason``
     ///   - immediateCallback: If true, the update will immediately notify listeners with the updated message.
     func updateCallEndReason(_ reason: CallEndReason, _ immediateCallback: Bool = true) {
+        consoleLogInfo("Update call end reason to: \(reason.rawValue)", type: .info)
         if let info = self.callInfo,let message = info.inviteMessage {
             let ext = message.ext ?? [:]
             var newExt = ext
@@ -1033,6 +1039,7 @@ extension CallKitManager: CallMessageService {
         }
         if let call = self.callInfo,call.callId == callId,call.callerId == ChatClient.shared().currentUsername ?? "" {
             if call.type != .groupCall {
+                consoleLogInfo("Caller cancelled the call", type: .info)
                 self.updateCallEndReason(.cancel)
             }
         }
@@ -1123,6 +1130,7 @@ extension CallKitManager: CallMessageService {
     ///   - result: The result of the call, such as "accept", "busy", or "refuse".
     ///   - callerDeviceId: The device ID of the caller.
     func answerCall(callId: String,callerId: String,result: String,callerDeviceId: String) {
+        consoleLogInfo("Answer call with ID: \(callId), caller ID: \(callerId), result: \(result), caller device ID: \(callerDeviceId)", type: .info)
         if callId.isEmpty || callerId.isEmpty || result.isEmpty || callerDeviceId.isEmpty {
             consoleLogInfo("Invalid parameters for answering call:\ncallId: \(callId), callerId: \(callerId), result: \(result), callerDeviceId: \(callerDeviceId)", type: .error)
             self.handleBusinessError(CallError.CallBusiness(error: .param, message: "Invalid parameters for answering call"))
@@ -1159,6 +1167,7 @@ extension CallKitManager: CallMessageService {
     }
     
     public func hangup() {
+        consoleLogInfo("Hangup called", type: .info)
         if let call = self.callInfo {
             AudioPlayerManager.shared.stopAudio()
             switch call.state {
@@ -1333,7 +1342,9 @@ extension CallKitManager: CallMessageService {
             DispatchQueue.main.async {
                 AudioPlayerManager.shared.stopAudio()
                 UIApplication.shared.isIdleTimerDisabled = false
-                UIViewController.currentController?.dismiss(animated: true)
+                if let currentVC = UIViewController.currentController, !(currentVC is Call1v1AudioViewController || currentVC is Call1v1VideoViewController || currentVC is CallMultiViewController) {
+                    self.dismissCurrentCallPage()
+                }
                 self.callVC?.dismiss(animated: false)
                 self.callVC = nil
                 self.popup?.dismiss()
@@ -1442,13 +1453,13 @@ extension CallKitManager: TimerServiceListener {
                     FloatingAudioView.removeFromWindow()
                 }
                 self.popup?.dismiss()
+                consoleLogInfo("Caller call timeout, cancel the call", type: .info)
                 self.updateCallEndReason(.remoteNoResponse)
             }
         case timerIdentifyRing://被叫振铃等待超时
             if seconds >= CallKitManager.shared.config.ringTimeOut {
                 self.stopRingTimer(callId: call.callId)
                 self.ringTimeout()
-                self.updateCallEndReason(.noResponse)
                 if let vc = UIViewController.currentController {
                      if vc is Call1v1AudioViewController || vc is Call1v1VideoViewController {
                         vc.dismiss(animated: true)
@@ -1461,6 +1472,7 @@ extension CallKitManager: TimerServiceListener {
             }
         case startInvitationSignalTimer://开始邀请回复信令超时
             if seconds >= updateDuration,call.calleeId == ChatClient.shared().currentUsername ?? "" {
+                consoleLogInfo("Callee invitation signal timeout, no response", type: .info)
                 self.updateCallEndReason(.noResponse)
                 self.stopInvitationSignalTimer(callId: call.callId)
                 AudioPlayerManager.shared.stopAudio()
@@ -1469,6 +1481,7 @@ extension CallKitManager: TimerServiceListener {
             if seconds >= updateDuration {
                 self.stopConfirmBuildConnectionTimer(callId: call.callId)
                 AudioPlayerManager.shared.stopAudio()
+                consoleLogInfo("Callee confirm build connection timeout, no response", type: .info)
                 self.updateCallEndReason(.remoteNoResponse)
             }
         case answeringTimerKey://更新时间

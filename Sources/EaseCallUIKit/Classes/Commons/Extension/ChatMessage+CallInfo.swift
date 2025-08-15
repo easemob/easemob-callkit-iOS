@@ -13,8 +13,8 @@ public extension ChatMessage {
             guard let msgType = ext[kMsgType] as? String,
                   let callId = ext[kCallId] as? String,
                   let callerDevId = ext[kCallerDevId] as? String
-            else {
-                consoleLogInfo("Get info invalid call info in message id:\(self.messageId) : \(String(describing: self.ext))", type: .error)
+                   else {
+                consoleLogInfo("Invalid call info in message id:\(messageId) : \(String(describing: ext))", type: .error)
                 return nil
             }
             let defaultCalleeId = ChatClient.shared().getDeviceConfig(nil).deviceUUID ?? ""
@@ -25,14 +25,17 @@ public extension ChatMessage {
             let isValid = ext[kCallStatus] as? Bool ?? false//呼叫的离线消息是否有效
             let result = ext[kCallResult] as? String ?? ""
             let callExtension: [String: Any] = ext[kExt] as? [String: Any] ?? [:]
-            let groupId = callExtension["groupId"] as? String ?? ""
-            let groupName = callExtension["groupName"] as? String ?? ""
-            let groupAvatar = callExtension["groupAvatar"] as? String ?? ""
-            if let userJson = ext[kUserInfo] as? [String: Any] {
-                let profile  = CallUserProfile()
+            let groupExtension: [String: Any] = ext[kCallKitGroupExt] as? [String: Any] ?? [:]
+            // 解析群组信息
+            let groupId = groupExtension["groupId"] as? String ?? ""
+            let groupName = groupExtension["groupName"] as? String ?? ""
+            let groupAvatar = groupExtension["groupAvatar"] as? String ?? ""
+            
+            if let userJson = ext[kUserInfo] as? [String: Any] {//解析携带的用户信息
+                let profile = CallUserProfile()
                 profile.setValuesForKeys(userJson)
                 if profile.id.isEmpty {
-                    profile.id = self.from
+                    profile.id = from
                 }
                 if CallKitManager.shared.usersCache[profile.id] == nil {
                     CallKitManager.shared.usersCache[profile.id] = profile
@@ -41,7 +44,7 @@ public extension ChatMessage {
                     CallKitManager.shared.usersCache[profile.id]?.avatarURL = profile.avatarURL
                 }
             }
-            let callInfo = CallInfo(callId: callId, callerId: callerDevId, callerDeviceId: callerDevId, channelName: channelName, type: callType)
+            let callInfo = CallInfo(callId: callId, callerId: from, callerDeviceId: callerDevId, channelName: channelName, type: callType)
             callInfo.state = isValid ? .ringing : .idle
             callInfo.extensionInfo = callExtension
             callInfo.groupId = groupId

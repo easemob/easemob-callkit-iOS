@@ -359,7 +359,7 @@ extension CallKitManager: AgoraRtcEngineDelegate {
     
     public func rtcEngine(_ engine: AgoraRtcEngineKit, didOfflineOfUid uid: UInt, reason: AgoraUserOfflineReason) {
         //On remote user leaving the RTC channel
-        
+        consoleLogInfo("rtcEngine didOfflineOfUid: \(uid) reason: \(reason.rawValue)", type: .debug)
         DispatchQueue.main.async {
             if let call = self.callInfo {
                 if call.type == .groupCall {
@@ -396,6 +396,12 @@ extension CallKitManager: AgoraRtcEngineDelegate {
                         //TODO: - 是否发送信令消息给对方告知通话异常结束(用户如果需要，可以自行改造信令流程)
                     case .quit:
                         self.updateCallEndReason(.hangup)
+                        DispatchQueue.main.async {
+                            self.callVC?.dismiss(animated: true, completion: nil)
+                            if let controller = UIViewController.currentController,(controller is Call1v1VideoViewController || controller is Call1v1AudioViewController ) {
+                                controller.dismiss(animated: true)
+                            }
+                        }
                     default:
                         break
                     }
