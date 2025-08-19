@@ -50,7 +50,7 @@ class LiveCommunicationManager: NSObject {
             maximumConversationGroups: 1,
             maximumConversationsPerConversationGroup: 1,
             includesConversationInRecents: false,
-            supportsVideo: false,
+            supportsVideo: true,
             supportedHandleTypes: [.generic]
         )
         manager = ConversationManager(configuration: config)

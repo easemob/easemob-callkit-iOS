@@ -191,9 +191,7 @@ extension CallKitManager: ChatEventsListener {
                                             guard let `self` = self else { return }
                                             if success {
                                                 CallKitManager.shared.callInfo?.state = .answering
-                                                DispatchQueue.main.async {
-                                                    self.presentCalleeController(call: call)
-                                                }
+                                                self.presentCalleeController(call: call)
                                             }
                                             consoleLogInfo("Failed to join channel with error code: \(success)", type: .error)
                                         }
@@ -255,7 +253,6 @@ extension CallKitManager: ChatEventsListener {
                             consoleLogInfo("Current device:\(deviceId) Call answer on other device:\(callerDevId) messageId:\(message.messageId) callId:\(callId) call.callId:\(String(describing: self.callInfo?.callId))", type: .error)
                             self.receivedCalls.removeValue(forKey: callId)
                             self.stopInvitationSignalTimer(callId: callId)
-                            self.quitCall()
                         }
                     }
                 }
@@ -373,7 +370,7 @@ extension CallKitManager: ChatEventsListener {
     
     func presentCalleeController(call: CallInfo) {
         if call.state != .idle {
-            var vc: UIViewController = Call1v1AudioViewController(role: .callee)
+            var vc: UIViewController = UIViewController()
             switch call.type {
             case .singleAudio:
                 vc = Call1v1AudioViewController(role: .callee)
@@ -665,7 +662,7 @@ extension CallKitManager: CallMessageService {
             if let currentUserId = ChatClient.shared().currentUsername {
                 excludeUsers.append(currentUserId)
             }
-            
+            currentVC.view.window?.backgroundColor = .black
             (currentVC is CallMultiViewController ? currentVC : UIApplication.shared.call.keyWindow?.rootViewController)?.present(
                 MultiCallParticipantsController(groupId: groupId, excludeUsers: excludeUsers, closure: { [weak self] ids,groupName,groupAvatar in
                     guard let `self` = self else { return }
@@ -689,6 +686,7 @@ extension CallKitManager: CallMessageService {
                         extensionInfo: extensionInfo,
                         currentVC: currentVC
                     )
+
                 }), animated: true
             )
         }
@@ -945,14 +943,6 @@ extension CallKitManager: CallMessageService {
                 self.handleError(error)
                 consoleLogInfo("Failed to send group call message: \(String(describing: error.errorDescription))", type: .error)
                 self.callStartTimerStop(callId: callId + " users:" + ids.joined(separator: "-"))
-                self.callInfo?.state = .idle
-                
-                // Dismiss UI on failure
-                DispatchQueue.main.async {
-                    AudioPlayerManager.shared.stopAudio()
-                    UIViewController.currentController?.dismiss(animated: true)
-                }
-                self.quitCall()
                 return
             }
             
@@ -996,7 +986,6 @@ extension CallKitManager: CallMessageService {
             let result = await ChatClient.shared().chatManager?.send(message, progress: nil)
             if let error = result?.1 {
                 self.handleError(error)
-                self.callInfo?.state = .idle
                 consoleLogInfo("Failed to send calleeAnswerCaller message: \(String(describing: error.errorDescription))", type: .error)
             }
         }
@@ -1078,7 +1067,6 @@ extension CallKitManager: CallMessageService {
             let result = await ChatClient.shared().chatManager?.send(message, progress: nil)
             if let error = result?.1 {
                 self.handleError(error)
-                self.callInfo?.state = .idle
                 consoleLogInfo("Failed to send confirm ring message: \(String(describing: error.errorDescription))", type: .error)
             }
         }
@@ -1117,7 +1105,6 @@ extension CallKitManager: CallMessageService {
             let result = await ChatClient.shared().chatManager?.send(message, progress: nil)
             if let error = result?.1 {
                 self.handleError(error)
-                self.callInfo?.state = .idle
                 consoleLogInfo("Failed to send confirm answer message: \(String(describing: error.errorDescription))", type: .error)
             }
         }

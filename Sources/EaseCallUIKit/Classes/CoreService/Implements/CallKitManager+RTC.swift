@@ -459,9 +459,7 @@ extension CallKitManager: AgoraRtcEngineDelegate {
                                     }
                                 }
                                 if let streamView = self.canvasCache[userId],let item = self.itemsCache[userId] {
-                                    if reason == .remoteUnmuted {//Remote video unmuted
-                                        item.videoMuted = false
-                                    }
+                                    item.videoMuted = false
                                     item.uid = UInt32(truncating: uidKey)
                                     streamView.updateItem(item)
                                     self.setupRemoteVideoView(userId: userId, uid: uid)
