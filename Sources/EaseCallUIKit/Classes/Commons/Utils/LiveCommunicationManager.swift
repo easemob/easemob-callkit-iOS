@@ -208,20 +208,8 @@ extension LiveCommunicationManager: ConversationManagerDelegate
     
     private func endAction(action: EndConversationAction) {
         consoleLogInfo("[LiveCommunicationManager] perform endAction:",type: .debug)
-        if let call = CallKitManager.shared.callInfo {
-            if call.state == .answering || call.state == .ringing {
-                CallKitManager.shared.hangup()
-                action.fulfill()
-            } else {
-                consoleLogInfo("[LiveCommunicationManager] call is not answering or ringing, state: \(call.state.rawValue)", type: .error)
-                action.fail()
-                CallKitManager.shared.quitCall()
-            }
-        } else {
-            consoleLogInfo("[LiveCommunicationManager] do not have call info", type: .error)
-            action.fail()
-            CallKitManager.shared.quitCall()
-        }
+        CallKitManager.shared.hangup()
+        action.fulfill()
     }
     
     func conversationManager(_ manager: ConversationManager, timedOutPerforming action: ConversationAction) {
