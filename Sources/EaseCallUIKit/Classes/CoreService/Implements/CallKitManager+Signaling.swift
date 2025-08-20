@@ -107,7 +107,7 @@ extension CallKitManager: ChatEventsListener {
                             info.groupName = groupName
                             info.groupAvatar = groupAvatar
                             info.state = .ringing
-                            info.inviteMessage = message
+                            info.inviteMessageId = message.messageId
                             self.receivedCalls[callId] = info
                             if UIApplication.shared.applicationState == .background {
                                 self.callInfo = info
@@ -186,7 +186,7 @@ extension CallKitManager: ChatEventsListener {
 //                                        if call.type == .singleVideo {
 //                                            self.setupLocalVideo()
 //                                        }
-                                        if call.type == .singleVideo {
+                                        if call.type != .singleAudio {
                                                 if #available(iOS 17.4, *),CallKitManager.shared.config.enableVOIP {
                                                     LiveCommunicationManager.shared.endCall()
                                                 }
@@ -282,7 +282,7 @@ extension CallKitManager: ChatEventsListener {
     ///   - immediateCallback: If true, the update will immediately notify listeners with the updated message.
     func updateCallEndReason(_ reason: CallEndReason, _ immediateCallback: Bool = true) {
         consoleLogInfo("Update call end reason to: \(reason.rawValue)", type: .info)
-        if let info = self.callInfo,let message = info.inviteMessage {
+        if let info = self.callInfo,let message = ChatClient.shared().chatManager?.getMessageWithMessageId(info.inviteMessageId) {
             let ext = message.ext ?? [:]
             var newExt = ext
             newExt[kCallEndReason] = reason.rawValue
@@ -609,7 +609,7 @@ extension CallKitManager: CallMessageService {
             }
             
             // Update call info with message details
-            self.callInfo?.inviteMessage = result?.0
+            self.callInfo?.inviteMessageId = result?.0?.messageId ?? ""
             self.callInfo?.extensionInfo = message.ext as? [String : Any]
             
             // Start call timer
@@ -874,7 +874,7 @@ extension CallKitManager: CallMessageService {
             }
             
             // Update call info with message details
-            self.callInfo?.inviteMessage = result?.0
+            self.callInfo?.inviteMessageId = result?.0?.messageId ?? ""
             
             // Start timer
             let timerKey = callId + " users:" + ids.joined(separator: "-")
@@ -951,7 +951,7 @@ extension CallKitManager: CallMessageService {
             }
             
             // Update call info with message details
-            self.callInfo?.inviteMessage = result?.0
+            self.callInfo?.inviteMessageId = result?.0?.messageId ?? ""
             
             // Start timer
             let timerKey = callId + " users:" + ids.joined(separator: "-")
@@ -1366,7 +1366,7 @@ extension CallKitManager: CallMessageService {
             self.callInfo?.groupId = nil
             self.callInfo?.groupName = nil
             self.callInfo?.groupAvatar = nil
-            self.callInfo?.inviteMessage = nil
+            self.callInfo?.inviteMessageId = ""
             self.callInfo?.calleeDeviceId = ""
             self.callInfo?.extensionInfo = nil
             self.callInfo?.state = .idle
@@ -1486,7 +1486,7 @@ extension CallKitManager: TimerServiceListener {
                     floating.updateSeconds(seconds: Int(seconds))
                 }
                 if seconds%updateDuration == 0 {
-                    if let message = self.callInfo?.inviteMessage {
+                    if let messageId = self.callInfo?.inviteMessageId, let message = ChatClient.shared().chatManager?.getMessageWithMessageId(messageId) {
                         let ext = message.ext ?? [:]
                         var newExt = ext
                         newExt[kCallDuration] = seconds

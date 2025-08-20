@@ -49,14 +49,13 @@ import AgoraRtcKit
     @objc public var groupName: String? // 群组名称（如果是群组通话）
     @objc public var groupAvatar: String? // 群组头像（如果是群组通话）
     @objc public var duration: UInt = 0 // 通话时长，默认为0
-    @objc public var inviteMessage: ChatMessage? // 邀请通话时的消息ID  消息对象
+    @objc public var inviteMessageId: String = "" // 邀请通话时的消息ID  消息对象
     
     @objc public init(callId: String, callerId: String, callerDeviceId: String, channelName: String, type: CallType, startMessageId: String = "", extensionInfo: [String: Any]? = nil) {
         self.callId = callId
         self.callerId = callerId
         self.callerDeviceId = callerDeviceId
         self.channelName = channelName
-        self.inviteMessage = ChatClient.shared().chatManager?.getMessageWithMessageId(startMessageId)
         self.type = type
         self.extensionInfo = extensionInfo
     }

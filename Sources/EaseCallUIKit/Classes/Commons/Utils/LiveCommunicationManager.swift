@@ -60,7 +60,7 @@ class LiveCommunicationManager: NSObject {
     func reportIncomingCall(uuid: UUID, callerName: String, call type: CallType) {
         let local = Handle(type: .generic, value: callerName, displayName: callerName)
         var capabilities: Conversation.Capabilities? = []
-        if type == .singleVideo {
+        if type != .singleAudio {
             capabilities = [.video]
         }
         let update = Conversation.Update(localMember: local,members: [local],activeRemoteMembers: [local],capabilities: capabilities)
@@ -68,7 +68,7 @@ class LiveCommunicationManager: NSObject {
         Task {
             do {
                 try await manager?.reportNewIncomingConversation(uuid: uuid, update: update)
-                consoleLogInfo("[LiveCommunicationManager] successfully reported new incoming call", type: .debug)
+                consoleLogInfo("[LiveCommunicationManager] successfully reported new incoming call: \(callerName) uuid: \(uuid.uuidString) type: \(type.rawValue)", type: .debug)
                 CallKitManager.shared.callInfo?.state = .ringing
             } catch {
                 consoleLogInfo("[LiveCommunicationManager] failed to report new incoming call: \(error.localizedDescription)", type: .error)
@@ -151,26 +151,17 @@ extension LiveCommunicationManager: PKPushRegistryDelegate {
         if let group = payload.dictionaryPayload["g"] as? String {
             groupId = group
         }
-        if let msgId = payload.dictionaryPayload["m"] as? String {
-            if let message = ChatClient.shared().chatManager?.getMessageWithMessageId(msgId) {
-                if let callInfo = message.callInfo {
-                    callId = callInfo.callId
-                    CallKitManager.shared.callInfo = callInfo
-                    CallKitManager.shared.callInfo?.inviteMessage = message
-                    consoleLogInfo("[LiveCommunicationManager] set callInfo from message: \(callInfo)", type: .debug)
-                } else {
-                    consoleLogInfo("[LiveCommunicationManager] message does not contain call info", type: .error)
-                }
-            }
-            
-        }
         CallKitManager.shared.callInfo = CallInfo(callId: callId, callerId: callerID, callerDeviceId: callerDeviceId, channelName: channelName, type: callType)
+        CallKitManager.shared.callInfo?.calleeDeviceId = ChatClient.shared().getDeviceConfig(nil).deviceUUID ?? ""
         CallKitManager.shared.callInfo?.groupId = groupId
         CallKitManager.shared.callInfo?.groupName = groupName
         CallKitManager.shared.callInfo?.groupAvatar = groupAvatar
         CallKitManager.shared.callInfo?.calleeId = calleeID
         CallKitManager.shared.callInfo?.state = .ringing
         CallKitManager.shared.callInfo?.extensionInfo = custom?[kUserInfo] as? [String: Any]
+        if let msgId = payload.dictionaryPayload["m"] as? String {
+            CallKitManager.shared.callInfo?.inviteMessageId = msgId
+        }
 
         consoleLogInfo("[LiveCommunicationManager] incoming call:  (\(callerID))", type: .debug)
         LiveCommunicationManager.shared.createConversationManager()

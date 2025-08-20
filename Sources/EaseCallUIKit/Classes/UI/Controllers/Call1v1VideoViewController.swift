@@ -127,7 +127,7 @@ open class Call1v1VideoViewController: UIViewController {
         
         var showUserId = (self.role == .caller ? CallKitManager.shared.callInfo?.calleeId : CallKitManager.shared.callInfo?.callerId) ?? ""
         if showUserId.isEmpty {
-            showUserId = CallKitManager.shared.callInfo?.inviteMessage?.from ?? showUserId
+            showUserId = ChatClient.shared().chatManager?.getMessageWithMessageId(CallKitManager.shared.callInfo?.inviteMessageId ?? "")?.from ?? showUserId
         }
         let username = CallKitManager.shared.usersCache[showUserId]?.nickname ?? ""
         let avatarURL = CallKitManager.shared.usersCache[showUserId]?.avatarURL

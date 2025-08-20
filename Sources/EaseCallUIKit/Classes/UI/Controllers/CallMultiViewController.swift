@@ -154,9 +154,11 @@ open class CallMultiViewController: UIViewController {
         case .mic_on:
             CallKitManager.shared.enableLocalAudio(true)
             item.audioMuted = false
+            canvas.updateItem(item)
         case .mic_off:
             CallKitManager.shared.enableLocalAudio(false)
             item.audioMuted = true
+            canvas.updateItem(item)
         case .flip_back: CallKitManager.shared.switchCamera()
         case .flip_front: CallKitManager.shared.switchCamera()
         case .camera_on:
@@ -187,9 +189,8 @@ open class CallMultiViewController: UIViewController {
             if let call = CallKitManager.shared.callInfo {
                 GlobalTimerManager.shared.removeListener(self, timerIdentify: "call-\(call.channelName)-answering-timer")
             }
-            CallKitManager.shared.callVC = nil
-            self.dismiss(animated: true, completion: nil)
             CallKitManager.shared.hangup()
+            self.dismiss(animated: true, completion: nil)
         default: break
         }
     }

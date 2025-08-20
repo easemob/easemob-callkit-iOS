@@ -48,7 +48,7 @@ public class Call1v1AudioViewController: UIViewController {
         // Do any additional setup after loading the view.
         var showUserId = (self.role == .caller ? CallKitManager.shared.callInfo?.calleeId : CallKitManager.shared.callInfo?.callerId) ?? ""
         if showUserId.isEmpty {
-            showUserId = CallKitManager.shared.callInfo?.inviteMessage?.from ?? showUserId
+            showUserId = ChatClient.shared().chatManager?.getMessageWithMessageId(CallKitManager.shared.callInfo?.inviteMessageId ?? "")?.from ?? showUserId
         }
         let username = CallKitManager.shared.usersCache[showUserId]?.nickname ?? ""
         let avatarURL = CallKitManager.shared.usersCache[showUserId]?.avatarURL
@@ -128,9 +128,8 @@ public class Call1v1AudioViewController: UIViewController {
             if let call = CallKitManager.shared.callInfo {
                 GlobalTimerManager.shared.removeListener(self, timerIdentify: "call-\(call.channelName)-answering-timer")
             }
-            CallKitManager.shared.callVC = nil
-            self.dismiss(animated: true, completion: nil)
             CallKitManager.shared.hangup()
+            self.dismiss(animated: true, completion: nil)
         default: break
         }
     }

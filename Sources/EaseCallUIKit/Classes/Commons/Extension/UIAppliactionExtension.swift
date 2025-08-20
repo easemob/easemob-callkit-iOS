@@ -20,7 +20,7 @@ public extension CallKitWrapper where Base == UIApplication {
     /// How to use?
     /// `UIApplication.shared.call.keyWindow`
     var keyWindow: UIWindow? {
-        (base.connectedScenes
+        var window = (base.connectedScenes
          // Keep only active scenes, onscreen and visible to the user
             .filter { $0.activationState == .foregroundActive }
          // Keep only the first `UIWindowScene`
@@ -29,6 +29,10 @@ public extension CallKitWrapper where Base == UIApplication {
             .flatMap({ $0 as? UIWindowScene })?.windows
          // Finally, keep only the key window
             .first(where: \.isKeyWindow))
+        if window == nil {
+            window = UIApplication.shared.keyWindow
+        }
+        return window
     }
 }
 
