@@ -123,7 +123,7 @@ public let CallKitVersion = "1.0.0"
 //        return nil
     }
     
-    @objc public func setupEngine() -> ChatError? {
+    @objc func setupEngine() -> ChatError? {
         if self.engine != nil {
             return nil
         }

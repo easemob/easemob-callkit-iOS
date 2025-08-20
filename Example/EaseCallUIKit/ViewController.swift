@@ -31,7 +31,8 @@ class ViewController: UIViewController {
 //        CallKitManager.shared.currentUserInfo = CallUserProfile()
         self.callTypeSegment.selectedSegmentIndex = 0
         self.callTypeSegment.selectedSegmentTintColor = .systemBlue
-        
+        CallKitManager.shared.profileProvider = self
+        CallKitManager.shared.addListener(self)
     }
     
     override func viewDidAppear(_ animated: Bool) {
@@ -105,4 +106,154 @@ extension ViewController: QLPreviewControllerDataSource {
     }
     
     
+}
+
+extension ViewController: CallUserProfileProvider {
+    func fetchUserProfiles(profileIds: [String]) async -> [any CallProfileProtocol] {
+        return await withTaskGroup(of: [EaseCallUIKit.CallProfileProtocol].self, returning: [EaseCallUIKit.CallProfileProtocol].self) { group in
+            var resultProfiles: [EaseCallUIKit.CallProfileProtocol] = []
+            group.addTask {
+                var resultProfiles: [EaseCallUIKit.CallProfileProtocol] = []
+                let result = await self.requestUserInfos(profileIds: profileIds)
+                if let infos = result {
+                    resultProfiles.append(contentsOf: infos)
+                }
+                return resultProfiles
+            }
+            //Await all task were executed.Return values.
+            for await result in group {
+                resultProfiles.append(contentsOf: result)
+            }
+            return resultProfiles
+        }
+    }
+    
+    func fetchGroupProfiles(profileIds: [String]) async -> [any CallProfileProtocol] {
+        return await withTaskGroup(of: [EaseCallUIKit.CallProfileProtocol].self, returning: [EaseCallUIKit.CallProfileProtocol].self) { group in
+            var resultProfiles: [EaseCallUIKit.CallProfileProtocol] = []
+            group.addTask {
+                var resultProfiles: [EaseCallUIKit.CallProfileProtocol] = []
+                let result = await self.requestGroupsInfo(groupIds: profileIds)
+                if let infos = result {
+                    resultProfiles.append(contentsOf: infos)
+                }
+                return resultProfiles
+            }
+            //Await all task were executed.Return values.
+            for await result in group {
+                resultProfiles.append(contentsOf: result)
+            }
+            return resultProfiles
+        }
+    }
+    
+    private func requestUserInfos(profileIds: [String]) async -> [CallProfileProtocol]? {
+        var unknownIds = [String]()
+        var resultProfiles = [CallProfileProtocol]()
+        for profileId in profileIds {
+            if let profile = CallKitManager.shared.usersCache[profileId] {
+                resultProfiles.append(profile)
+            } else {
+                unknownIds.append(profileId)
+            }
+        }
+        if unknownIds.isEmpty {
+            return resultProfiles
+        }
+        let result = await ChatClient.shared().userInfoManager?.fetchUserInfo(byId: unknownIds)
+        if result?.1 == nil,let infoMap = result?.0 {
+            for (userId,info) in infoMap {
+                let profile = CallUserProfile()
+                let nickname = info.nickname ?? ""
+                profile.id = userId
+                profile.nickname = nickname
+                profile.avatarURL = info.avatarUrl ?? ""
+
+            }
+            return resultProfiles
+        }
+        return []
+    }
+    
+    private func requestGroupsInfo(groupIds: [String]) async -> [CallProfileProtocol]? {
+        var resultProfiles = [CallProfileProtocol]()
+        let groups = ChatClient.shared().groupManager?.getJoinedGroups() ?? []
+        for groupId in groupIds {
+            if let group = groups.first(where: { $0.groupId == groupId }) {
+                let profile = CallUserProfile()
+                profile.id = groupId
+                profile.nickname = group.groupName
+                profile.avatarURL = group.settings.ext
+                resultProfiles.append(profile)
+            }
+
+        }
+        return resultProfiles
+    }
+
+    
+}
+
+extension ViewController: CallServiceListener {
+    func didOccurError(error: CallError) {
+        DispatchQueue.main.async {
+            self.showCallToast(toast: "Occur error:\(error.errorMessage) on module:\(error.module.rawValue)")
+        }
+        switch error {
+        case .im(.invalidURL):
+            print("Invalid URL")
+        case .rtc(.invalidToken):
+            print("Invalid Token")
+        case .business(.state):
+            print("State error")
+        case .business(.param):
+            print("Param error")
+        default:
+            // 注意这里要通过 error.error.message 访问
+            print("Other error: \(error.error.message)")
+        }
+//        switch error.module {//OC use case
+//        case .im:
+//            switch error.getIMError() {
+//            case .invalidURL:
+//                print("")
+//            default:
+//                break
+//            }
+//        case .rtc:
+//            switch error.getRTCError() {
+//            case .invalidToken:
+//                print("")
+//            default:
+//                break
+//            }
+//        case .business:
+//            switch error.getCallBusinessError() {
+//            case .state:
+//                print("")
+//            case .param:
+//                print("")
+//            case .signaling:
+//                print("")
+//            default:
+//                break
+//            }
+//        default:
+//            break
+//        }
+    }
+        
+    func didUpdateCallEndReason(reason: CallEndReason, info: CallInfo) {
+        print("didUpdateCallEndReason: \(String(describing: info.inviteMessageId))")
+        NotificationCenter.default.post(name: Notification.Name("didUpdateCallEndReason"), object: info.inviteMessageId)
+        
+    }
+    
+    func remoteUserDidJoined(userId: String, uid: UInt, channelName: String, type: CallType) {
+        
+    }
+    
+    func remoteUserDidLeft(userId: String, uid: UInt, channelName: String, type: CallType) {
+        
+    }
 }

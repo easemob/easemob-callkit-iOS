@@ -29,13 +29,14 @@
 - [快速开始](#快速开始)
   - [第一步：初始化EaseCallUIKit](#第一步初始化easecalluikit)
   - [第二步：登录IM SDK](#第2步登录im-sdk)
-  - [第三步：实现呼叫功能](#第三步写一个呼叫按钮一个呼叫人userid输入框)
+  - [第三步：让AI帮写界面后运行](#第三步让ai帮写界面后运行)
 - [集成文档](#集成文档)
   - [1.初始化EaseCallUIKit（进阶）](#1初始化easecalluikit)
   - [2.登录](#2登录)
   - [3.Provider配置](#3easecalluikit中的provider)
   - [4.创建呼叫页面并调用呼叫Api](#4创建呼叫页面并调用呼叫api)
-  - [5.监听事件和错误](#5监听easecalluikit事件和错误)
+  - [5.监听事件和错误](#5监听easecalluikit事件和错误)    
+- [常见问题](#常见问题)
 - [自定义](#自定义)
   - [1.修改UI可配置项](#1修改ui可配置项)
   - [2.修改原有资源](#2修改原有资源)
@@ -120,22 +121,47 @@ Classes
     ├─ Views // 所有UIView。
     └─ Cells // 所有UITableViewCell。
 ```
+Provider文件夹中包含`CallProfileProtocol.swift`用户信息协议以及`Providers.swift`信息提供者协议
+Services文件夹中包含`CallError.swift`错误信息以及`CallMessageService.swift`呼叫API协议以及回调方法跟结束原因枚举等。
+Commons文件夹中包含一些工具类、UI配置类、主题类等。一些CallKitManager用到的工具类（AudioPlayerManager、LiveCommunicationManager、GlobalTimerManager）
+UI文件夹中包含所有UI组件，包括视图控制器、UIView、UITableViewCell等。
 # 运行示例项目
 
-- [注册环信AppKey](https://docs-im-beta.easemob.com/product/enable_and_configure_IM.html#%E8%8E%B7%E5%8F%96%E7%8E%AF%E4%BF%A1%E5%8D%B3%E6%97%B6%E9%80%9A%E8%AE%AF-im-%E7%9A%84%E4%BF%A1%E6%81%AF)
-- ![开通RTC功能](./DocumentationImages/open_rtc.png)
+## 前提条件
 
-- 在Appdelegate.swift 中找到
+- 登录 [环信控制台]
+
+- [注册环信AppKey](https://docs-im-beta.easemob.com/product/enable_and_configure_IM.html#%E8%8E%B7%E5%8F%96%E7%8E%AF%E4%BF%A1%E5%8D%B3%E6%97%B6%E9%80%9A%E8%AE%AF-im-%E7%9A%84%E4%BF%A1%E6%81%AF)
+
+- 开通RTC功能  ![开通RTC功能](./DocumentationImages/open_rtc.png)
+
+- [创建IM用户并获取token](https://v2-console.easemob.com/app/operation/management/micro/app/im-service/operative-service/user),这里建议创建两个用户。![](./DocumentationImages/createUser.png)
+
+- 在`PublicDefines.swift` 中找到
 ```Swift
-let option = ChatOptions(appkey: <#环信AppKey#>)
+let AppKey: String = <#AppKey#>
 ```
-将注册的AppKey填入其中。
-- 如果想要自定义的头像昵称显示信息，在ViewController.swift中找到loginAction方法后填入您要显示的当前用户id对应的昵称头像`profile.nickname` `profile.avatarURL`信息即可，然后运行项目即可，出现登录界面后需要您去创建用户以及获取用户token // 。 [使用控制台生成的临时Token登录](https://docs-im-beta.easemob.com/product/enable_and_configure_IM.html#%E5%88%9B%E5%BB%BA-im-%E7%94%A8%E6%88%B7)，将用户名以及token复制粘贴填写在输入框中->然后点击登录->选择呼叫类型->输入呼叫用户的userId->点击呼叫
+- 将注册的AppKey填入其中。
+- 在终端cd到podfile所在的文件目录，复制代理到终端，执行`pod install`命令，等待成功后点击运行即可。
+- 将用户名以及token复制粘贴填写在输入框中->然后点击登录->选择呼叫类型->输入呼叫用户的userId->点击呼叫。
+
+![](./DocumentationImages/example.png)
+
+注意： 如果想要自定义的头像昵称显示信息，在ViewController.swift中找到loginAction方法后填入您要显示的当前用户id对应的昵称头像`profile.nickname` `profile.avatarURL`信息即可
 
 
 # 快速开始
 
 本指南提供了不同 EaseCallUIKit 组件的多个使用示例。 请参阅“示例”文件夹以获取显示各种用例的详细代码片段和项目。
+## 前提条件
+
+- 登录 [环信控制台]
+
+- [注册环信AppKey](https://docs-im-beta.easemob.com/product/enable_and_configure_IM.html#%E8%8E%B7%E5%8F%96%E7%8E%AF%E4%BF%A1%E5%8D%B3%E6%97%B6%E9%80%9A%E8%AE%AF-im-%E7%9A%84%E4%BF%A1%E6%81%AF)
+
+- 开通RTC功能  ![开通RTC功能](./DocumentationImages/open_rtc.png)
+
+- [创建IM用户并获取token](https://v2-console.easemob.com/app/operation/management/micro/app/im-service/operative-service/user),这里建议创建两个用户。![](./DocumentationImages/createUser.png)
 
 参考以下步骤在 Xcode 中创建一个 iOS 平台下的App，创建设置如下：
 
@@ -167,11 +193,7 @@ class AppDelegate：UIResponder，UIApplicationDelegate {
      var window: UIWindow？
 
      func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplicationLaunchOptionsKey: Any]?) -> Bool {
-         // 您可以在应用程序加载时或使用之前初始化 EaseCallUIKit。
-         // 需要传入App Key。
-         // 获取App Key，请访问
-         // https://docs-im-beta.easemob.com/product/enable_and_configure_IM.html#%E8%8E%B7%E5%8F%96%E7%8E%AF%E4%BF%A1%E5%8D%B3%E6%97%B6%E9%80%9A%E8%AE%AF-im-%E7%9A%84%E4%BF%A1%E6%81%AF
-        let option = ChatSDKOptions(appkey: AppKey)//首先需要登录SDK
+        let option = ChatSDKOptions(appkey: "your app key")//首先需要初始化SDK
         option.enableConsoleLog = true//开启日志
         option.isAutoLogin = false//此处只是示例项目，真实使用时参考环信Demo源码，自动登录更方便
         ChatClient.shared().initializeSDK(with: option)//初始化SDK
@@ -188,42 +210,47 @@ class AppDelegate：UIResponder，UIApplicationDelegate {
                 self?.showCallToast(toast: "Login failed: \(error.errorDescription ?? "")")
             } else {
                 self?.showCallToast(toast: "Login successful")
-//if !userId.isEmpty { //如有需要透传头像昵称请打开
-//    let profile = CallUserProfile()
-//    profile.id = userId
-//    profile.avatarURL = "https://xxxxx"
-//    profile.nickname = "\(userId)昵称"
-//    CallKitManager.shared.currentUserInfo = profile
-//}
                 self?.userIdField.isHidden = true
                 self?.tokenField.isHidden = true
                 self?.loginButton.isHidden = true 
             }
         }
-// token生成参见快速开始中登录步骤中链接。
-// 需要从您的应用服务器获取token。 您也可以使用控制台生成的临时Token登录。
-// 在控制台生成用户和临时用户 token，请参见
-// https://docs-im-beta.easemob.com/product/enable_and_configure_IM.html#%E5%88%9B%E5%BB%BA-im-%E7%94%A8%E6%88%B7。
 ```
 
-### 第三步：写一个呼叫按钮一个呼叫人userId输入框
+### 第三步：让AI帮写界面后运行
+
+复制下面这段话给豆包、GPT、Claude、Grok、DeepSeek、Kimi等AI。
+- 我创建了一个新的iOS工程，里面有一个ViewController以及一个Main.storyboard，我想在这个页面中增加一个用户id的输入框、一个用户token的输入框、一个登录按钮、一个被叫方用户id的输入框，一个呼叫按钮，touchBegin的时候收起所有键盘，点击登录以及呼叫按钮的时候也一样，点击登录按钮的时候调用下面代码
+``` Swift
+        ChatClient.shared().login(withUsername: userId, token: token) { [weak self] userId,error  in
+            if let error = error {
+                self?.showCallToast(toast: "Login failed: \(error.errorDescription ?? "")")
+            } else {
+                self?.showCallToast(toast: "Login successful")
+                self?.userIdField.isHidden = true
+                self?.tokenField.isHidden = true
+                self?.loginButton.isHidden = true 
+            }
+        }
+
+```
+点击呼叫的时候调用下面代码
 
 ```Swift
         // 在Console中创建一个新用户，新用户使用一样的快速开始工程登录后，将这个用id复制后传入下面构造方法参数中，跳转页面即可。
-        func callAction(type: CallType) {
+        func callAction() {
                 
             guard let input = inputField.text?.trimmingCharacters(in: .whitespacesAndNewlines), !input.isEmpty else {
                 self.showCallToast(toast: "Please enter a valid username or group id")
                 return
             }
-            if type != .groupCall {
-                CallKitManager.shared.call(with: input, type: type)
-            } else {
-                CallKitManager.shared.groupCall(groupId: input)
-            }
+            CallKitManager.shared.call(with: input, type: .singleAudio)
         }
 
 ```
+
+获取代码粘贴进`ViewController.swift`,获取AI给出的xml代码找到工程中的Main.storyboard右键菜单，Open As->Source Code，然后复制粘贴即可运行项目，安装到两台设备并且两个用户分别登录后，主叫设备输入被叫用户id即可点击呼叫。
+
 
 # 集成文档
 
@@ -232,14 +259,15 @@ class AppDelegate：UIResponder，UIApplicationDelegate {
 ## 1.初始化EaseCallUIKit
 相比于上面快速开始的EaseCallUIKit初始化这里多了ChatOptions的参数，主要是对SDK中是否打印log以及是否自动登录，是否默认使用用户属性的开关配置。ChatOptions即IMSDK的Option类，内中有诸多开关属性可参见环信官网IMSDK文档
 ```Swift
+    //已经集成了环信IMSDK 即已经import HyphenateChat
     private func setupCallKit() {
         let options = EMOptions(appkey: appKey)
         #if DEBUG
-        options.apnsCertName = "EaseIM_APNS_Developer"
-        options.pushKitCertName = "EasemobVoipDev"
+        options.apnsCertName = "Your_APNS_Developer"
+        options.pushKitCertName = "YourVoipDev"
         #else
-        options.apnsCertName = "EaseIM_APNS_Product"
-        options.pushKitCertName = "EasemobVoipPro"
+        options.apnsCertName = "Your_APNS_Product"
+        options.pushKitCertName = "YourVoipPro"
         #endif
         EMClient.shared().initializeSDK(with: options)
         //初始化环信CallKit
@@ -248,6 +276,25 @@ class AppDelegate：UIResponder，UIApplicationDelegate {
         config.enablePIPOn1V1VideoScene = true//开启画中画，同时需要开启应用后台摄像头采集权限，详见[PictureInPicture.md](./PictureInPicture.md)。
         CallKitManager.shared.setup(config)
     }
+
+    //没有集成环信IMSDK，只想使用CallKit
+    private func setupCallKit() {
+        let options = ChatSDKOptions(appkey: appKey)
+        #if DEBUG
+        options.apnsCertName = "Your_APNS_Developer"
+        options.pushKitCertName = "YourVoipDev"
+        #else
+        options.apnsCertName = "Your_APNS_Product"
+        options.pushKitCertName = "YourVoipPro"
+        #endif
+        ChatClient.shared().initializeSDK(with: options)
+        //初始化环信CallKit
+        let config = EaseCallUIKit.CallKitConfig()
+        config.enableVOIP = true//开启voip功能后会自动开启LiveCommunicationKit，需要在develop.apple.com申请证书时勾选
+        config.enablePIPOn1V1VideoScene = true//开启画中画，同时需要开启应用后台摄像头采集权限，详见[PictureInPicture.md](./PictureInPicture.md)。
+        CallKitManager.shared.setup(config)
+    }
+    
 ```
 
 ## 2.登录
@@ -401,14 +448,41 @@ extension MainViewController: CallUserProfileProvider {
 
 ## 4.创建呼叫页面并调用呼叫Api
 
-- 页面随用户自行创建即可，可以给AI说明我需要一个呼叫页面名字叫XXX，然后页面中有一个输入框输入呼叫人userId，一个segment选择器选择呼叫类型，一个按钮点击后进行呼叫。待AI给出代码后复制粘贴即可
+复制下面这段话给豆包、GPT、Claude、Grok、DeepSeek、Kimi等AI。
+- 我创建了一个新的iOS工程，里面有一个ViewController以及一个Main.storyboard，我想在这个页面中增加一个用户id的输入框、一个用户token的输入框、一个登录按钮、一个被叫方用户id的输入框，一个选择呼叫类型的segment（有audio、video、group分别对应EaseCallUIKit.CallType的singleAudio、singleVideo、group），一个呼叫按钮，touchBegin的时候收起所有键盘，点击登录以及呼叫按钮的时候也一样，点击登录按钮的时候调用下面代码
+``` Swift
+        ChatClient.shared().login(withUsername: userId, token: token) { [weak self] userId,error  in
+            if let error = error {
+                self?.showCallToast(toast: "Login failed: \(error.errorDescription ?? "")")
+            } else {
+                self?.showCallToast(toast: "Login successful")
+                self?.userIdField.isHidden = true
+                self?.tokenField.isHidden = true
+                self?.loginButton.isHidden = true 
+            }
+        }
 
-```Swift 
-        //在需要呼叫的页面中调用下面方法即可
-        CallKitManager.shared.call(with: input, type: type)//type为CallType枚举类型，详见CallMessageService.swift
-        //如果是群组通话则调用下面方法
-        CallKitManager.shared.groupCall(groupId: input)
 ```
+点击呼叫的时候调用下面代码
+
+```Swift
+        // 在Console中创建一个新用户，新用户使用一样的快速开始工程登录后，将这个用id复制后传入下面构造方法参数中，跳转页面即可。
+        func callAction() {
+                
+            guard let input = inputField.text?.trimmingCharacters(in: .whitespacesAndNewlines), !input.isEmpty else {
+                self.showCallToast(toast: "Please enter a valid username or group id")
+                return
+            }
+            if self.type == .group {
+                CallKitManager.shared.groupCall(groupId: input)
+            } else {
+                CallKitManager.shared.call(with: input, type: type)
+            }
+        }
+
+```
+
+获取代码粘贴进`ViewController.swift`,获取AI给出的xml代码找到工程中的Main.storyboard右键菜单，Open As->Source Code，然后复制粘贴即可运行项目，安装到两台设备并且两个用户分别登录后，主叫设备输入被叫用户id即可点击呼叫。
 
 ## 5.监听EaseCallUIKit事件和错误
 
@@ -471,8 +545,8 @@ extension MainViewController: CallServiceListener {
         
     func didUpdateCallEndReason(reason: CallEndReason, info: CallInfo) {
         print("didUpdateCallEndReason: \(String(describing: info.inviteMessage?.ext))")
-        if let message = info.inviteMessage {
-            NotificationCenter.default.post(name: Notification.Name("didUpdateCallEndReason"), object: message)
+        if let messageId = info.inviteMessageId {
+            NotificationCenter.default.post(name: Notification.Name("didUpdateCallEndReason"), object: messageId)
         }
         
     }
@@ -488,8 +562,17 @@ extension MainViewController: CallServiceListener {
 }
 ```
 
-## 6.常见问题 
-- callkit与系统电话或者其它应用兼容问题
+# 常见问题 
+
+- CocoaPods安装问题请咨询AI
+
+- [RTC SDK报错请参考](https://doc.shengwang.cn/doc/rtc/ios/error-code)
+
+- [IM SDK报错请参考](https://doc.easemob.com/document/ios/error.html)
+
+- 业务报错请参看[ErrorHandler.md](./ErrorHandler.md)
+
+- EaseCallUIKit与系统电话或者其它应用兼容问题
 用户自行监听系统电话事件，判断是否需要挂断当前通话。可以调用方法`CallKitManager.shared.hangup()`
 
 # 自定义
@@ -513,13 +596,11 @@ extension MainViewController: CallServiceListener {
 
 主要包含有
 
-- 图片
-- 音频
-- 国际化文件
+- 图片 导航资源(back,boxes)、背景图片、被叫弹窗(phone_hang_mini.png,phone_pick_mini.png)、呼叫页面(phone_hang、phone_pick、speaker_on、speaker_off、camera_on、camera_off、mic_on、mic_off)、其他资源(person_add、network相关、语音音量相关)等。
+- 音频 音频文件(dialing.mp3、ringing.mp3、busy.mp3)
+- 国际化文件 国际化文件（en、zh-Hans）
 
 ![资源图](./DocumentationImages/resource_replace.png)
-
-![资源图1](./DocumentationImages/resource_replace1.png)
 
 
 ## 3.修改业务可配置项

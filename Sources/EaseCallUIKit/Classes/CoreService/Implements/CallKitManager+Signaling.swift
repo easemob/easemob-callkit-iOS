@@ -454,7 +454,19 @@ extension CallKitManager: CallMessageService {
     
     public func call(with userId: String, type: CallType, extensionInfo: [String : Any]? = nil) {
         if self.currentUserInfo == nil {
-            if self.profileProvider != nil {
+            if let currentUserId = ChatClient.shared().currentUsername {
+                Task {
+                    let profiles = await self.profileProvider?.fetchUserProfiles(profileIds: [currentUserId])
+                    if let profile = profiles?.first {
+                        self.currentUserInfo = profile
+                    } else {
+                        consoleLogInfo("Failed to fetch user profile for ID: \(currentUserId)", type: .error)
+                        self.handleBusinessError(CallError.CallBusiness(error: .param, message: "Failed to fetch user profile"))
+                    }
+                }
+            }
+            
+            if self.profileProvider != nil,self.usersCache[userId] == nil {
                 Task {
                     let profiles = await self.profileProvider?.fetchUserProfiles(profileIds: [userId])
                     if let profile = profiles?.first {
