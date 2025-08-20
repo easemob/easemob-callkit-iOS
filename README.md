@@ -488,6 +488,10 @@ extension MainViewController: CallServiceListener {
 }
 ```
 
+## 6.常见问题 
+- callkit与系统电话或者其它应用兼容问题
+用户自行监听系统电话事件，判断是否需要挂断当前通话。可以调用方法`CallKitManager.shared.hangup()`
+
 # 自定义
 
 ## 1.修改UI可配置项

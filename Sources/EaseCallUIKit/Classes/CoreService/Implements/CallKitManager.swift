@@ -38,11 +38,7 @@ public let CallKitVersion = "1.0.0"
     public internal(set) var canvasCache: [String: CallStreamView] = [:]
     
     /// Cache for call stream items
-    public internal(set) var itemsCache: [String: CallStreamItem] = [:] {
-        didSet{
-            
-        }
-    }
+    public internal(set) var itemsCache: [String: CallStreamItem] = [:] 
     
     /// Listeners for call events
     public internal(set) var listeners:NSHashTable<CallServiceListener> = NSHashTable<CallServiceListener>.weakObjects()

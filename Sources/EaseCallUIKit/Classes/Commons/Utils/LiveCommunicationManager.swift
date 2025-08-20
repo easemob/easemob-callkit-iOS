@@ -57,9 +57,13 @@ class LiveCommunicationManager: NSObject {
         manager?.delegate = self
     }
          
-    func reportIncomingCall(uuid: UUID, callerName: String) {
+    func reportIncomingCall(uuid: UUID, callerName: String, call type: CallType) {
         let local = Handle(type: .generic, value: callerName, displayName: callerName)
-        let update = Conversation.Update(localMember: local,members: [local],activeRemoteMembers: [local])
+        var capabilities: Conversation.Capabilities? = []
+        if type == .singleVideo {
+            capabilities = [.video]
+        }
+        let update = Conversation.Update(localMember: local,members: [local],activeRemoteMembers: [local],capabilities: capabilities)
          
         Task {
             do {
@@ -108,10 +112,44 @@ extension LiveCommunicationManager: PKPushRegistryDelegate {
             callId = id
         }
         let callerID = payload.dictionaryPayload["f"] as? String ?? ""
-//        let calleeID = ChatClient.shared().currentUsername ?? ""
+        let callerDeviceId = custom?[kCallerDevId] as? String ?? ""
+        let calleeDeviceId = custom?[kCalleeDevId] as? String ?? ""
+        let calleeID = ChatClient.shared().currentUsername ?? ""
         var callerNickname = ""
         if let nickname = custom?["callerNickname"] as? String {
             callerNickname = nickname
+        }
+        var channelName = ""
+        if let channel = custom?[kChannelName] as? String {
+            channelName = channel
+        }
+        var callType = CallType.singleAudio
+        if let type = custom?[kCallType] as? UInt {
+            callType = CallType(rawValue: type) ?? callType
+        }
+        var groupId = ""
+        var groupName = ""
+        var groupAvatar = ""
+        if let group = custom?[kCallKitGroupExt] as? [String:Any] {
+            groupId = group["groupId"] as? String ?? ""
+            groupName = group["groupName"] as? String ?? ""
+            groupAvatar = group["groupAvatar"] as? String ?? ""
+        }
+        if let userJson = custom?[kUserInfo] as? [String: Any] {//解析携带的用户信息
+            let profile = CallUserProfile()
+            profile.setValuesForKeys(userJson)
+            if profile.id.isEmpty {
+                profile.id = callerID
+            }
+            if CallKitManager.shared.usersCache[profile.id] == nil {
+                CallKitManager.shared.usersCache[profile.id] = profile
+            } else {
+                CallKitManager.shared.usersCache[profile.id]?.nickname = profile.nickname
+                CallKitManager.shared.usersCache[profile.id]?.avatarURL = profile.avatarURL
+            }
+        }
+        if let group = payload.dictionaryPayload["g"] as? String {
+            groupId = group
         }
         if let msgId = payload.dictionaryPayload["m"] as? String {
             if let message = ChatClient.shared().chatManager?.getMessageWithMessageId(msgId) {
@@ -123,14 +161,16 @@ extension LiveCommunicationManager: PKPushRegistryDelegate {
                 } else {
                     consoleLogInfo("[LiveCommunicationManager] message does not contain call info", type: .error)
                 }
-            } else {
-                consoleLogInfo("[LiveCommunicationManager] failed to get message with id: \(msgId)", type: .error)
             }
+            
         }
-//        var groupId = ""
-//        if let group = payload.dictionaryPayload["g"] as? String {
-//            groupId = group
-//        }
+        CallKitManager.shared.callInfo = CallInfo(callId: callId, callerId: callerID, callerDeviceId: callerDeviceId, channelName: channelName, type: callType)
+        CallKitManager.shared.callInfo?.groupId = groupId
+        CallKitManager.shared.callInfo?.groupName = groupName
+        CallKitManager.shared.callInfo?.groupAvatar = groupAvatar
+        CallKitManager.shared.callInfo?.calleeId = calleeID
+        CallKitManager.shared.callInfo?.state = .ringing
+        CallKitManager.shared.callInfo?.extensionInfo = custom?[kUserInfo] as? [String: Any]
 
         consoleLogInfo("[LiveCommunicationManager] incoming call:  (\(callerID))", type: .debug)
         LiveCommunicationManager.shared.createConversationManager()
@@ -141,7 +181,7 @@ extension LiveCommunicationManager: PKPushRegistryDelegate {
         } else {
             consoleLogInfo("[LiveCommunicationManager] reuse UUID: \(uuid!.uuidString)", type: .debug)
         }
-        LiveCommunicationManager.shared.reportIncomingCall(uuid: uuid!, callerName: callerNickname.isEmpty ? callerID:callerNickname)
+        LiveCommunicationManager.shared.reportIncomingCall(uuid: uuid!, callerName: callerNickname.isEmpty ? callerID:callerNickname,call: callType)
     }
 }
 

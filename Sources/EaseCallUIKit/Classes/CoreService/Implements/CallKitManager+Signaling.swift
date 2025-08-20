@@ -186,6 +186,11 @@ extension CallKitManager: ChatEventsListener {
 //                                        if call.type == .singleVideo {
 //                                            self.setupLocalVideo()
 //                                        }
+                                        if call.type == .singleVideo {
+                                                if #available(iOS 17.4, *),CallKitManager.shared.config.enableVOIP {
+                                                    LiveCommunicationManager.shared.endCall()
+                                                }
+                                        }
                                         UIViewController.currentController?.showCallToast(toast: "Connecting".call.localize)
                                         self.joinChannel(channelName: self.callInfo?.channelName ?? "") { [weak self] success in
                                             guard let `self` = self else { return }
@@ -266,7 +271,6 @@ extension CallKitManager: ChatEventsListener {
             if currentVC is Call1v1AudioViewController || currentVC is Call1v1VideoViewController {
                 currentVC.dismiss(animated: true)
                 consoleLogInfo("Dismiss current call page:\(currentVC)", type: .info)
-                self.quitCall()
             }
             self.popup?.dismiss()
         }
@@ -358,7 +362,7 @@ extension CallKitManager: ChatEventsListener {
                     if let profile = user {
                         callerName = profile.nickname
                     }
-                    LiveCommunicationManager.shared.reportIncomingCall(uuid: liveUUID, callerName: callerName)
+                    LiveCommunicationManager.shared.reportIncomingCall(uuid: liveUUID, callerName: callerName, call: call.type)
                 } else {
                     consoleLogInfo("[LiveCommunicationManager] failed to create UUID", type: .error)
                 }
@@ -391,7 +395,7 @@ extension CallKitManager: ChatEventsListener {
     
     private func presentCallerPage(call: CallInfo) {
         startRingTimer(callId: call.callId)
-        var vc: UIViewController = Call1v1AudioViewController(role: .caller)
+        var vc: UIViewController = UIViewController()
         switch call.type {
         case .singleAudio:
             vc = Call1v1AudioViewController(role: .caller)
@@ -578,7 +582,7 @@ extension CallKitManager: CallMessageService {
         }
         
         if self.config.enableVOIP {
-            ext[kPush_payload] = ["type":"call"]
+            ext[kPush_payload] = ["type":"call","custom":ext]
             ext[kPush_iOS_payload_apns] = ["em_push_type":"voip"]
         }
         
@@ -840,7 +844,7 @@ extension CallKitManager: CallMessageService {
         }
         
         if self.config.enableVOIP {
-            ext[kPush_payload] = ["type":"call"]
+            ext[kPush_payload] = ["type":"call","custom":ext]
             ext[kPush_iOS_payload_apns] = ["em_push_type":"voip"]
         }
         
@@ -924,7 +928,7 @@ extension CallKitManager: CallMessageService {
         }
         
         if self.config.enableVOIP {
-            ext[kPush_payload] = ["type":"call"]
+            ext[kPush_payload] = ["type":"call","custom":ext]
             ext[kPush_iOS_payload_apns] = ["em_push_type":"voip"]
         }
         
@@ -1062,7 +1066,6 @@ extension CallKitManager: CallMessageService {
             }
         }
         let message = ChatMessage(conversationID: calleeId, body: ChatCMDMessageBody(action: kCall), ext: ext)
-        message.deliverOnlineOnly = true
         Task {
             let result = await ChatClient.shared().chatManager?.send(message, progress: nil)
             if let error = result?.1 {
@@ -1100,7 +1103,6 @@ extension CallKitManager: CallMessageService {
             }
         }
         let message = ChatMessage(conversationID: calleeId, body: ChatCMDMessageBody(action: kCall), ext: ext)
-        message.deliverOnlineOnly = true
         Task {
             let result = await ChatClient.shared().chatManager?.send(message, progress: nil)
             if let error = result?.1 {
@@ -1329,13 +1331,20 @@ extension CallKitManager: CallMessageService {
             DispatchQueue.main.async {
                 AudioPlayerManager.shared.stopAudio()
                 UIApplication.shared.isIdleTimerDisabled = false
-                if let currentVC = UIViewController.currentController, !(currentVC is Call1v1AudioViewController || currentVC is Call1v1VideoViewController || currentVC is CallMultiViewController) {
-                    self.dismissCurrentCallPage()
+                if let currentVC = UIViewController.currentController, (currentVC is Call1v1AudioViewController || currentVC is Call1v1VideoViewController ) {
+                    currentVC.dismiss(animated: false)
+                } else {
+                    if self.callVC == nil {
+                        if let currentVC = UIApplication.shared.keyWindow?.rootViewController?.presentedViewController, (currentVC is Call1v1AudioViewController || currentVC is Call1v1VideoViewController ) {
+                            currentVC.dismiss(animated: false)
+                        }
+                    }
                 }
                 self.callVC?.dismiss(animated: false)
                 self.callVC = nil
                 self.popup?.dismiss()
                 FloatingAudioView.removeFromWindow()
+                self.cleanUICache()
             }
             GlobalTimerManager.shared.invalidate()
             
@@ -1358,7 +1367,6 @@ extension CallKitManager: CallMessageService {
             self.callInfo?.groupName = nil
             self.callInfo?.groupAvatar = nil
             self.callInfo?.inviteMessage = nil
-            self.cleanUICache()
             self.callInfo?.calleeDeviceId = ""
             self.callInfo?.extensionInfo = nil
             self.callInfo?.state = .idle

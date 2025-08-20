@@ -145,7 +145,6 @@ open class Call1v1VideoViewController: UIViewController {
         //When the app goes to background, pop the view controller
         NotificationCenter.default.addObserver(forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
             self?.pop()
-            consoleLogInfo("iOS 17.4及以上系统，开启VOIP模式下，应用进入后台会自动挂断LiveCommunicationManager通话", type: .error)
         }
         self.floatView.updateVideoState(true)
     }
@@ -181,7 +180,7 @@ open class Call1v1VideoViewController: UIViewController {
     private func setupViews() {
         // 确保视图层级正确
         self.micView.isHidden = true
-        self.view.addSubViews([self.background, self.navigationBlur, self.navigationBar, self.bottomView, self.micView])
+        self.view.addSubViews([self.background, self.navigationBar, self.bottomView, self.micView,self.navigationBlur])
         self.background.addSubViews([self.callView, self.floatView])
         self.navigationBlur.image = UIImage(named: "mask", in: .callBundle, with: nil)
         // 确保floatView在最上层

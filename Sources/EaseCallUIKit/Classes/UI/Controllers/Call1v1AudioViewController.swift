@@ -61,7 +61,13 @@ public class Call1v1AudioViewController: UIViewController {
             self?.bottomClick(type: $0)
         }
       
-        
+    }
+    
+    public override func viewIsAppearing(_ animated: Bool) {
+        super.viewIsAppearing(animated)
+        if CallKitManager.shared.callVC != nil {
+            self.bottomView.setState(self.bottomView.currentState, animated: false)
+        }
     }
     
     func addCallTimer() {

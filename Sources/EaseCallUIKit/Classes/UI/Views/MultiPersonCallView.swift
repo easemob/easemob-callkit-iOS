@@ -238,7 +238,7 @@ public class MultiPersonCallView: UIView {
         // 重新布局 scrollView 中的视图
         let remainingViews = scrollView.subviews
             .compactMap { $0 as? CallStreamView }
-            .sorted { $0.item.index < $1.item.index }
+            .sorted { $0.item.index > $1.item.index }
         
         for (index, view) in remainingViews.enumerated() {
             view.translatesAutoresizingMaskIntoConstraints = false
@@ -384,7 +384,7 @@ public class MultiPersonCallView: UIView {
     private func layoutItemsForNormalState() {
         NSLayoutConstraint.deactivate(activeConstraints)
         activeConstraints.removeAll()
-        let itemViews = CallKitManager.shared.canvasCache.values.sorted { $0.item.index < $1.item.index }
+        let itemViews = CallKitManager.shared.canvasCache.values.sorted { $0.item.index > $1.item.index }
         // 确保所有视图都在当前视图层级中
         for view in itemViews {
             if view.superview != self {
@@ -726,9 +726,9 @@ public class MultiPersonCallView: UIView {
             scrollView!.topAnchor.constraint(equalTo: expandedView.bottomAnchor, constant: 12),
             scrollView!.heightAnchor.constraint(equalToConstant: thumbnailSize)
         ]
-        let itemViews = CallKitManager.shared.canvasCache.values.sorted { $0.item.index < $1.item.index }
+        let itemViews = CallKitManager.shared.canvasCache.values.sorted { $0.item.index > $1.item.index }
         // Add thumbnail views to scroll view (all square) - sorted by index
-        let otherViews = itemViews.filter { $0 != expandedView }.sorted { $0.item.index < $1.item.index }
+        let otherViews = itemViews.filter { $0 != expandedView }.sorted { $0.item.index > $1.item.index }
         
         // Clear scroll view content first
         scrollView!.subviews.forEach { $0.removeFromSuperview() }
@@ -876,7 +876,7 @@ extension MultiPersonCallView {
         expandedView = nil
         
         CallKitManager.shared.itemsCache.values.forEach { $0.isExpanded = false }
-        var itemViews = CallKitManager.shared.canvasCache.values.sorted { $0.item.index < $1.item.index }
+        var itemViews = CallKitManager.shared.canvasCache.values.sorted { $0.item.index > $1.item.index }
 
         // 不在这里单独设置 displayMode，使用统一方法
         updateAllDisplayModes()
@@ -952,7 +952,7 @@ extension MultiPersonCallView {
             
             // Find the original index of newView in scrollView
             let sortedViews = scrollView.subviews.compactMap { $0 as? CallStreamView }
-                .sorted { $0.item.index < $1.item.index }
+                .sorted { $0.item.index > $1.item.index }
             newViewOriginalIndex = sortedViews.firstIndex(of: newView) ?? -1
         } else {
             newThumbnailFrame = newView.frame
@@ -985,7 +985,7 @@ extension MultiPersonCallView {
         // Calculate the target position for oldView in scrollView
         if let scrollView = scrollView {
             let existingViews = scrollView.subviews.compactMap { $0 as? CallStreamView }
-                .sorted { $0.item.index < $1.item.index }
+                .sorted { $0.item.index > $1.item.index }
             
             for view in existingViews {
                 if view.item.index < oldViewIndex {
@@ -1010,7 +1010,7 @@ extension MultiPersonCallView {
         if let scrollView = scrollView, needsSpaceAnimation {
             // Get the current stream views in scrollView
             let currentViews = scrollView.subviews.compactMap { $0 as? CallStreamView }
-                .sorted { $0.item.index < $1.item.index }
+                .sorted { $0.item.index > $1.item.index }
             
             // Record the current positions of all views
             for (index, view) in currentViews.enumerated() {
@@ -1065,7 +1065,7 @@ extension MultiPersonCallView {
             
             // 根据 index 插入到正确的层级位置
             let sortedViews = scrollView.subviews.compactMap { $0 as? CallStreamView }
-                .sorted { $0.item.index < $1.item.index }
+                .sorted { $0.item.index > $1.item.index }
             
             var insertAtIndex = 0
             for view in sortedViews {

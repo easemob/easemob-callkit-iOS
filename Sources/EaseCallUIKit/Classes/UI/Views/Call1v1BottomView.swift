@@ -13,14 +13,13 @@ enum Call1v1BottomViewState {
     case connected     // 接通状态（3个按钮）
 }
 
-
-
 // MARK: - CallControlView
 public class Call1v1BottomView: UIView {
     
     public var didTapButton: ((CallButtonType) -> Void)?
+    
     // MARK: - Properties
-    private var currentState: Call1v1BottomViewState = .incoming
+    var currentState: Call1v1BottomViewState = .incoming
     private let buttonSize: CGFloat = 64
     private let incomingButtonSpacing: CGFloat = 105  // decline/accept 按钮距离中心的距离
     private let connectedButtonSpacing: CGFloat = 128 // mic/speaker 按钮距离 End 按钮的距离
@@ -31,6 +30,11 @@ public class Call1v1BottomView: UIView {
     private let muteTag = 3
     private let speakerTag = 5
     private let hangupTag = 4
+    
+    // Button sizes
+    private let mainButtonSize = CGSize(width: 70, height: 96)  // decline/accept/hangup buttons
+    private let smallButtonSize = CGSize(width: 50, height: 82)  // mute/speaker buttons
+    
     // Buttons using CallButtonView
     private lazy var declineButton: CallButtonView = {
         let button = createCallButton(
@@ -119,18 +123,22 @@ public class Call1v1BottomView: UIView {
     
     private func createCallButton(data: CallButtonData, tag: Int) -> CallButtonView {
         var buttonAllowSelection = true
-        var buttonSize = CGSize(width: 50, height: 82)
+        var buttonSize: CGSize
         var space = CGFloat(4)
+        
         if tag == declineTag || tag == hangupTag || tag == acceptTag {
-            buttonSize = CGSize(width: 70, height: 96)
+            buttonSize = mainButtonSize
             buttonAllowSelection = false
             space = 12
+        } else {
+            buttonSize = smallButtonSize
         }
-        let button = CallButtonView(frame: CGRect(origin: .zero, size: buttonSize),iconTitleSpace: space)
+        
+        let button = CallButtonView(frame: CGRect(origin: .zero, size: buttonSize), iconTitleSpace: space)
         button.allowSelection = buttonAllowSelection
         button.configure(data: data)
-        button.translatesAutoresizingMaskIntoConstraints = false
         button.buttonTag = tag
+        
         // Set up tap handler
         button.didTap = { [weak self] sender in
             if sender.allowSelection {
@@ -153,23 +161,13 @@ public class Call1v1BottomView: UIView {
         addSubview(speakerButton)
         addSubview(hangupButton)
         
-        // Setup constraints
-        NSLayoutConstraint.activate([
-            declineButton.widthAnchor.constraint(equalToConstant: 70),
-            declineButton.heightAnchor.constraint(equalToConstant: 96),
-            
-            acceptButton.widthAnchor.constraint(equalToConstant: 70),
-            acceptButton.heightAnchor.constraint(equalToConstant: 96),
-            
-            muteButton.widthAnchor.constraint(equalToConstant: 50),
-            muteButton.heightAnchor.constraint(equalToConstant: 82),
-            
-            speakerButton.widthAnchor.constraint(equalToConstant: 50),
-            speakerButton.heightAnchor.constraint(equalToConstant: 82),
-            
-            hangupButton.widthAnchor.constraint(equalToConstant: 70),
-            hangupButton.heightAnchor.constraint(equalToConstant: 96),
-        ])
+        // Set initial frames
+        declineButton.frame.size = mainButtonSize
+        acceptButton.frame.size = mainButtonSize
+        muteButton.frame.size = smallButtonSize
+        speakerButton.frame.size = smallButtonSize
+        hangupButton.frame.size = mainButtonSize
+        
         // Set initial state
         setState(.incoming, animated: false)
     }
@@ -192,8 +190,8 @@ public class Call1v1BottomView: UIView {
     }
     
     private func setButtonsForState(_ state: Call1v1BottomViewState, animated: Bool) {
-        let centerY = bounds.height / 2 - 20
-        let centerX = bounds.width / 2
+        let centerY = bounds.height / 2.0 - 20
+        let centerX = bounds.width / 2.0
         
         switch state {
         case .incoming:
@@ -227,7 +225,6 @@ public class Call1v1BottomView: UIView {
     }
     
     private func animateToState(_ state: Call1v1BottomViewState, from previousState: Call1v1BottomViewState) {
-        
         switch state {
         case .incoming:
             setButtonsForState(state, animated: true)
@@ -242,8 +239,8 @@ public class Call1v1BottomView: UIView {
     }
     
     private func animateAcceptCall() {
-        let centerY = bounds.height / 2
-        let centerX = bounds.width / 2
+        let centerY = bounds.height / 2.0 - 20
+        let centerX = bounds.width / 2.0
         let offscreenY = bounds.height + buttonSize
         
         // 准备从底部滑入的按钮
@@ -347,13 +344,17 @@ public class Call1v1BottomView: UIView {
     
     private func hideButton(_ button: CallButtonView, animated: Bool) {
         if animated {
-            button.alpha = 0
-            button.transform = CGAffineTransform(scaleX: 0.8, y: 0.8)
-            // Move button below visible area instead of hiding
-            button.center.y = bounds.height + buttonSize
+            UIView.animate(withDuration: animationDuration * 0.5,
+                           animations: {
+                button.alpha = 0
+                button.transform = CGAffineTransform(scaleX: 0.8, y: 0.8)
+                // Move button below visible area
+                button.center.y = self.bounds.height + self.buttonSize
+            })
         } else {
             button.alpha = 0
             button.center.y = bounds.height + buttonSize
+            button.transform = CGAffineTransform(scaleX: 0.8, y: 0.8)
         }
     }
     
@@ -363,8 +364,10 @@ public class Call1v1BottomView: UIView {
         let impactFeedback = UIImpactFeedbackGenerator(style: .light)
         impactFeedback.impactOccurred()
         print("tag: \(sender.buttonTag)")
+        
         guard let data = sender.data, let buttonType = self.getActionType(for: data, button: sender) else { return }
         self.didTapButton?(buttonType)
+        
         if buttonType == .accept {
             animateAcceptCall()
         }
@@ -373,11 +376,16 @@ public class Call1v1BottomView: UIView {
     private func getActionType(for data: CallButtonData, button: CallButtonView) -> CallButtonType? {
         var type: CallButtonType?
         switch button.buttonTag {
-        case speakerTag: type = data.isSelected ? .speaker_off : .speaker_on
-        case hangupTag: type = .end
-        case muteTag: type = data.isSelected ? .mic_off : .mic_on
-        case acceptTag: type = .accept
-        case declineTag: type = .decline
+        case speakerTag:
+            type = data.isSelected ? .speaker_off : .speaker_on
+        case hangupTag:
+            type = .end
+        case muteTag:
+            type = data.isSelected ? .mic_off : .mic_on
+        case acceptTag:
+            type = .accept
+        case declineTag:
+            type = .decline
         default:
             break
         }
@@ -405,17 +413,20 @@ public class Call1v1BottomView: UIView {
     // MARK: - Layout
     public override func layoutSubviews() {
         super.layoutSubviews()
+        
         // Only update positions if view size changed significantly
-        if abs(bounds.width - lastLayoutWidth) > 1 {
+        if abs(bounds.width - lastLayoutWidth) > 1 || abs(bounds.height - lastLayoutHeight) > 1 {
+            // Update button positions based on current state
             setButtonsForState(currentState, animated: false)
             lastLayoutWidth = bounds.width
+            lastLayoutHeight = bounds.height
         }
-        
     }
     
     private var lastLayoutWidth: CGFloat = 0
+    private var lastLayoutHeight: CGFloat = 0
     
     deinit {
-        consoleLogInfo("Call1v1BottomView deinit",type: .debug)
+        consoleLogInfo("Call1v1BottomView deinit", type: .debug)
     }
 }
