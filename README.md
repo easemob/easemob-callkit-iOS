@@ -69,7 +69,7 @@
 
 ```ruby
 source 'https://github.com/CocoaPods/Specs.git'
-platform :ios, '14.0'
+platform :ios, '15.0'
 
 target 'YourTarget' do
   use_frameworks!
@@ -80,7 +80,7 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     target.build_configurations.each do |config|
-      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
       config.build_settings["EXCLUDED_ARCHS[sdk=iphonesimulator*]"] = "arm64"
     end
   end
@@ -1073,7 +1073,7 @@ extension ViewController: CallUserProfileProvider {
 
 ### 5.4 画中画
 
-- 注意：仅限iOS14及其以上系统可用（因没有iOS14设备，未测试），iOS15设备已测试
+- 注意：仅限iOS15及其以上系统可用，iOS15设备已测试
 
 详见[PictureInPicture.md](./PictureInPicture.md)
 
