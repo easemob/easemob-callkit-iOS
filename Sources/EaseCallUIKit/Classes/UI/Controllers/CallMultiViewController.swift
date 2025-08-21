@@ -146,27 +146,40 @@ open class CallMultiViewController: UIViewController {
     }
     
     @objc open func bottomClick(type: CallButtonType) {
-        guard let currentUserId = ChatClient.shared().currentUsername,let item = CallKitManager.shared.itemsCache[currentUserId],let canvas = CallKitManager.shared.canvasCache[currentUserId] else {
-            consoleLogInfo("CallMultiViewController: Current user not found in items cache.", type: .error)
-            return
-        }
+        
         switch type {
         case .mic_on:
+            guard let currentUserId = ChatClient.shared().currentUsername,let item = CallKitManager.shared.itemsCache[currentUserId],let canvas = CallKitManager.shared.canvasCache[currentUserId] else {
+                consoleLogInfo("CallMultiViewController: Current user not found in items cache.", type: .error)
+                return
+            }
             CallKitManager.shared.enableLocalAudio(true)
             item.audioMuted = false
             canvas.updateItem(item)
         case .mic_off:
+            guard let currentUserId = ChatClient.shared().currentUsername,let item = CallKitManager.shared.itemsCache[currentUserId],let canvas = CallKitManager.shared.canvasCache[currentUserId] else {
+                consoleLogInfo("CallMultiViewController: Current user not found in items cache.", type: .error)
+                return
+            }
             CallKitManager.shared.enableLocalAudio(false)
             item.audioMuted = true
             canvas.updateItem(item)
         case .flip_back: CallKitManager.shared.switchCamera()
         case .flip_front: CallKitManager.shared.switchCamera()
         case .camera_on:
+            guard let currentUserId = ChatClient.shared().currentUsername,let item = CallKitManager.shared.itemsCache[currentUserId],let canvas = CallKitManager.shared.canvasCache[currentUserId] else {
+                consoleLogInfo("CallMultiViewController: Current user not found in items cache.", type: .error)
+                return
+            }
             CallKitManager.shared.setupLocalVideo()
             CallKitManager.shared.enableLocalVideo(true)
             item.videoMuted = false
             canvas.updateItem(item)
         case .camera_off:
+            guard let currentUserId = ChatClient.shared().currentUsername,let item = CallKitManager.shared.itemsCache[currentUserId],let canvas = CallKitManager.shared.canvasCache[currentUserId] else {
+                consoleLogInfo("CallMultiViewController: Current user not found in items cache.", type: .error)
+                return
+            }
             CallKitManager.shared.enableLocalVideo(false)
             item.videoMuted = true
             canvas.updateItem(item)
