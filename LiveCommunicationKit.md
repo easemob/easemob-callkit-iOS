@@ -10,11 +10,11 @@
     private func setupCallKit() {
         let options = EMOptions(appkey: appKey)
         #if DEBUG
-        options.apnsCertName = "EaseIM_APNS_Developer"
-        options.pushKitCertName = "EasemobVoipDev"
+        options.apnsCertName = "your_APNS_Developer"
+        options.pushKitCertName = "yourVoipDev"
         #else
-        options.apnsCertName = "EaseIM_APNS_Product"
-        options.pushKitCertName = "EasemobVoipPro"
+        options.apnsCertName = "your_APNS_Product"
+        options.pushKitCertName = "yourVoipPro"
         #endif
         EMClient.shared().initializeSDK(with: options)
         //初始化环信CallKit

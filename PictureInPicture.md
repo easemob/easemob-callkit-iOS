@@ -21,22 +21,9 @@
 - 对于VoIP 应用，在 **Background Modes** 中勾选 **Voice over IP (VoIP)**，支持 LiveCommunicationKit。若不勾选，采用厂商默认系统推送。
 - 若应用需要后台采集视频流，需要申请多任务相机访问权限（Multitasking Camera Access Entitlement）。iOS 系统版本对多任务相机访问权限的支持详见 [苹果官方文档](https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.developer.avfoundation.multitasking-camera-access)。
 
-![](./DocumentationImages/multiCameraAccess.png)
+![](./DocumentationImages/backgroundCameraAccess.png)
 
-```swift
-// Info.plist 配置添加，可以在 Capability 中增加。
-    <key>UIBackgroundModes</key>
-    <array>
-        <string>audio</string>
-        <string>remote-notification</string>
-        <string>voip</string>
-    </array>
-//YourDemo.entitlements 配置添加。
-    <key>com.apple.developer.avfoundation.multitasking-camera-access</key>
-    <true/>    
-// 启用 PiP。
-AVPictureInPictureController.isPictureInPictureSupported()
-```
+![](./)
 
 ## 单聊视频通话 PiP
 
@@ -133,7 +120,6 @@ func setupGridLayout(streams: [VideoStream]) {
     //远端视频流 
     public func onRenderVideoFrame(_ videoFrame: AgoraOutputVideoFrame, uid: UInt, channelId: String) -> Bool
 ```
-// TODO：下面的没有问题吧，我没在声网官网上看到 onCapture，只查到了 onCaptureVideoFrame。示例代码中是否要改为 onCaptureVideoFrame。
 
 - `onCaptureVideoFrame`：获取本地设备采集到的视频数据。详见 [声网 RTC 官网文档](https://doc.shengwang.cn/api-ref/rtc/ios/API/toc_video_raw#onCaptureVideoFrame:sourceType:)
 - `onRenderVideoFrame:uid:channelId:`：获取远端发送的视频数据。详见 [声网 RTC 官网文档](https://doc.shengwang.cn/api-ref/rtc/ios/API/toc_video_raw#onRenderVideoFrame:uid:channelId:)
