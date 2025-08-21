@@ -120,7 +120,6 @@ func setupGridLayout(streams: [VideoStream]) {
     //远端视频流 
     public func onRenderVideoFrame(_ videoFrame: AgoraOutputVideoFrame, uid: UInt, channelId: String) -> Bool
 ```
-// TODO：下面的没有问题吧，我没在声网官网上看到 onCapture，只查到了 onCaptureVideoFrame。示例代码中是否要改为 onCaptureVideoFrame。
 
 - `onCaptureVideoFrame`：获取本地设备采集到的视频数据。详见 [声网 RTC 官网文档](https://doc.shengwang.cn/api-ref/rtc/ios/API/toc_video_raw#onCaptureVideoFrame:sourceType:)
 - `onRenderVideoFrame:uid:channelId:`：获取远端发送的视频数据。详见 [声网 RTC 官网文档](https://doc.shengwang.cn/api-ref/rtc/ios/API/toc_video_raw#onRenderVideoFrame:uid:channelId:)
