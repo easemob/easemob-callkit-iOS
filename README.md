@@ -7,7 +7,7 @@
 
 在本项目中，“Example”文件夹中有一个最佳实践演示项目，供您构建自己的业务能力。
 
-如需体验EaseCallUIKit的完整功能（包含LiveCommunicationKit），您可以扫描以下二维码试用demo。
+如需体验EaseCallUIKit的完整功能（包含LiveCommunicationKit&Picture In Picture），您可以扫描以下二维码试用demo。
 
 ![Demo](./DocumentationImages/demo.png)
 
@@ -16,7 +16,7 @@
 ## 简介
 
 本指南介绍了 EaseCallUIKit 框架在 iOS 开发中的概述和使用示例
-- EaseCallUIKit支持的通话类型（音频通话、视频通话、群组通话）必须与环信IM SDK一起使用
+- EaseCallUIKit支持的通话类型（音频通话、视频通话、群组通话）必须与环信IM SDK（登录初始化）一起使用
 
 ## 目录
 
@@ -29,19 +29,20 @@
 - [快速开始](#快速开始)
   - [第一步：初始化EaseCallUIKit](#第一步初始化easecalluikit)
   - [第二步：登录IM SDK](#第2步登录im-sdk)
-  - [第三步：让AI帮写界面后运行](#第三步让ai帮写界面后运行)
+  - [第三步：粘贴代码后运行](#第三步粘贴代码后运行)
 - [集成文档](#集成文档)
   - [1.初始化EaseCallUIKit（进阶）](#1初始化easecalluikit)
   - [2.登录](#2登录)
-  - [3.Provider配置](#3easecalluikit中的provider)
-  - [4.创建呼叫页面并调用呼叫Api](#4创建呼叫页面并调用呼叫api)
-  - [5.监听事件和错误](#5监听easecalluikit事件和错误)    
+  - [3.监听事件和错误](#3监听easecalluikit事件和错误)   
+  - [4.创建呼叫页面并调用呼叫Api](#4创建呼叫页面并调用呼叫api) 
+  - [5.进阶用法](#5进阶用法)
 - [常见问题](#常见问题)
 - [自定义](#自定义)
   - [1.修改UI可配置项](#1修改ui可配置项)
   - [2.修改原有资源](#2修改原有资源)
   - [3.修改业务可配置项](#3修改业务可配置项)
   - [4.如果想进一步修改业务逻辑，请源码集成后修改](#4如果想进一步修改业务逻辑请源码集成后修改)
+- [API概览](#api概览)
 - [文档](#文档)
 - [信令设计](#信令设计)
 - [设计指南](#设计指南)
@@ -144,10 +145,15 @@ let AppKey: String = <#AppKey#>
 - 将注册的AppKey填入其中。
 - 在终端cd到podfile所在的文件目录，复制代理到终端，执行`pod install`命令，等待成功后点击运行即可。
 - 将用户名以及token复制粘贴填写在输入框中->然后点击登录->选择呼叫类型->输入呼叫用户的userId->点击呼叫。
+- 若需发起群组通话，才需要[创建群组](https://v2-console.easemob.com/app/operation/management/micro/app/im-service/operative-service/group)，将已创建用户加入群组见下图，让其中一两个用户登录后，将群组id复制到输入框中点击呼叫即可。
+
+![](./DocumentationImages/joinGroup.png)
 
 ![](./DocumentationImages/example.png)
 
 注意： 如果想要自定义的头像昵称显示信息，在ViewController.swift中找到loginAction方法后填入您要显示的当前用户id对应的昵称头像`profile.nickname` `profile.avatarURL`信息即可
+注意：
+   在生产环境中，为了安全考虑，你需要在你的应用服务器集成 获取 App Token API 和 获取用户 Token API 实现获取 Token 的业务逻辑，使你的用户从你的应用服务器获取 Token。
 
 
 # 快速开始
@@ -162,6 +168,9 @@ let AppKey: String = <#AppKey#>
 - 开通RTC功能  ![开通RTC功能](./DocumentationImages/open_rtc.png)
 
 - [创建IM用户并获取token](https://v2-console.easemob.com/app/operation/management/micro/app/im-service/operative-service/user),这里建议创建两个用户。![](./DocumentationImages/createUser.png)
+
+注意：
+   在生产环境中，为了安全考虑，你需要在你的应用服务器集成 获取 App Token API 和 获取用户 Token API 实现获取 Token 的业务逻辑，使你的用户从你的应用服务器获取 Token。
 
 参考以下步骤在 Xcode 中创建一个 iOS 平台下的App，创建设置如下：
 
@@ -217,39 +226,264 @@ class AppDelegate：UIResponder，UIApplicationDelegate {
         }
 ```
 
-### 第三步：让AI帮写界面后运行
+### 第三步：粘贴代码后运行
 
-复制下面这段话给豆包、GPT、Claude、Grok、DeepSeek、Kimi等AI。
-- 我创建了一个新的iOS工程，里面有一个ViewController以及一个Main.storyboard，我想在这个页面中增加一个用户id的输入框、一个用户token的输入框、一个登录按钮、一个被叫方用户id的输入框，一个呼叫按钮，touchBegin的时候收起所有键盘，点击登录以及呼叫按钮的时候也一样，点击登录按钮的时候调用下面代码
+- 找到项目中Main.storyboard然后右键菜单，Open As->Source Code,复制下列代码替换并
+``` XML
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="23504" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" colorMatched="YES" initialViewController="vXZ-lx-hvc">
+    <device id="retina4_7" orientation="portrait" appearance="light"/>
+    <dependencies>
+        <deployment identifier="iOS"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="23506"/>
+        <capability name="System colors in document resources" minToolsVersion="11.0"/>
+        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+    </dependencies>
+    <scenes>
+        <!--View Controller-->
+        <scene sceneID="ufC-wZ-h7g">
+            <objects>
+                <viewController id="vXZ-lx-hvc" customClass="ViewController" customModule="EaseCallUIKitQuickStart" customModuleProvider="target" sceneMemberID="viewController">
+                    <layoutGuides>
+                        <viewControllerLayoutGuide type="top" id="jyV-Pf-zRb"/>
+                        <viewControllerLayoutGuide type="bottom" id="2fi-mo-0CV"/>
+                    </layoutGuides>
+                    <view key="view" contentMode="scaleToFill" id="kh9-bI-dsS">
+                        <rect key="frame" x="0.0" y="0.0" width="375" height="667"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                        <subviews>
+                            <textField opaque="NO" contentMode="scaleToFill" horizontalHuggingPriority="248" contentHorizontalAlignment="left" contentVerticalAlignment="center" borderStyle="roundedRect" placeholder="call user or group with id" textAlignment="center" minimumFontSize="17" translatesAutoresizingMaskIntoConstraints="NO" id="laE-OW-CWK">
+                                <rect key="frame" x="75" y="191" width="225" height="40"/>
+                                <color key="backgroundColor" systemColor="systemGray5Color"/>
+                                <constraints>
+                                    <constraint firstAttribute="height" constant="40" id="kOp-K7-HeC"/>
+                                </constraints>
+                                <color key="textColor" white="0.0" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                                <fontDescription key="fontDescription" type="system" pointSize="18"/>
+                                <textInputTraits key="textInputTraits"/>
+                            </textField>
+                            <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="system" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="zid-qi-Z7H">
+                                <rect key="frame" x="161.5" y="254" width="52.5" height="35"/>
+                                <constraints>
+                                    <constraint firstAttribute="height" constant="35" id="Qdf-ZL-nrv"/>
+                                </constraints>
+                                <state key="normal" title="Button"/>
+                                <buttonConfiguration key="configuration" style="filled" title="Call"/>
+                                <connections>
+                                    <action selector="callAction:" destination="vXZ-lx-hvc" eventType="touchUpInside" id="21A-e9-7bB"/>
+                                </connections>
+                            </button>
+                            <textField opaque="NO" contentMode="scaleToFill" horizontalHuggingPriority="248" contentHorizontalAlignment="left" contentVerticalAlignment="center" borderStyle="roundedRect" placeholder="login user id" textAlignment="center" minimumFontSize="17" translatesAutoresizingMaskIntoConstraints="NO" id="hM6-uK-yyP">
+                                <rect key="frame" x="139" y="316" width="97" height="34"/>
+                                <color key="backgroundColor" systemColor="systemGray5Color"/>
+                                <constraints>
+                                    <constraint firstAttribute="height" constant="34" id="L6Z-yu-oNG"/>
+                                    <constraint firstAttribute="width" constant="97" id="mfC-xf-iFf"/>
+                                </constraints>
+                                <fontDescription key="fontDescription" type="system" pointSize="14"/>
+                                <textInputTraits key="textInputTraits"/>
+                            </textField>
+                            <textField opaque="NO" contentMode="scaleToFill" horizontalHuggingPriority="248" contentHorizontalAlignment="left" contentVerticalAlignment="center" borderStyle="roundedRect" placeholder="token" textAlignment="center" minimumFontSize="17" translatesAutoresizingMaskIntoConstraints="NO" id="9QV-P8-MOd">
+                                <rect key="frame" x="155.5" y="377" width="64" height="34"/>
+                                <color key="backgroundColor" systemColor="systemGray5Color"/>
+                                <constraints>
+                                    <constraint firstAttribute="height" constant="34" id="bLn-UW-UNZ"/>
+                                </constraints>
+                                <fontDescription key="fontDescription" type="system" pointSize="14"/>
+                                <textInputTraits key="textInputTraits"/>
+                            </textField>
+                            <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="system" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="1TW-7c-QOv">
+                                <rect key="frame" x="154.5" y="438" width="66" height="35"/>
+                                <constraints>
+                                    <constraint firstAttribute="height" constant="35" id="X5z-2c-9KQ"/>
+                                </constraints>
+                                <state key="normal" title="Button"/>
+                                <buttonConfiguration key="configuration" style="filled" title="Login"/>
+                                <connections>
+                                    <action selector="loginAction:" destination="vXZ-lx-hvc" eventType="touchUpInside" id="D5E-pO-2Jw"/>
+                                </connections>
+                            </button>
+                            <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="system" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="0Qd-2k-2aV">
+                                <rect key="frame" x="161" y="497" width="53" height="35"/>
+                                <constraints>
+                                    <constraint firstAttribute="height" constant="35" id="fuc-9c-KcU"/>
+                                    <constraint firstAttribute="width" constant="53" id="u4m-wu-cwy"/>
+                                </constraints>
+                                <state key="normal" title="Button"/>
+                                <buttonConfiguration key="configuration" style="filled" title="Log"/>
+                                <connections>
+                                    <action selector="logAction:" destination="vXZ-lx-hvc" eventType="touchUpInside" id="QkB-ye-mNH"/>
+                                </connections>
+                            </button>
+                            <segmentedControl opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="top" segmentControlStyle="plain" selectedSegmentIndex="0" translatesAutoresizingMaskIntoConstraints="NO" id="KgU-kb-zgq">
+                                <rect key="frame" x="89" y="129" width="197" height="32"/>
+                                <constraints>
+                                    <constraint firstAttribute="height" constant="31" id="49T-gN-YNX"/>
+                                    <constraint firstAttribute="width" constant="197" id="64h-61-hN9"/>
+                                </constraints>
+                                <segments>
+                                    <segment title="audio"/>
+                                    <segment title="video"/>
+                                    <segment title="group"/>
+                                </segments>
+                                <color key="tintColor" systemColor="systemBlueColor"/>
+                                <connections>
+                                    <action selector="chooseCallType:" destination="vXZ-lx-hvc" eventType="valueChanged" id="faD-YP-JKc"/>
+                                </connections>
+                            </segmentedControl>
+                        </subviews>
+                        <color key="backgroundColor" red="1" green="1" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                        <constraints>
+                            <constraint firstItem="zid-qi-Z7H" firstAttribute="centerX" secondItem="kh9-bI-dsS" secondAttribute="centerX" id="3PV-gJ-xUs"/>
+                            <constraint firstItem="zid-qi-Z7H" firstAttribute="top" secondItem="laE-OW-CWK" secondAttribute="bottom" constant="23" id="3d9-xN-rVV"/>
+                            <constraint firstItem="KgU-kb-zgq" firstAttribute="top" secondItem="jyV-Pf-zRb" secondAttribute="bottom" constant="109" id="3iR-bE-dsH"/>
+                            <constraint firstItem="1TW-7c-QOv" firstAttribute="centerX" secondItem="kh9-bI-dsS" secondAttribute="centerX" id="7qi-nX-Ep7"/>
+                            <constraint firstItem="hM6-uK-yyP" firstAttribute="top" secondItem="zid-qi-Z7H" secondAttribute="bottom" constant="27" id="Fbk-dr-XJy"/>
+                            <constraint firstItem="9QV-P8-MOd" firstAttribute="centerX" secondItem="kh9-bI-dsS" secondAttribute="centerX" id="NLK-X7-nmU"/>
+                            <constraint firstItem="KgU-kb-zgq" firstAttribute="centerX" secondItem="kh9-bI-dsS" secondAttribute="centerX" id="PaT-sj-EOF"/>
+                            <constraint firstItem="0Qd-2k-2aV" firstAttribute="centerX" secondItem="kh9-bI-dsS" secondAttribute="centerX" id="Ptx-cV-DpW"/>
+                            <constraint firstItem="1TW-7c-QOv" firstAttribute="top" secondItem="9QV-P8-MOd" secondAttribute="bottom" constant="27" id="Vde-Gf-T6Q"/>
+                            <constraint firstItem="laE-OW-CWK" firstAttribute="centerX" secondItem="kh9-bI-dsS" secondAttribute="centerX" id="ZDm-c5-ZIK"/>
+                            <constraint firstItem="9QV-P8-MOd" firstAttribute="top" secondItem="hM6-uK-yyP" secondAttribute="bottom" constant="27" id="hag-4S-Gef"/>
+                            <constraint firstItem="0Qd-2k-2aV" firstAttribute="top" secondItem="1TW-7c-QOv" secondAttribute="bottom" constant="24" id="r8t-en-w10"/>
+                            <constraint firstItem="laE-OW-CWK" firstAttribute="top" secondItem="jyV-Pf-zRb" secondAttribute="bottom" constant="171" id="vBn-aQ-3Q3"/>
+                            <constraint firstItem="hM6-uK-yyP" firstAttribute="centerX" secondItem="kh9-bI-dsS" secondAttribute="centerX" id="ztk-Cf-e76"/>
+                        </constraints>
+                    </view>
+                    <connections>
+                        <outlet property="callButton" destination="zid-qi-Z7H" id="Awl-9Z-oQR"/>
+                        <outlet property="callTypeSegment" destination="KgU-kb-zgq" id="wvg-RC-nDZ"/>
+                        <outlet property="inputField" destination="laE-OW-CWK" id="jPc-mR-gs4"/>
+                        <outlet property="logButton" destination="0Qd-2k-2aV" id="7P1-p7-nd8"/>
+                        <outlet property="loginButton" destination="1TW-7c-QOv" id="xVW-DO-dD2"/>
+                        <outlet property="tokenField" destination="9QV-P8-MOd" id="rAN-5C-qu0"/>
+                        <outlet property="userIdField" destination="hM6-uK-yyP" id="zV0-uW-JWD"/>
+                    </connections>
+                </viewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="x5A-6p-PRh" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="13.6" y="-69.715142428785612"/>
+        </scene>
+    </scenes>
+    <resources>
+        <systemColor name="systemBlueColor">
+            <color red="0.0" green="0.47843137250000001" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+        </systemColor>
+        <systemColor name="systemGray5Color">
+            <color red="0.8980392157" green="0.8980392157" blue="0.91764705879999997" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+        </systemColor>
+    </resources>
+</document>
+
+```
+
+- 找到项目中的ViewController.swift，复制下列代码并替换
 ``` Swift
+import UIKit
+import EaseCallUIKit
+import QuickLook
+
+class ViewController: UIViewController {
+    
+    var callType: CallType = .singleAudio
+
+    @IBOutlet var inputField: UITextField!
+        
+    @IBOutlet var callButton: UIButton!
+    
+    @IBOutlet weak var userIdField: UITextField!
+    @IBOutlet weak var tokenField: UITextField!
+    @IBOutlet weak var loginButton: UIButton!
+    @IBOutlet weak var callTypeSegment: UISegmentedControl!
+    @IBOutlet weak var logButton: UIButton!
+
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        // Do any additional setup after loading the view, typically from a nib.
+//        CallKitManager.shared.currentUserInfo = CallUserProfile()
+        self.callTypeSegment.selectedSegmentIndex = 0
+        self.callTypeSegment.selectedSegmentTintColor = .systemBlue
+        CallKitManager.shared.profileProvider = self
+        CallKitManager.shared.addListener(self)
+    }
+    
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+    }
+
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        self.view.endEditing(true)
+    }
+
+    @IBAction func chooseCallType(_ sender: Any) {
+        self.callType = CallType(rawValue: UInt(self.callTypeSegment.selectedSegmentIndex)) ?? .singleAudio
+    }
+    
+    @IBAction func loginAction(_ sender: Any) {
+        self.view.endEditing(true)
+        guard let userId = userIdField.text, !userId.isEmpty,
+              let token = tokenField.text, !token.isEmpty else {
+            self.showCallToast(toast: "Please enter a valid username and token")
+            return
+        }
+        
         ChatClient.shared().login(withUsername: userId, token: token) { [weak self] userId,error  in
             if let error = error {
                 self?.showCallToast(toast: "Login failed: \(error.errorDescription ?? "")")
             } else {
                 self?.showCallToast(toast: "Login successful")
+                if !userId.isEmpty {
+                    let profile = CallUserProfile()
+                    profile.id = userId
+                    profile.avatarURL = "https://xxxxx"
+                    profile.nickname = "\(userId)昵称"
+                    CallKitManager.shared.currentUserInfo = profile
+                }
                 self?.userIdField.isHidden = true
                 self?.tokenField.isHidden = true
                 self?.loginButton.isHidden = true 
             }
         }
-
-```
-点击呼叫的时候调用下面代码
-
-```Swift
-        // 在Console中创建一个新用户，新用户使用一样的快速开始工程登录后，将这个用id复制后传入下面构造方法参数中，跳转页面即可。
-        func callAction() {
-                
-            guard let input = inputField.text?.trimmingCharacters(in: .whitespacesAndNewlines), !input.isEmpty else {
-                self.showCallToast(toast: "Please enter a valid username or group id")
-                return
-            }
-            CallKitManager.shared.call(with: input, type: .singleAudio)
+    }
+    
+    @IBAction func logAction(_ sender: Any) {
+        let previewController = QLPreviewController()
+        previewController.dataSource = self
+        self.present(previewController, animated: true)
+    }
+    
+    @IBAction func callAction(_ sender: Any) {
+        self.view.endEditing(true)
+        guard let input = inputField.text?.trimmingCharacters(in: .whitespacesAndNewlines), !input.isEmpty else {
+            self.showCallToast(toast: "Please enter a valid username or group id")
+            return
         }
+        if self.callType != .groupCall {
+            CallKitManager.shared.call(with: input, type: self.callType)
+        } else {
+            CallKitManager.shared.groupCall(groupId: input)
+        }
+    }
+}
+
+extension ViewController: QLPreviewControllerDataSource {
+    public func numberOfPreviewItems(in controller: QLPreviewController) -> Int {
+        1
+    }
+    
+    public func previewController(_ controller: QLPreviewController, previewItemAt index: Int) -> QLPreviewItem {
+        let fileURL = URL(fileURLWithPath: NSHomeDirectory() + "/Library/Application Support/HyphenateSDK/easemobLog/easemob.log")
+        return fileURL as QLPreviewItem
+    }
+    
+    
+}
 
 ```
 
-获取代码粘贴进`ViewController.swift`,获取AI给出的xml代码找到工程中的Main.storyboard右键菜单，Open As->Source Code，然后复制粘贴即可运行项目，安装到两台设备并且两个用户分别登录后，主叫设备输入被叫用户id即可点击呼叫。
+然后点击运行即可.
 
 
 # 集成文档
@@ -323,7 +557,349 @@ class AppDelegate：UIResponder，UIApplicationDelegate {
 // https://docs-im-beta.easemob.com/product/enable_and_configure_IM.html#%E5%88%9B%E5%BB%BA-im-%E7%94%A8%E6%88%B7。
 ```
 
-## 3.EaseCallUIKit中的Provider
+## 3.监听EaseCallUIKit事件和错误
+
+您可以调用下面方法来监听 EaseCallUIKit中用户相关状态变更的事件和错误。
+
+```Swift        
+        CallKitManager.shared.addListener(self)//添加监听，均为可选方法
+```
+下面是监听事件的示例代码。
+```Swift 
+extension MainViewController: CallServiceListener {
+    
+    func didOccurError(error: CallError) {
+        DispatchQueue.main.async {
+            self.showToast(toast: "Occur error:\(error.errorMessage) on module:\(error.module.rawValue)")
+        }
+        switch error { //Swift error handler
+        case .im(.invalidURL):
+            print("Invalid URL")
+        case .rtc(.invalidToken):
+            print("Invalid Token")
+        case .business(.state):
+            print("State error")
+        case .business(.param):
+            print("Param error")
+        default:
+            // 注意这里要通过 error.error.message 访问
+            print("Other error: \(error.error.message)")
+        }
+//        switch error.module {//OC error handler
+//        case .im:
+//            switch error.getIMError() {
+//            case .invalidURL:
+//                print("")
+//            default:
+//                break
+//            }
+//        case .rtc:
+//            switch error.getRTCError() {
+//            case .invalidToken:
+//                print("")
+//            default:
+//                break
+//            }
+//        case .business:
+//            switch error.getCallBusinessError() {
+//            case .state:
+//                print("")
+//            case .param:
+//                print("")
+//            case .signaling:
+//                print("")
+//            default:
+//                break
+//            }
+//        default:
+//            break
+//        }
+    }
+        
+    func didUpdateCallEndReason(reason: CallEndReason, info: CallInfo) {
+        print("didUpdateCallEndReason: \(String(describing: info.inviteMessage?.ext))")
+        if let messageId = info.inviteMessageId {
+            NotificationCenter.default.post(name: Notification.Name("didUpdateCallEndReason"), object: messageId)
+        }
+        
+    }
+    
+    func remoteUserDidJoined(userId: String, uid: UInt, channelName: String, type: CallType) {
+        
+    }
+    
+    func remoteUserDidLeft(userId: String, uid: UInt, channelName: String, type: CallType) {
+        
+    }
+    
+    func onRtcEngineCreated(engine: AgoraRtcEngineKit?) {
+        
+    }
+    
+}
+```
+## 4.创建呼叫页面并调用呼叫Api
+
+- 找到项目中Main.storyboard然后右键菜单，Open As->Source Code,复制下列代码替换并
+``` XML
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="23504" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" colorMatched="YES" initialViewController="vXZ-lx-hvc">
+    <device id="retina4_7" orientation="portrait" appearance="light"/>
+    <dependencies>
+        <deployment identifier="iOS"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="23506"/>
+        <capability name="System colors in document resources" minToolsVersion="11.0"/>
+        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+    </dependencies>
+    <scenes>
+        <!--View Controller-->
+        <scene sceneID="ufC-wZ-h7g">
+            <objects>
+                <viewController id="vXZ-lx-hvc" customClass="ViewController" customModule="EaseCallUIKitQuickStart" customModuleProvider="target" sceneMemberID="viewController">
+                    <layoutGuides>
+                        <viewControllerLayoutGuide type="top" id="jyV-Pf-zRb"/>
+                        <viewControllerLayoutGuide type="bottom" id="2fi-mo-0CV"/>
+                    </layoutGuides>
+                    <view key="view" contentMode="scaleToFill" id="kh9-bI-dsS">
+                        <rect key="frame" x="0.0" y="0.0" width="375" height="667"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                        <subviews>
+                            <textField opaque="NO" contentMode="scaleToFill" horizontalHuggingPriority="248" contentHorizontalAlignment="left" contentVerticalAlignment="center" borderStyle="roundedRect" placeholder="call user or group with id" textAlignment="center" minimumFontSize="17" translatesAutoresizingMaskIntoConstraints="NO" id="laE-OW-CWK">
+                                <rect key="frame" x="75" y="191" width="225" height="40"/>
+                                <color key="backgroundColor" systemColor="systemGray5Color"/>
+                                <constraints>
+                                    <constraint firstAttribute="height" constant="40" id="kOp-K7-HeC"/>
+                                </constraints>
+                                <color key="textColor" white="0.0" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                                <fontDescription key="fontDescription" type="system" pointSize="18"/>
+                                <textInputTraits key="textInputTraits"/>
+                            </textField>
+                            <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="system" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="zid-qi-Z7H">
+                                <rect key="frame" x="161.5" y="254" width="52.5" height="35"/>
+                                <constraints>
+                                    <constraint firstAttribute="height" constant="35" id="Qdf-ZL-nrv"/>
+                                </constraints>
+                                <state key="normal" title="Button"/>
+                                <buttonConfiguration key="configuration" style="filled" title="Call"/>
+                                <connections>
+                                    <action selector="callAction:" destination="vXZ-lx-hvc" eventType="touchUpInside" id="21A-e9-7bB"/>
+                                </connections>
+                            </button>
+                            <textField opaque="NO" contentMode="scaleToFill" horizontalHuggingPriority="248" contentHorizontalAlignment="left" contentVerticalAlignment="center" borderStyle="roundedRect" placeholder="login user id" textAlignment="center" minimumFontSize="17" translatesAutoresizingMaskIntoConstraints="NO" id="hM6-uK-yyP">
+                                <rect key="frame" x="139" y="316" width="97" height="34"/>
+                                <color key="backgroundColor" systemColor="systemGray5Color"/>
+                                <constraints>
+                                    <constraint firstAttribute="height" constant="34" id="L6Z-yu-oNG"/>
+                                    <constraint firstAttribute="width" constant="97" id="mfC-xf-iFf"/>
+                                </constraints>
+                                <fontDescription key="fontDescription" type="system" pointSize="14"/>
+                                <textInputTraits key="textInputTraits"/>
+                            </textField>
+                            <textField opaque="NO" contentMode="scaleToFill" horizontalHuggingPriority="248" contentHorizontalAlignment="left" contentVerticalAlignment="center" borderStyle="roundedRect" placeholder="token" textAlignment="center" minimumFontSize="17" translatesAutoresizingMaskIntoConstraints="NO" id="9QV-P8-MOd">
+                                <rect key="frame" x="155.5" y="377" width="64" height="34"/>
+                                <color key="backgroundColor" systemColor="systemGray5Color"/>
+                                <constraints>
+                                    <constraint firstAttribute="height" constant="34" id="bLn-UW-UNZ"/>
+                                </constraints>
+                                <fontDescription key="fontDescription" type="system" pointSize="14"/>
+                                <textInputTraits key="textInputTraits"/>
+                            </textField>
+                            <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="system" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="1TW-7c-QOv">
+                                <rect key="frame" x="154.5" y="438" width="66" height="35"/>
+                                <constraints>
+                                    <constraint firstAttribute="height" constant="35" id="X5z-2c-9KQ"/>
+                                </constraints>
+                                <state key="normal" title="Button"/>
+                                <buttonConfiguration key="configuration" style="filled" title="Login"/>
+                                <connections>
+                                    <action selector="loginAction:" destination="vXZ-lx-hvc" eventType="touchUpInside" id="D5E-pO-2Jw"/>
+                                </connections>
+                            </button>
+                            <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="system" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="0Qd-2k-2aV">
+                                <rect key="frame" x="161" y="497" width="53" height="35"/>
+                                <constraints>
+                                    <constraint firstAttribute="height" constant="35" id="fuc-9c-KcU"/>
+                                    <constraint firstAttribute="width" constant="53" id="u4m-wu-cwy"/>
+                                </constraints>
+                                <state key="normal" title="Button"/>
+                                <buttonConfiguration key="configuration" style="filled" title="Log"/>
+                                <connections>
+                                    <action selector="logAction:" destination="vXZ-lx-hvc" eventType="touchUpInside" id="QkB-ye-mNH"/>
+                                </connections>
+                            </button>
+                            <segmentedControl opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="top" segmentControlStyle="plain" selectedSegmentIndex="0" translatesAutoresizingMaskIntoConstraints="NO" id="KgU-kb-zgq">
+                                <rect key="frame" x="89" y="129" width="197" height="32"/>
+                                <constraints>
+                                    <constraint firstAttribute="height" constant="31" id="49T-gN-YNX"/>
+                                    <constraint firstAttribute="width" constant="197" id="64h-61-hN9"/>
+                                </constraints>
+                                <segments>
+                                    <segment title="audio"/>
+                                    <segment title="video"/>
+                                    <segment title="group"/>
+                                </segments>
+                                <color key="tintColor" systemColor="systemBlueColor"/>
+                                <connections>
+                                    <action selector="chooseCallType:" destination="vXZ-lx-hvc" eventType="valueChanged" id="faD-YP-JKc"/>
+                                </connections>
+                            </segmentedControl>
+                        </subviews>
+                        <color key="backgroundColor" red="1" green="1" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                        <constraints>
+                            <constraint firstItem="zid-qi-Z7H" firstAttribute="centerX" secondItem="kh9-bI-dsS" secondAttribute="centerX" id="3PV-gJ-xUs"/>
+                            <constraint firstItem="zid-qi-Z7H" firstAttribute="top" secondItem="laE-OW-CWK" secondAttribute="bottom" constant="23" id="3d9-xN-rVV"/>
+                            <constraint firstItem="KgU-kb-zgq" firstAttribute="top" secondItem="jyV-Pf-zRb" secondAttribute="bottom" constant="109" id="3iR-bE-dsH"/>
+                            <constraint firstItem="1TW-7c-QOv" firstAttribute="centerX" secondItem="kh9-bI-dsS" secondAttribute="centerX" id="7qi-nX-Ep7"/>
+                            <constraint firstItem="hM6-uK-yyP" firstAttribute="top" secondItem="zid-qi-Z7H" secondAttribute="bottom" constant="27" id="Fbk-dr-XJy"/>
+                            <constraint firstItem="9QV-P8-MOd" firstAttribute="centerX" secondItem="kh9-bI-dsS" secondAttribute="centerX" id="NLK-X7-nmU"/>
+                            <constraint firstItem="KgU-kb-zgq" firstAttribute="centerX" secondItem="kh9-bI-dsS" secondAttribute="centerX" id="PaT-sj-EOF"/>
+                            <constraint firstItem="0Qd-2k-2aV" firstAttribute="centerX" secondItem="kh9-bI-dsS" secondAttribute="centerX" id="Ptx-cV-DpW"/>
+                            <constraint firstItem="1TW-7c-QOv" firstAttribute="top" secondItem="9QV-P8-MOd" secondAttribute="bottom" constant="27" id="Vde-Gf-T6Q"/>
+                            <constraint firstItem="laE-OW-CWK" firstAttribute="centerX" secondItem="kh9-bI-dsS" secondAttribute="centerX" id="ZDm-c5-ZIK"/>
+                            <constraint firstItem="9QV-P8-MOd" firstAttribute="top" secondItem="hM6-uK-yyP" secondAttribute="bottom" constant="27" id="hag-4S-Gef"/>
+                            <constraint firstItem="0Qd-2k-2aV" firstAttribute="top" secondItem="1TW-7c-QOv" secondAttribute="bottom" constant="24" id="r8t-en-w10"/>
+                            <constraint firstItem="laE-OW-CWK" firstAttribute="top" secondItem="jyV-Pf-zRb" secondAttribute="bottom" constant="171" id="vBn-aQ-3Q3"/>
+                            <constraint firstItem="hM6-uK-yyP" firstAttribute="centerX" secondItem="kh9-bI-dsS" secondAttribute="centerX" id="ztk-Cf-e76"/>
+                        </constraints>
+                    </view>
+                    <connections>
+                        <outlet property="callButton" destination="zid-qi-Z7H" id="Awl-9Z-oQR"/>
+                        <outlet property="callTypeSegment" destination="KgU-kb-zgq" id="wvg-RC-nDZ"/>
+                        <outlet property="inputField" destination="laE-OW-CWK" id="jPc-mR-gs4"/>
+                        <outlet property="logButton" destination="0Qd-2k-2aV" id="7P1-p7-nd8"/>
+                        <outlet property="loginButton" destination="1TW-7c-QOv" id="xVW-DO-dD2"/>
+                        <outlet property="tokenField" destination="9QV-P8-MOd" id="rAN-5C-qu0"/>
+                        <outlet property="userIdField" destination="hM6-uK-yyP" id="zV0-uW-JWD"/>
+                    </connections>
+                </viewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="x5A-6p-PRh" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="13.6" y="-69.715142428785612"/>
+        </scene>
+    </scenes>
+    <resources>
+        <systemColor name="systemBlueColor">
+            <color red="0.0" green="0.47843137250000001" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+        </systemColor>
+        <systemColor name="systemGray5Color">
+            <color red="0.8980392157" green="0.8980392157" blue="0.91764705879999997" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+        </systemColor>
+    </resources>
+</document>
+
+```
+
+- 找到项目中的ViewController.swift，复制下列代码并替换
+``` Swift
+import UIKit
+import EaseCallUIKit
+import QuickLook
+
+class ViewController: UIViewController {
+    
+    var callType: CallType = .singleAudio
+
+    @IBOutlet var inputField: UITextField!
+        
+    @IBOutlet var callButton: UIButton!
+    
+    @IBOutlet weak var userIdField: UITextField!
+    @IBOutlet weak var tokenField: UITextField!
+    @IBOutlet weak var loginButton: UIButton!
+    @IBOutlet weak var callTypeSegment: UISegmentedControl!
+    @IBOutlet weak var logButton: UIButton!
+
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        // Do any additional setup after loading the view, typically from a nib.
+//        CallKitManager.shared.currentUserInfo = CallUserProfile()
+        self.callTypeSegment.selectedSegmentIndex = 0
+        self.callTypeSegment.selectedSegmentTintColor = .systemBlue
+        CallKitManager.shared.profileProvider = self
+        CallKitManager.shared.addListener(self)
+    }
+    
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+    }
+
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        self.view.endEditing(true)
+    }
+
+    @IBAction func chooseCallType(_ sender: Any) {
+        self.callType = CallType(rawValue: UInt(self.callTypeSegment.selectedSegmentIndex)) ?? .singleAudio
+    }
+    
+    @IBAction func loginAction(_ sender: Any) {
+        self.view.endEditing(true)
+        guard let userId = userIdField.text, !userId.isEmpty,
+              let token = tokenField.text, !token.isEmpty else {
+            self.showCallToast(toast: "Please enter a valid username and token")
+            return
+        }
+        
+        ChatClient.shared().login(withUsername: userId, token: token) { [weak self] userId,error  in
+            if let error = error {
+                self?.showCallToast(toast: "Login failed: \(error.errorDescription ?? "")")
+            } else {
+                self?.showCallToast(toast: "Login successful")
+                if !userId.isEmpty {
+                    let profile = CallUserProfile()
+                    profile.id = userId
+                    profile.avatarURL = "https://xxxxx"
+                    profile.nickname = "\(userId)昵称"
+                    CallKitManager.shared.currentUserInfo = profile
+                }
+                self?.userIdField.isHidden = true
+                self?.tokenField.isHidden = true
+                self?.loginButton.isHidden = true 
+            }
+        }
+    }
+    
+    @IBAction func logAction(_ sender: Any) {
+        let previewController = QLPreviewController()
+        previewController.dataSource = self
+        self.present(previewController, animated: true)
+    }
+    
+    @IBAction func callAction(_ sender: Any) {
+        self.view.endEditing(true)
+        guard let input = inputField.text?.trimmingCharacters(in: .whitespacesAndNewlines), !input.isEmpty else {
+            self.showCallToast(toast: "Please enter a valid username or group id")
+            return
+        }
+        if self.callType != .groupCall {
+            CallKitManager.shared.call(with: input, type: self.callType)
+        } else {
+            CallKitManager.shared.groupCall(groupId: input)
+        }
+    }
+}
+
+extension ViewController: QLPreviewControllerDataSource {
+    public func numberOfPreviewItems(in controller: QLPreviewController) -> Int {
+        1
+    }
+    
+    public func previewController(_ controller: QLPreviewController, previewItemAt index: Int) -> QLPreviewItem {
+        let fileURL = URL(fileURLWithPath: NSHomeDirectory() + "/Library/Application Support/HyphenateSDK/easemobLog/easemob.log")
+        return fileURL as QLPreviewItem
+    }
+    
+    
+}
+
+```
+
+然后复制粘贴即可运行项目，安装到两台设备并且两个用户分别登录后，主叫设备输入被叫用户id即可点击呼叫。
+
+## 5.进阶用法
+
+### 5.1 EaseCallUIKit中的Provider
 
 - 注: 仅用于会话列表以及联系人列表,在只是用快速开始进入聊天页面时不需要实现Provider
 
@@ -446,121 +1022,29 @@ extension MainViewController: CallUserProfileProvider {
 }
 ```
 
-## 4.创建呼叫页面并调用呼叫Api
-
-复制下面这段话给豆包、GPT、Claude、Grok、DeepSeek、Kimi等AI。
-- 我创建了一个新的iOS工程，里面有一个ViewController以及一个Main.storyboard，我想在这个页面中增加一个用户id的输入框、一个用户token的输入框、一个登录按钮、一个被叫方用户id的输入框，一个选择呼叫类型的segment（有audio、video、group分别对应EaseCallUIKit.CallType的singleAudio、singleVideo、group），一个呼叫按钮，touchBegin的时候收起所有键盘，点击登录以及呼叫按钮的时候也一样，点击登录按钮的时候调用下面代码
-``` Swift
-        ChatClient.shared().login(withUsername: userId, token: token) { [weak self] userId,error  in
-            if let error = error {
-                self?.showCallToast(toast: "Login failed: \(error.errorDescription ?? "")")
-            } else {
-                self?.showCallToast(toast: "Login successful")
-                self?.userIdField.isHidden = true
-                self?.tokenField.isHidden = true
-                self?.loginButton.isHidden = true 
-            }
-        }
-
-```
-点击呼叫的时候调用下面代码
+### 5.2 RTC私有化部署
 
 ```Swift
-        // 在Console中创建一个新用户，新用户使用一样的快速开始工程登录后，将这个用id复制后传入下面构造方法参数中，跳转页面即可。
-        func callAction() {
-                
-            guard let input = inputField.text?.trimmingCharacters(in: .whitespacesAndNewlines), !input.isEmpty else {
-                self.showCallToast(toast: "Please enter a valid username or group id")
-                return
-            }
-            if self.type == .group {
-                CallKitManager.shared.groupCall(groupId: input)
-            } else {
-                CallKitManager.shared.call(with: input, type: type)
-            }
-        }
-
+//添加CallKitListener监听后实现下面方法，填写自己的ip地址以及域名
+    func onRtcEngineCreated(engine: AgoraRtcEngineKit?) {
+        let config = AgoraLocalAccessPointConfiguration()
+        config.ipList = ["123.456.789.0"]
+        config.verifyDomainName = "ap.xxx.agora.local"
+        config.mode = .localOnly
+        engine?.setLocalAccessPoint(withConfig: config)
+    }
 ```
+### 5.3 LiveCommunicationKit
 
-获取代码粘贴进`ViewController.swift`,获取AI给出的xml代码找到工程中的Main.storyboard右键菜单，Open As->Source Code，然后复制粘贴即可运行项目，安装到两台设备并且两个用户分别登录后，主叫设备输入被叫用户id即可点击呼叫。
+- 注意：仅限iOS17.4及其以上系统可用
 
-## 5.监听EaseCallUIKit事件和错误
+详见[LiveCommunicationKit.md](./LiveCommunicationKit.md)
 
-您可以调用下面方法来监听 EaseCallUIKit中用户相关状态变更的事件和错误。
+### 5.4 画中画
 
-```Swift        
-        CallKitManager.shared.addListener(self)//添加监听，均为可选方法
-```
-下面是监听事件的示例代码。
-```Swift 
-extension MainViewController: CallServiceListener {
-    
-    func didOccurError(error: CallError) {
-        DispatchQueue.main.async {
-            self.showToast(toast: "Occur error:\(error.errorMessage) on module:\(error.module.rawValue)")
-        }
-        switch error { //Swift error handler
-        case .im(.invalidURL):
-            print("Invalid URL")
-        case .rtc(.invalidToken):
-            print("Invalid Token")
-        case .business(.state):
-            print("State error")
-        case .business(.param):
-            print("Param error")
-        default:
-            // 注意这里要通过 error.error.message 访问
-            print("Other error: \(error.error.message)")
-        }
-//        switch error.module {//OC error handler
-//        case .im:
-//            switch error.getIMError() {
-//            case .invalidURL:
-//                print("")
-//            default:
-//                break
-//            }
-//        case .rtc:
-//            switch error.getRTCError() {
-//            case .invalidToken:
-//                print("")
-//            default:
-//                break
-//            }
-//        case .business:
-//            switch error.getCallBusinessError() {
-//            case .state:
-//                print("")
-//            case .param:
-//                print("")
-//            case .signaling:
-//                print("")
-//            default:
-//                break
-//            }
-//        default:
-//            break
-//        }
-    }
-        
-    func didUpdateCallEndReason(reason: CallEndReason, info: CallInfo) {
-        print("didUpdateCallEndReason: \(String(describing: info.inviteMessage?.ext))")
-        if let messageId = info.inviteMessageId {
-            NotificationCenter.default.post(name: Notification.Name("didUpdateCallEndReason"), object: messageId)
-        }
-        
-    }
-    
-    func remoteUserDidJoined(userId: String, uid: UInt, channelName: String, type: CallType) {
-        
-    }
-    
-    func remoteUserDidLeft(userId: String, uid: UInt, channelName: String, type: CallType) {
-        
-    }
-    
-}
-```
+- 注意：仅限iOS14及其以上系统可用（因没有iOS14设备，未测试），iOS15设备已测试
+
+详见[PictureInPicture.md](./PictureInPicture.md)
 
 # 常见问题 
 
@@ -613,6 +1097,10 @@ extension MainViewController: CallServiceListener {
 ```
 
 4.如果想进一步修改业务逻辑，请源码集成后修改
+
+# API概览
+
+详见 [API概览](./APIOverView.md)
 
 # 文档
 
