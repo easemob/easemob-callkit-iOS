@@ -618,13 +618,6 @@ extension CallKitManager: CallMessageService {
                 self.handleError(error)
                 consoleLogInfo("Failed to send call message: \(String(describing: error.errorDescription))", type: .error)
                 self.callStartTimerStop(callId: callId)
-                
-                // Dismiss the UI on failure
-                DispatchQueue.main.async {
-                    AudioPlayerManager.shared.stopAudio()
-                    UIViewController.currentController?.dismiss(animated: true)
-                }
-                self.quitCall()
                 return
             }
             
