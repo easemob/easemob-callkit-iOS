@@ -233,7 +233,6 @@ open class CallMultiViewController: UIViewController {
     }
     
     deinit {
-        CallKitManager.shared.callInfo?.state = .idle
         consoleLogInfo("CallMultiViewController deinit", type: .info)
     }
     

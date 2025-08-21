@@ -40,6 +40,10 @@ extension CallKitManager: ChatEventsListener {
                 consoleLogInfo("Invalid call info in message id:\(message.messageId) : \(String(describing: message.ext))", type: .error)
                 return
             }
+            if message.from.lowercased() == ChatClient.shared().currentUsername?.lowercased() ?? "" {
+                consoleLogInfo("Call info from current user, ignoring message id:\(message.messageId)", type: .info)
+                return
+            }
             let defaultCalleeId = ChatClient.shared().getDeviceConfig(nil).deviceUUID ?? ""
             let calleeDevId = ext[kCalleeDevId] as? String ?? defaultCalleeId
             let callTypeRawValue = ext[kCallType] as? UInt ?? 0
@@ -198,7 +202,7 @@ extension CallKitManager: ChatEventsListener {
                                                 CallKitManager.shared.callInfo?.state = .answering
                                                 self.presentCalleeController(call: call)
                                             }
-                                            consoleLogInfo("Failed to join channel with error code: \(success)", type: .error)
+                                            consoleLogInfo("join channel with result: \(success)", type: .error)
                                         }
                                     case kBusyResult:
                                         consoleLogInfo("Remote user is busy for callId: \(callId)", type: .info)
@@ -316,6 +320,10 @@ extension CallKitManager: ChatEventsListener {
         }
         switch UIApplication.shared.applicationState {
         case .active:
+            if #available(iOS 17.4, *),self.config.enableVOIP,LiveCommunicationManager.shared.manager != nil {
+                consoleLogInfo("LiveCommunicationManager is not nil,doesn't need to show call popup", type: .debug)
+                return
+            }
             popup = CallPopupView(frame: UIScreen.main.bounds)
             if let profile = user {
                 popup?.refresh(profile: profile,type: call.type)
@@ -633,11 +641,7 @@ extension CallKitManager: CallMessageService {
                 if !success {
                     // Handle join channel failure
                     self.callStartTimerStop(callId: callId)
-                    DispatchQueue.main.async {
-                        AudioPlayerManager.shared.stopAudio()
-                        UIViewController.currentController?.dismiss(animated: true)
-                        self.callInfo?.state = .idle
-                    }
+                    self.hangup()
                 }
             }
         }
@@ -875,13 +879,6 @@ extension CallKitManager: CallMessageService {
                 self.handleError(error)
                 consoleLogInfo("Failed to send group call message: \(String(describing: error.errorDescription))", type: .error)
                 self.callStartTimerStop(callId: callId + " users:" + ids.joined(separator: "-"))
-                
-                // Dismiss UI on failure
-                DispatchQueue.main.async {
-                    AudioPlayerManager.shared.stopAudio()
-                    UIViewController.currentController?.dismiss(animated: true)
-                }
-                self.quitCall()
                 return
             }
             
@@ -899,10 +896,7 @@ extension CallKitManager: CallMessageService {
                     if !success {
                         // Handle join channel failure
                         self.callStartTimerStop(callId: timerKey)
-                        DispatchQueue.main.async {
-                            AudioPlayerManager.shared.stopAudio()
-                            self.quitCall()
-                        }
+                        self.hangup()
                     }
                 }
             }
@@ -959,6 +953,7 @@ extension CallKitManager: CallMessageService {
                 self.handleError(error)
                 consoleLogInfo("Failed to send group call message: \(String(describing: error.errorDescription))", type: .error)
                 self.callStartTimerStop(callId: callId + " users:" + ids.joined(separator: "-"))
+                
                 return
             }
             
@@ -1318,7 +1313,7 @@ extension CallKitManager: CallMessageService {
         }
     }
     
-    private func joinedThenPresentCallVC() {
+    func joinedThenPresentCallVC() {
         UIApplication.shared.isIdleTimerDisabled = true
         if let call = self.callInfo {
             switch call.type  {
@@ -1332,6 +1327,11 @@ extension CallKitManager: CallMessageService {
                 self.enableLocalVideo(false)
             default:
                 break
+            }
+            if call.callerId == ChatClient.shared().currentUsername ?? "" {
+                self.presentCallerPage(call: call)
+            } else {
+                self.presentCalleeController(call: call)
             }
         }
     }

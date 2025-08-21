@@ -112,16 +112,8 @@ extension CallKitManager: AgoraRtcEngineDelegate {
             listener.didOccurError?(error: CallError(CallError.RTC(code: errorCode, message: "RTC error occurred with code: \(errorCode.rawValue)"), module: .rtc))
         }
         switch errorCode {
-        case .tokenExpired,.invalidToken:
-            DispatchQueue.main.async {
-                let controller = UIViewController.currentController
-                if controller is Call1v1AudioViewController || controller is Call1v1VideoViewController || controller is CallMultiViewController {
-                    // If the current controller is a call view, dismiss it
-                    controller?.dismiss(animated: true, completion: nil)
-                    self.quitCall()
-                }
-                self.popup?.dismiss()
-            }
+        case .invalidToken:
+            self.hangup()
         default:
             break
         }
@@ -222,14 +214,15 @@ extension CallKitManager: AgoraRtcEngineDelegate {
             } else {
                 // Fetch the call token from the IM SDK
                 ChatClient.shared().getRTCToken(withChannel: nil) { [weak self] uid, token, expiration, error in
+                    guard let `self` = self else { return }
                     if let error = error {
-                        self?.token = ""
-                        self?.handleError(error)
+                        self.token = ""
+                        self.handleError(error)
                         consoleLogInfo("Failed to fetch call token: \(String(describing: error.errorDescription))", type: .error)
                     } else {
                         let rtcToken = token ?? ""
-                        self?.token = rtcToken
-                        self?.currentUserRTCUID = UInt32(uid)
+                        self.token = rtcToken
+                        self.currentUserRTCUID = UInt32(uid)
                         let options: AgoraRtcChannelMediaOptions = AgoraRtcChannelMediaOptions()
                         options.autoSubscribeAudio = true
                         options.autoSubscribeVideo = true
@@ -239,8 +232,17 @@ extension CallKitManager: AgoraRtcEngineDelegate {
                         options.channelProfile = .liveBroadcasting
                         options.token = rtcToken
                         // Update the channel with the new token
-                        let result = self?.engine?.updateChannelEx(with: options, connection: AgoraRtcConnection(channelId: channelName, localUid: Int(uid)))
+                        let result = self.engine?.updateChannelEx(with: options, connection: AgoraRtcConnection(channelId: channelName, localUid: Int(uid)))
                         consoleLogInfo("Call token fetched successfully when token expired: \(String(describing: token)) updateChannelEx result: \(String(describing: result)) channelName: \(channelName) uid: \(uid) userId: \(userId)", type: .info)
+                        if result == 0 {
+                            self.callInfo?.state = .answering
+                            self.joinedThenPresentCallVC()
+                            if uid == self.currentUserRTCUID {
+                                self.hadJoinedChannel = true
+                                self.updateCallEndReason(.abnormalEnd,false)
+                            }
+                        }
+//                        self.joinChannel(channelName: <#T##String#>, completion: <#T##((Bool) -> Void)##((Bool) -> Void)##(Bool) -> Void#>)
                     }
                 }
             }

@@ -495,7 +495,6 @@ open class Call1v1VideoViewController: UIViewController {
         if CallKitManager.shared.config.enablePIPOn1V1VideoScene {
             releaseActiveVideoCallSourceView()
         }
-        CallKitManager.shared.callInfo?.state = .idle
     }
 }
 
