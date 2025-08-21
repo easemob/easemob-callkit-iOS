@@ -188,7 +188,7 @@ let AppKey: String = <#AppKey#>
 * Product Name 填入EaseCallUIKitQuickStart。
 * Organization Identifier 设为 您的identifier。
 * User Interface 选择 Storyboard。
-* Language 选择 你的常用开发语言。
+* Language 选择 你的常用开发语言，推荐Swift&Main.storyboard。
 * 添加权限 在项目 `info.plist` 中添加相关权限：
 
 Add related privileges in the `info.plist` project:
@@ -198,9 +198,6 @@ Privacy - Photo Library Usage Description //相册权限    Album privileges.
 Privacy - Microphone Usage Description //麦克风权限     Microphone privileges.
 Privacy - Camera Usage Description //相机权限    Camera privileges.
 ```
-
-- 如要配置画中画，[PictureInPicture.md](./PictureInPicture.md)。
-- 如要配置LiveCommunicationKit，[LiveCommunicationKit.md](./LiveCommunicationKit.md)。
 
 ### 第一步：初始化EaseCallUIKit
 
@@ -464,13 +461,6 @@ class ViewController: UIViewController {
                 self?.showCallToast(toast: "Login failed: \(error.errorDescription ?? "")")
             } else {
                 self?.showCallToast(toast: "Login successful")
-                if !userId.isEmpty {
-                    let profile = CallUserProfile()
-                    profile.id = userId
-                    profile.avatarURL = "https://xxxxx"
-                    profile.nickname = "\(userId)昵称"
-                    CallKitManager.shared.currentUserInfo = profile
-                }
                 self?.userIdField.isHidden = true
                 self?.tokenField.isHidden = true
                 self?.loginButton.isHidden = true 
@@ -974,22 +964,34 @@ Provider是一个数据提供者，当会话列表展示并且滑动减速时候
 
 //MARK: - CallUserProfileProvider 
 //For example using conversations controller,as follows.
-extension MainViewController: CallUserProfileProvider {
-    func fetchGroupProfiles(profileIds: [String]) async -> [any EaseCallUIKit.CallProfileProtocol] {
-        consoleLogInfo("fetchGroupProfiles", type: .error)
+extension ViewController: CallUserProfileProvider {
+    func fetchUserProfiles(profileIds: [String]) async -> [any CallProfileProtocol] {
+        return await withTaskGroup(of: [EaseCallUIKit.CallProfileProtocol].self, returning: [EaseCallUIKit.CallProfileProtocol].self) { group in
+            var resultProfiles: [EaseCallUIKit.CallProfileProtocol] = []
+            group.addTask {
+                var resultProfiles: [EaseCallUIKit.CallProfileProtocol] = []
+                let result = await self.requestUserInfos(profileIds: profileIds)
+                if let infos = result {
+                    resultProfiles.append(contentsOf: infos)
+                }
+                return resultProfiles
+            }
+            //Await all task were executed.Return values.
+            for await result in group {
+                resultProfiles.append(contentsOf: result)
+            }
+            return resultProfiles
+        }
+    }
+    
+    func fetchGroupProfiles(profileIds: [String]) async -> [any CallProfileProtocol] {
         return await withTaskGroup(of: [EaseCallUIKit.CallProfileProtocol].self, returning: [EaseCallUIKit.CallProfileProtocol].self) { group in
             var resultProfiles: [EaseCallUIKit.CallProfileProtocol] = []
             group.addTask {
                 var resultProfiles: [EaseCallUIKit.CallProfileProtocol] = []
                 let result = await self.requestGroupsInfo(groupIds: profileIds)
                 if let infos = result {
-                    for groupInfo in infos {
-                        let profile = EaseCallUIKit.CallUserProfile()
-                        profile.id = groupInfo.id
-                        profile.nickname = groupInfo.nickname
-                        profile.avatarURL = groupInfo.avatarURL
-                        resultProfiles.append(profile)
-                    }
+                    resultProfiles.append(contentsOf: infos)
                 }
                 return resultProfiles
             }
@@ -1001,39 +1003,12 @@ extension MainViewController: CallUserProfileProvider {
         }
     }
     
-    func fetchUserProfiles(profileIds: [String]) async -> [any EaseCallUIKit.CallProfileProtocol] {
-        return await withTaskGroup(of: [EaseCallUIKit.CallProfileProtocol].self, returning: [EaseCallUIKit.CallProfileProtocol].self) { group in
-            var resultProfiles: [EaseCallUIKit.CallProfileProtocol] = []
-            group.addTask {
-                var resultProfiles: [EaseCallUIKit.CallProfileProtocol] = []
-                let result = await self.requestUserInfos(profileIds: profileIds) ?? []
-                for userInfo in result {
-                    let profile = EaseCallUIKit.CallUserProfile()
-                    profile.id = userInfo.id
-                    profile.nickname = userInfo.nickname
-                    profile.avatarURL = userInfo.avatarURL
-                    resultProfiles.append(profile)
-                }
-                return resultProfiles
-            }
-            //Await all task were executed.Return values.
-            for await result in group {
-                resultProfiles.append(contentsOf: result)
-            }
-            return resultProfiles
-        }
-    }
-    
-    private func requestUserInfos(profileIds: [String]) async -> [ChatUserProfileProtocol]? {
+    private func requestUserInfos(profileIds: [String]) async -> [CallProfileProtocol]? {
         var unknownIds = [String]()
-        var resultProfiles = [ChatUserProfileProtocol]()
+        var resultProfiles = [CallProfileProtocol]()
         for profileId in profileIds {
-            if let profile = ChatUIKitContext.shared?.userCache?[profileId] {
-                if profile.nickname.isEmpty {
-                    unknownIds.append(profile.id)
-                } else {
-                    resultProfiles.append(profile)
-                }
+            if let profile = CallKitManager.shared.usersCache[profileId] {
+                resultProfiles.append(profile)
             } else {
                 unknownIds.append(profileId)
             }
@@ -1044,43 +1019,35 @@ extension MainViewController: CallUserProfileProvider {
         let result = await ChatClient.shared().userInfoManager?.fetchUserInfo(byId: unknownIds)
         if result?.1 == nil,let infoMap = result?.0 {
             for (userId,info) in infoMap {
-                let profile = ChatUserProfile()
+                let profile = CallUserProfile()
                 let nickname = info.nickname ?? ""
                 profile.id = userId
                 profile.nickname = nickname
-                if let remark = ChatClient.shared().contactManager?.getContact(userId)?.remark {
-                    profile.remark = remark
-                }
                 profile.avatarURL = info.avatarUrl ?? ""
-                resultProfiles.append(profile)
-                if (ChatUIKitContext.shared?.userCache?[userId]) != nil {
-                    profile.updateFFDB()
-                } else {
-                    profile.insert()
-                }
-                ChatUIKitContext.shared?.userCache?[userId] = profile
+
             }
             return resultProfiles
         }
         return []
     }
     
-    private func requestGroupsInfo(groupIds: [String]) async -> [ChatUserProfileProtocol]? {
-        var resultProfiles = [ChatUserProfileProtocol]()
+    private func requestGroupsInfo(groupIds: [String]) async -> [CallProfileProtocol]? {
+        var resultProfiles = [CallProfileProtocol]()
         let groups = ChatClient.shared().groupManager?.getJoinedGroups() ?? []
         for groupId in groupIds {
             if let group = groups.first(where: { $0.groupId == groupId }) {
-                let profile = ChatUserProfile()
+                let profile = CallUserProfile()
                 profile.id = groupId
                 profile.nickname = group.groupName
                 profile.avatarURL = group.settings.ext
                 resultProfiles.append(profile)
-                ChatUIKitContext.shared?.groupCache?[groupId] = profile
             }
 
         }
         return resultProfiles
     }
+
+    
 }
 ```
 
@@ -1136,7 +1103,7 @@ extension MainViewController: CallUserProfileProvider {
         CallAppearance.avatarPlaceHolder = UIImage(named: "avatar_placeholder")
         //整体替换资源bundle
         CallAppearance.resourceBundle = Bundle.main
-        //替换聊天背景图
+        //替换呼叫背景图
         CallAppearance.backgroundImage = UIImage(named: "chat_background")
 ```
 
