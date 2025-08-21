@@ -1,6 +1,6 @@
 # EaseCallUIKit for iOS
 
-本指南将介绍环信新EaseCallUIKit（V4.16.0）。新EaseCallUIKit致力于为开发者提供高效集成、功能全面、设计美观的通话场景，轻松满足即时通信呼叫绝大多数场景。请下载示例进行体验。
+本指南将介绍环信新EaseCallUIKit（基于环信IMSDK V4.16.0及其以上）。新EaseCallUIKit致力于为开发者提供高效集成、功能全面、设计美观的通话场景，轻松满足即时通信呼叫绝大多数场景。请下载示例进行体验。
 
 # 示例Demo
 
