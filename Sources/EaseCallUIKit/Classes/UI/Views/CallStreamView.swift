@@ -222,7 +222,6 @@ public class CallStreamView: UIImageView {
         // Force layout update
         setNeedsLayout()
         layoutIfNeeded()
-        superview?.layoutIfNeeded()
     }
     
     public override func layoutSubviews() {
