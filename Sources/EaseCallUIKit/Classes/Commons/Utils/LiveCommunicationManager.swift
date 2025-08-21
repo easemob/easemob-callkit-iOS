@@ -246,7 +246,7 @@ extension LiveCommunicationManager: ConversationManagerDelegate
     func conversationManager(_ manager: ConversationManager, timedOutPerforming action: ConversationAction) {
         // 会话超时
         consoleLogInfo("[LiveCommunicationManager] perform timedOutPerforming:\(action)",type: .debug)
-        CallKitManager.shared.quitCall()
+        CallKitManager.shared.hangup()
     }
     
     func conversationManager(_ manager: ConversationManager, didActivate audioSession: AVAudioSession) {
@@ -257,7 +257,7 @@ extension LiveCommunicationManager: ConversationManagerDelegate
     func conversationManager(_ manager: ConversationManager, didDeactivate audioSession: AVAudioSession) {
         //会话失效了
         consoleLogInfo("[LiveCommunicationManager] perform didDeactivate:",type: .debug)
-        CallKitManager.shared.quitCall()
+        CallKitManager.shared.hangup()
     }
 }
 

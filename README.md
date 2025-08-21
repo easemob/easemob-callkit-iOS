@@ -1090,6 +1090,10 @@ extension ViewController: CallUserProfileProvider {
 - EaseCallUIKit与系统电话或者其它应用兼容问题
 用户自行监听系统电话事件，判断是否需要挂断当前通话。可以调用方法`CallKitManager.shared.hangup()`
 
+- 一方挂断另一方没有反应，请联系技术支持获取日志检查是否有`rtcEngine didOfflineOfUid:`
+
+- 如果没有声音没有画面，请检查是否有权限问题，iOS15及以上系统需要在Info.plist中添加NSMicrophoneUsageDescription和NSCameraUsageDescription描述。如果权限没问题,请联系技术支持查询应用的音视频流状态。
+
 # 自定义
 
 ## 1.修改UI可配置项

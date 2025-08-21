@@ -170,7 +170,6 @@ public class Call1v1AudioViewController: UIViewController {
         if let call = CallKitManager.shared.callInfo {
             CallKitManager.shared.stopRingTimer(callId: call.callId)
         }
-        CallKitManager.shared.callInfo?.state = .idle
         CallKitManager.shared.lastPIPFrame = .zero
     }
 }
