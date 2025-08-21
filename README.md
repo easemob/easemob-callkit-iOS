@@ -1,11 +1,10 @@
-
 # EaseCallUIKit for iOS
 
 本指南将介绍环信新EaseCallUIKit（V4.16.0）。新EaseCallUIKit致力于为开发者提供高效集成、功能全面、设计美观的通话场景，轻松满足即时通信呼叫绝大多数场景。请下载示例进行体验。
 
 # 示例Demo
 
-在本项目中，“Example”文件夹中有一个最佳实践演示项目，供您构建自己的业务能力。
+在本项目中，"Example"文件夹中有一个最佳实践演示项目，供您构建自己的业务能力。
 
 如需体验EaseCallUIKit的完整功能（包含LiveCommunicationKit&Picture In Picture），您可以扫描以下二维码试用demo。
 
@@ -65,6 +64,9 @@
 
 在podfile中添加如下依赖
 
+<details>
+<summary>点击展开/收起 Podfile 配置代码</summary>
+
 ```ruby
 source 'https://github.com/CocoaPods/Specs.git'
 platform :ios, '14.0'
@@ -85,6 +87,8 @@ post_install do |installer|
 end
 ```
 
+</details>
+
 然后cd到终端下podfile所在文件夹目录执行
 
 ```
@@ -101,6 +105,9 @@ end
 # 结构
 
 ### EaseCallUIKit 基本项目结构
+
+<details>
+<summary>点击展开/收起项目结构</summary>
 
 ```
 Classes
@@ -122,10 +129,14 @@ Classes
     ├─ Views // 所有UIView。
     └─ Cells // 所有UITableViewCell。
 ```
+
+</details>
+
 Provider文件夹中包含`CallProfileProtocol.swift`用户信息协议以及`Providers.swift`信息提供者协议
 Services文件夹中包含`CallError.swift`错误信息以及`CallMessageService.swift`呼叫API协议以及回调方法跟结束原因枚举等。
 Commons文件夹中包含一些工具类、UI配置类、主题类等。一些CallKitManager用到的工具类（AudioPlayerManager、LiveCommunicationManager、GlobalTimerManager）
 UI文件夹中包含所有UI组件，包括视图控制器、UIView、UITableViewCell等。
+
 # 运行示例项目
 
 ## 前提条件
@@ -158,7 +169,7 @@ let AppKey: String = <#AppKey#>
 
 # 快速开始
 
-本指南提供了不同 EaseCallUIKit 组件的多个使用示例。 请参阅“示例”文件夹以获取显示各种用例的详细代码片段和项目。
+本指南提供了不同 EaseCallUIKit 组件的多个使用示例。 请参阅"示例"文件夹以获取显示各种用例的详细代码片段和项目。
 ## 前提条件
 
 - 登录 [环信控制台]
@@ -193,6 +204,9 @@ Privacy - Camera Usage Description //相机权限    Camera privileges.
 
 ### 第一步：初始化EaseCallUIKit
 
+<details>
+<summary>点击展开/收起初始化代码</summary>
+
 ```Swift
 import EaseCallUIKit
 
@@ -211,7 +225,12 @@ class AppDelegate：UIResponder，UIApplicationDelegate {
 }
 ```
 
+</details>
+
 ### 第2步：登录IM SDK
+
+<details>
+<summary>点击展开/收起登录代码</summary>
 
 ``` Swift
         ChatClient.shared().login(withUsername: userId, token: token) { [weak self] userId,error  in
@@ -226,9 +245,15 @@ class AppDelegate：UIResponder，UIApplicationDelegate {
         }
 ```
 
+</details>
+
 ### 第三步：粘贴代码后运行
 
 - 找到项目中Main.storyboard然后右键菜单，Open As->Source Code,复制下列代码替换并
+
+<details>
+<summary>点击展开/收起 Main.storyboard XML代码</summary>
+
 ``` XML
 <?xml version="1.0" encoding="UTF-8"?>
 <document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="23504" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" colorMatched="YES" initialViewController="vXZ-lx-hvc">
@@ -374,10 +399,15 @@ class AppDelegate：UIResponder，UIApplicationDelegate {
         </systemColor>
     </resources>
 </document>
-
 ```
 
+</details>
+
 - 找到项目中的ViewController.swift，复制下列代码并替换
+
+<details>
+<summary>点击展开/收起 ViewController.swift 代码</summary>
+
 ``` Swift
 import UIKit
 import EaseCallUIKit
@@ -480,8 +510,9 @@ extension ViewController: QLPreviewControllerDataSource {
     
     
 }
-
 ```
+
+</details>
 
 然后点击运行即可.
 
@@ -492,6 +523,10 @@ extension ViewController: QLPreviewControllerDataSource {
 
 ## 1.初始化EaseCallUIKit
 相比于上面快速开始的EaseCallUIKit初始化这里多了ChatOptions的参数，主要是对SDK中是否打印log以及是否自动登录，是否默认使用用户属性的开关配置。ChatOptions即IMSDK的Option类，内中有诸多开关属性可参见环信官网IMSDK文档
+
+<details>
+<summary>点击展开/收起初始化代码（进阶）</summary>
+
 ```Swift
     //已经集成了环信IMSDK 即已经import HyphenateChat
     private func setupCallKit() {
@@ -531,7 +566,12 @@ extension ViewController: QLPreviewControllerDataSource {
     
 ```
 
+</details>
+
 ## 2.登录
+
+<details>
+<summary>点击展开/收起登录代码</summary>
 
 ```Swift
             ChatClient.shared().login(withUsername: userId, token: token) { [weak self] userId,error  in
@@ -557,6 +597,8 @@ extension ViewController: QLPreviewControllerDataSource {
 // https://docs-im-beta.easemob.com/product/enable_and_configure_IM.html#%E5%88%9B%E5%BB%BA-im-%E7%94%A8%E6%88%B7。
 ```
 
+</details>
+
 ## 3.监听EaseCallUIKit事件和错误
 
 您可以调用下面方法来监听 EaseCallUIKit中用户相关状态变更的事件和错误。
@@ -565,6 +607,10 @@ extension ViewController: QLPreviewControllerDataSource {
         CallKitManager.shared.addListener(self)//添加监听，均为可选方法
 ```
 下面是监听事件的示例代码。
+
+<details>
+<summary>点击展开/收起监听事件代码</summary>
+
 ```Swift 
 extension MainViewController: CallServiceListener {
     
@@ -638,9 +684,16 @@ extension MainViewController: CallServiceListener {
     
 }
 ```
+
+</details>
+
 ## 4.创建呼叫页面并调用呼叫Api
 
 - 找到项目中Main.storyboard然后右键菜单，Open As->Source Code,复制下列代码替换并
+
+<details>
+<summary>点击展开/收起 Main.storyboard XML代码</summary>
+
 ``` XML
 <?xml version="1.0" encoding="UTF-8"?>
 <document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="23504" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" colorMatched="YES" initialViewController="vXZ-lx-hvc">
@@ -786,10 +839,15 @@ extension MainViewController: CallServiceListener {
         </systemColor>
     </resources>
 </document>
-
 ```
 
+</details>
+
 - 找到项目中的ViewController.swift，复制下列代码并替换
+
+<details>
+<summary>点击展开/收起 ViewController.swift 代码</summary>
+
 ``` Swift
 import UIKit
 import EaseCallUIKit
@@ -892,8 +950,9 @@ extension ViewController: QLPreviewControllerDataSource {
     
     
 }
-
 ```
+
+</details>
 
 然后复制粘贴即可运行项目，安装到两台设备并且两个用户分别登录后，主叫设备输入被叫用户id即可点击呼叫。
 
@@ -904,6 +963,9 @@ extension ViewController: QLPreviewControllerDataSource {
 - 注: 仅用于会话列表以及联系人列表,在只是用快速开始进入聊天页面时不需要实现Provider
 
 Provider是一个数据提供者，当会话列表展示并且滑动减速时候，EaseCallUIKit会向你请求一些当前屏幕上要显示会话的展示信息例如头像昵称等。下面是Provider的具体示例以及用法。
+
+<details>
+<summary>点击展开/收起 Provider 代码</summary>
 
 ```Swift
         CallKitManager.shared.profileProvider = self//Swift
@@ -1022,6 +1084,8 @@ extension MainViewController: CallUserProfileProvider {
 }
 ```
 
+</details>
+
 ### 5.2 RTC私有化部署
 
 ```Swift
@@ -1078,11 +1142,17 @@ extension MainViewController: CallUserProfileProvider {
 
 ## 2.修改原有资源
 
-主要包含有
+主要包含以下资源类型：
 
-- 图片 导航资源(back,boxes)、背景图片、被叫弹窗(phone_hang_mini.png,phone_pick_mini.png)、呼叫页面(phone_hang、phone_pick、speaker_on、speaker_off、camera_on、camera_off、mic_on、mic_off)、其他资源(person_add、network相关、语音音量相关)等。
-- 音频 音频文件(dialing.mp3、ringing.mp3、busy.mp3)
-- 国际化文件 国际化文件（en、zh-Hans）
+| 资源类型 | 内容描述 | 详细说明 |
+|---------|---------|---------|
+| **图片资源** | 导航资源 | back、boxes等导航相关图标 |
+| | 背景图片 | 聊天背景图等 |
+| | 被叫弹窗 | phone_hang_mini.png、phone_pick_mini.png |
+| | 呼叫页面图标 | phone_hang、phone_pick、speaker_on、speaker_off、camera_on、camera_off、mic_on、mic_off |
+| | 其他资源 | person_add、network相关、语音音量相关图标等 |
+| **音频资源** | 音频文件 | dialing.mp3（拨号音）、ringing.mp3（响铃音）、busy.mp3（忙音） |
+| **国际化文件** | 语言支持 | en（英文）、zh-Hans（简体中文） |
 
 ![资源图](./DocumentationImages/resource_replace.png)
 
@@ -1096,7 +1166,7 @@ extension MainViewController: CallUserProfileProvider {
         CallKitManager.shared.setup(config)
 ```
 
-4.如果想进一步修改业务逻辑，请源码集成后修改
+## 4.如果想进一步修改业务逻辑，请源码集成后修改
 
 # API概览
 
@@ -1106,9 +1176,9 @@ extension MainViewController: CallUserProfileProvider {
 
 ## [文档](/Documentation/EaseCallUIKit.doccarchive)
 
-您可以在 Xcode 中打开“EaseCallUIKit.doccarchive”文件来查看其中的文件。
+您可以在 Xcode 中打开"EaseCallUIKit.doccarchive"文件来查看其中的文件。
 
-另外，您可以右键单击该文件以显示包内容并将其中的所有文件复制到一个文件夹中。 然后将此文件夹拖到“terminal”应用程序中并运行以下命令将其部署到本地IP地址上。
+另外，您可以右键单击该文件以显示包内容并将其中的所有文件复制到一个文件夹中。 然后将此文件夹拖到"terminal"应用程序中并运行以下命令将其部署到本地IP地址上。
 
 ```bash
 python3 -m http.server 8080
@@ -1143,4 +1213,3 @@ EaseCallUIKit 可在 MIT 许可下使用。 有关详细信息，请参阅许可
 ## 更新日志
 
 [更新日志](./changeLog.md)
-
