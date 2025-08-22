@@ -368,26 +368,26 @@ extension CallKitManager: AgoraRtcEngineDelegate {
                     if let currentVC = UIViewController.currentController as? CallMultiViewController {
                         if let item = self.itemsCache.first(where: { $0.value.uid == UInt32(uid) })?.value {
                             let userId = item.userId
-                            self.canvasCache[userId]?.removeFromSuperview()
-                            self.canvasCache.removeValue(forKey: userId)
-                            self.itemsCache.removeValue(forKey: userId)
                             for listener in self.listeners.allObjects {
                                 listener.remoteUserDidLeft?(userId: userId, channelName: call.channelName, type: call.type)
                             }
-                            currentVC.callView.updateWithItems([userId])
+                            currentVC.callView.updateWithItems([userId])  // 先更新UI
+                            self.itemsCache.removeValue(forKey: userId)   // 后清理缓存
+//                            self.canvasCache[userId]?.removeFromSuperview()
+                            self.canvasCache.removeValue(forKey: userId)
                             consoleLogInfo("rtcEngine didOfflineOfUid: \(uid) userId:\(userId) reason: \(reason.rawValue)", type: .debug)
                         }
                         
                     } else {
                         if let item = self.itemsCache.first(where: { $0.value.uid == UInt32(uid) })?.value {
                             let userId = item.userId
-                            self.canvasCache[userId]?.removeFromSuperview()
-                            self.canvasCache.removeValue(forKey: userId)
-                            self.itemsCache.removeValue(forKey: userId)
                             for listener in self.listeners.allObjects {
                                 listener.remoteUserDidLeft?(userId: item.userId, channelName: call.channelName, type: call.type)
                             }
+                            self.itemsCache.removeValue(forKey: userId)
                             (self.callVC as? CallMultiViewController)?.callView.updateWithItems([userId])
+//                            self.canvasCache[userId]?.removeFromSuperview()
+                            self.canvasCache.removeValue(forKey: userId)
                             consoleLogInfo("rtcEngine didOfflineOfUid: \(uid) userId:\(userId) reason: \(reason.rawValue)", type: .debug)
                         }
                     }
@@ -398,12 +398,6 @@ extension CallKitManager: AgoraRtcEngineDelegate {
                         //TODO: - 是否发送信令消息给对方告知通话异常结束(用户如果需要，可以自行改造信令流程)
                     case .quit:
                         self.updateCallEndReason(.hangup)
-                        DispatchQueue.main.async {
-                            self.callVC?.dismiss(animated: true, completion: nil)
-                            if let controller = UIViewController.currentController,(controller is Call1v1VideoViewController || controller is Call1v1AudioViewController ) {
-                                controller.dismiss(animated: true)
-                            }
-                        }
                     default:
                         break
                     }

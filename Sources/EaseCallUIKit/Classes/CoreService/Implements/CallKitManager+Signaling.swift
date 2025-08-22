@@ -402,6 +402,9 @@ extension CallKitManager: ChatEventsListener {
     }
     
     private func presentCallerPage(call: CallInfo) {
+        if UIViewController.currentController is CallMultiViewController || UIViewController.currentController is Call1v1AudioViewController || UIViewController.currentController is Call1v1VideoViewController {
+            return
+        }
         startRingTimer(callId: call.callId)
         var vc: UIViewController = UIViewController()
         switch call.type {

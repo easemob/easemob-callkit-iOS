@@ -21,61 +21,9 @@ public class MultiPersonCallView: UIView {
     
     required init?(coder: NSCoder) {
         super.init(coder: coder)
+        setupViews()
     }
     
-    // MARK: - Public Methods
-    func updateWithItems(_ removeUsers: [String] = []) {
-        
-        // 更新 items cache
-//        let items = CallKitManager.shared.itemsCache.values.sorted { $0.index > $1.index }
-
-        // 1. 找出所有需要删除的视图
-        var viewsInScrollView: [CallStreamView] = []
-        let currentUserIds = Set(CallKitManager.shared.itemsCache.keys)
-
-        
-        // 检查 scrollView 中的 CallStreamView
-        if let scrollView = scrollView {
-            for subview in scrollView.subviews {
-                if let streamView = subview as? CallStreamView {
-                    if !currentUserIds.contains(streamView.item.userId) {
-                        viewsInScrollView.append(streamView)
-                    }
-                }
-            }
-        }
-        
-        // 修改这里的逻辑：只有在确实需要删除用户或者需要重新布局时才调用setupViews
-        if removeUsers.isEmpty {
-            // 检查是否有新用户需要添加视图
-            setupViews()
-            return
-        }
-        
-        var viewsToRemove: [CallStreamView] = []
-        // 2. 判断删除逻辑
-        for user in removeUsers {
-            if let view = CallKitManager.shared.canvasCache[user] {
-                viewsToRemove.append(view)
-            }
-        }
-        let isRemovingExpandedView = viewsToRemove.contains { $0 == expandedView }
-        
-        if isRemovingExpandedView {
-            // 删除的是展开视图，需要回归常规状态
-            animateRemovalAndReturnToNormal(viewsToRemove: viewsToRemove)
-        } else if expandedView != nil {
-            // 在展开状态下删除非展开视图
-            animateRemovalInExpandedState(viewsToRemove: viewsToRemove, viewsInScrollView: viewsInScrollView)
-        } else {
-            viewsToRemove.forEach { $0.removeFromSuperview() }
-            // 在常规状态下删除视图
-            self.setupViews()
-        }
-        // 不在这里单独设置 displayMode，使用统一方法
-        updateAllDisplayModes()
-    }
-
     // MARK: - 辅助动画方法
 
     private func animateRemovalAndReturnToNormal(viewsToRemove: [CallStreamView]) {
@@ -103,7 +51,15 @@ public class MultiPersonCallView: UIView {
             self.expandedView = nil
             
             // 重新设置视图
-            self.setupViews()
+            // 检查删除后剩余的视图数量
+            let remainingCount = CallKitManager.shared.canvasCache.count
+            if remainingCount == 1 {
+                // 只剩一个视图，执行特殊处理
+                self.animateToSingleViewLayout()
+            } else {
+                // 重新布局展开状态的缩略图
+                self.updateScrollViewContent()
+            }
         })
     }
 
@@ -281,9 +237,6 @@ public class MultiPersonCallView: UIView {
             if let streamView = subview as? CallStreamView {
                 streamView.removeFromSuperview()
             }
-        }
-        for streamView in CallKitManager.shared.canvasCache.values {
-            streamView.removeFromSuperview()
         }
         scrollView?.removeFromSuperview()
         scrollView = nil
@@ -667,9 +620,19 @@ public class MultiPersonCallView: UIView {
         // Clear all existing constraints first
         NSLayoutConstraint.deactivate(activeConstraints)
         activeConstraints.removeAll()
-        
+        expandedView.translatesAutoresizingMaskIntoConstraints = false
         let padding: CGFloat = 20
-        let expandedHeight = ScreenWidth-24
+        let heightWidthRatio: CGFloat = ScreenHeight/ScreenWidth // Square views
+        
+        var expandedHeight: CGFloat = 0
+        
+        if heightWidthRatio <= 16.0/9.0 {
+            // 屏幕高宽比正好是 16:9
+            expandedHeight = ScreenWidth * 2.0/3.0
+        } else {
+            // 屏幕高宽比大于 16:9（更高的屏幕）
+            expandedHeight = ScreenWidth - 24
+        }
         let thumbnailSize: CGFloat = 72
         let thumbnailSpacing: CGFloat = 6
         
@@ -705,17 +668,10 @@ public class MultiPersonCallView: UIView {
         
         // Move expanded view to the absolute front
         bringSubviewToFront(expandedView)
-        
-        // Layout expanded view (square and centered)
-        expandedView.translatesAutoresizingMaskIntoConstraints = false
-        
-        // Remove any existing constraints on the expanded view
-        expandedView.removeFromSuperview()
-        addSubview(expandedView)
-        
+
         activeConstraints += [
             expandedView.centerXAnchor.constraint(equalTo: centerXAnchor),
-            expandedView.centerYAnchor.constraint(equalTo: centerYAnchor, constant: -padding*2),
+            expandedView.centerYAnchor.constraint(equalTo: centerYAnchor),
             expandedView.widthAnchor.constraint(equalToConstant: expandedHeight),
             expandedView.heightAnchor.constraint(equalToConstant: expandedHeight)
         ]
@@ -723,7 +679,7 @@ public class MultiPersonCallView: UIView {
         activeConstraints += [
             scrollView!.leadingAnchor.constraint(equalTo: leadingAnchor),
             scrollView!.trailingAnchor.constraint(equalTo: trailingAnchor),
-            scrollView!.topAnchor.constraint(equalTo: expandedView.bottomAnchor, constant: 12),
+            scrollView!.topAnchor.constraint(equalTo: centerYAnchor, constant: expandedHeight/2.0+12),
             scrollView!.heightAnchor.constraint(equalToConstant: thumbnailSize)
         ]
         let itemViews = CallKitManager.shared.canvasCache.values.sorted { $0.item.index > $1.item.index }
@@ -738,7 +694,7 @@ public class MultiPersonCallView: UIView {
         for (index, view) in otherViews.enumerated() {
             // Ensure view is visible before adding to scroll view
             view.ensureVisible()
-            view.displayMode = .buttonsOnly
+            view.displayMode = .hidden
             scrollView!.addSubview(view)
             view.translatesAutoresizingMaskIntoConstraints = false
             
@@ -803,24 +759,22 @@ public class MultiPersonCallView: UIView {
 extension MultiPersonCallView {
     
     private func animateExpandViewImproved(_ viewToExpand: CallStreamView) {
-        // Store current frame before any changes
+        // Store original frame for calculating starting constraints
         let originalFrame = viewToExpand.frame
         
-        // Ensure the view to expand is visible and properly configured
+        // Ensure the view is visible and in the correct superview
         viewToExpand.ensureVisible()
-        
-        // If switching from another expanded view, ensure the new view is in the main view
         if viewToExpand.superview != self {
             viewToExpand.removeFromSuperview()
             addSubview(viewToExpand)
         }
         
         expandedView = viewToExpand
-        // 不在这里单独设置 displayMode，使用统一方法
         
+        // Update display modes, item states, and video streams (unchanged)
         for view in CallKitManager.shared.canvasCache.values {
-            view.displayMode = (view == viewToExpand ? .all:.hidden)
-            view.item.isExpanded = view == viewToExpand
+            view.displayMode = (view == viewToExpand ? .all : .hidden)
+            view.item.isExpanded = (view == viewToExpand)
             if viewToExpand.item.userId == view.item.userId {
                 CallKitManager.shared.engine?.setRemoteVideoStream(UInt(view.item.uid), type: .high)
             } else {
@@ -828,44 +782,50 @@ extension MultiPersonCallView {
             }
         }
         
-        viewToExpand.item.isExpanded = true
-        // Position view at original location
-        viewToExpand.translatesAutoresizingMaskIntoConstraints = false
-        viewToExpand.removeFromSuperview()
-        addSubview(viewToExpand)
-        viewToExpand.frame = originalFrame
+        // Deactivate existing constraints to prepare for transition
+        NSLayoutConstraint.deactivate(activeConstraints)
+        activeConstraints.removeAll()
         
-        // Layout everything else without animation
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
+        // Set up the target expanded layout, but don't activate constraints yet
         layoutItemsForExpandedState()
-        layoutIfNeeded()
+        let targetConstraints = activeConstraints // Capture the new expanded constraints
+        NSLayoutConstraint.deactivate(targetConstraints) // Deactivate temporarily
         
-        // Get the final expanded frame
-        let expandedFrame = viewToExpand.frame
+        // Create temporary starting constraints matching the original frame
+        viewToExpand.translatesAutoresizingMaskIntoConstraints = false
+        let startingConstraints: [NSLayoutConstraint] = [
+            viewToExpand.leadingAnchor.constraint(equalTo: leadingAnchor, constant: originalFrame.origin.x),
+            viewToExpand.topAnchor.constraint(equalTo: topAnchor, constant: originalFrame.origin.y),
+            viewToExpand.widthAnchor.constraint(equalToConstant: originalFrame.width),
+            viewToExpand.heightAnchor.constraint(equalToConstant: originalFrame.height)
+        ]
+        // Add starting constraints for other views/scrollView if needed, but focus on expanded view for simplicity
         
-        // Reset to original position
-        viewToExpand.frame = originalFrame
-        CATransaction.commit()
+        // Activate starting constraints
+        NSLayoutConstraint.activate(startingConstraints)
+        layoutIfNeeded() // Ensure starting position is applied immediately
         
-        // 使用更平滑的动画参数
-        UIView.animate(
-            withDuration: 0.35,  // 稍微延长动画时间
-            delay: 0,
-            options: [.curveEaseInOut, .allowUserInteraction], // 允许用户交互
-            animations: {
-                viewToExpand.frame = expandedFrame
-                
-                // 添加轻微的透明度变化，增强视觉效果
-                viewToExpand.alpha = 0.95
-            },
-            completion: { _ in
-                UIView.animate(withDuration: 0.1) {
-                    viewToExpand.alpha = 1.0
-                }
-                self.layoutIfNeeded()
-            }
-        )
+        // Animate the transition to target constraints
+        UIView.animate(withDuration: 0.35, delay: 0, usingSpringWithDamping: 0.85, initialSpringVelocity: 0.3, options: [.curveEaseInOut, .allowUserInteraction], animations: {
+            // Swap constraints: deactivate starting, activate target
+            NSLayoutConstraint.deactivate(startingConstraints)
+            NSLayoutConstraint.activate(targetConstraints)
+            
+            // Also animate scrollView fade-in if it was just created
+            self.scrollView?.alpha = 1.0
+            
+            self.layoutIfNeeded() // This triggers the animated layout change
+        }, completion: { _ in
+            // Clean up: remove starting constraints entirely
+            startingConstraints.forEach { $0.isActive = false }
+            
+            // Ensure final layout and visibility
+            self.activeConstraints = targetConstraints
+            self.layoutIfNeeded()
+            viewToExpand.ensureVisible()
+            self.bringSubviewToFront(viewToExpand)
+            self.updateAllDisplayModes()
+        })
     }
     
     // 缩小动画也需要相应改进
@@ -940,111 +900,100 @@ extension MultiPersonCallView {
 extension MultiPersonCallView {
     
     private func switchExpandedViewWithSmartSpace(from oldView: CallStreamView, to newView: CallStreamView) {
-        // 1. Record position of oldView
+        // 1. 记录初始位置
         let oldExpandedFrame = oldView.frame
-        
-        // 2. Get position of newView
         var newThumbnailFrame: CGRect = .zero
-        var newViewOriginalIndex: Int = -1
+        var newViewOriginalPositionInScroll: Int = -1
         
+        // 获取 newView 的位置
         if let scrollView = scrollView, newView.superview == scrollView {
             newThumbnailFrame = scrollView.convert(newView.frame, to: self)
             
-            // Find the original index of newView in scrollView
+            // 找到 newView 在 scrollView 中的实际位置（不是 item.index）
             let sortedViews = scrollView.subviews.compactMap { $0 as? CallStreamView }
                 .sorted { $0.item.index > $1.item.index }
-            newViewOriginalIndex = sortedViews.firstIndex(of: newView) ?? -1
+            newViewOriginalPositionInScroll = sortedViews.firstIndex(of: newView) ?? -1
         } else {
             newThumbnailFrame = newView.frame
         }
+        
+        // 2. 更新视图状态和视频流
         for view in CallKitManager.shared.canvasCache.values {
-            view.displayMode = (view == newView ? .all:.hidden)
+            view.displayMode = (view == newView ? .all : .hidden)
             if newView.item.userId == view.item.userId {
                 CallKitManager.shared.engine?.setRemoteVideoStream(UInt(view.item.uid), type: .high)
             } else {
                 CallKitManager.shared.engine?.setRemoteVideoStream(UInt(view.item.uid), type: CallKitManager.shared.getStreamRenderQuality(with: UInt(CallKitManager.shared.canvasCache.count)))
             }
         }
-        // update expanded view
+        
+        // 更新展开状态
         expandedView = newView
         oldView.item.isExpanded = false
         newView.item.isExpanded = true
         
-        // 4. Move newView to the main view if it's in scrollView
+        // 3. 如果 newView 在 scrollView 中，移到主视图
         if newView.superview == scrollView {
             newView.removeFromSuperview()
             addSubview(newView)
             newView.frame = newThumbnailFrame
         }
+        print("newThumbnail .frame : \(newThumbnailFrame)")
         
-        // 5. Calculate the target position for oldView
-        let oldViewIndex = oldView.item.index
+        // 4. 计算 oldView 在 scrollView 中的目标位置
         var oldViewTargetPosition: Int = 0
         var needsSpaceAnimation = true
         
-        // Calculate the target position for oldView in scrollView
         if let scrollView = scrollView {
             let existingViews = scrollView.subviews.compactMap { $0 as? CallStreamView }
                 .sorted { $0.item.index > $1.item.index }
             
+            // 根据 index 大小关系计算插入位置
             for view in existingViews {
-                if view.item.index < oldViewIndex {
+                if view.item.index > oldView.item.index {
                     oldViewTargetPosition += 1
                 }
             }
             
-            // Whether we need space animation depends on the target position
-            let totalPositions = existingViews.count + 1 // Add going back old view
-            if oldViewTargetPosition == totalPositions - 1 {
-                // oldView will be the last one, no need for space animation
-                needsSpaceAnimation = false
-            }
+            // 如果是最后一个位置，不需要空间动画
+            let totalPositions = existingViews.count + 1
+            needsSpaceAnimation = (oldViewTargetPosition < totalPositions - 1)
         }
         
-        // 6. Ready for move view animation
+        // 5. 准备视图移动数据
         var viewsToMove: [(view: CallStreamView, startX: CGFloat, endX: CGFloat)] = []
         let thumbnailSize: CGFloat = 72
         let thumbnailSpacing: CGFloat = 6
         let padding: CGFloat = 12
         
         if let scrollView = scrollView, needsSpaceAnimation {
-            // Get the current stream views in scrollView
             let currentViews = scrollView.subviews.compactMap { $0 as? CallStreamView }
                 .sorted { $0.item.index > $1.item.index }
             
-            // Record the current positions of all views
-            for (index, view) in currentViews.enumerated() {
+            // 计算每个视图的目标位置
+            for (currentPosition, view) in currentViews.enumerated() {
                 let currentX = view.frame.origin.x
-                var targetX = currentX
+                var targetPosition = currentPosition
                 
-                if oldViewTargetPosition == 0 {
-                    // oldView will be the first, all views need to move right
-                    targetX = padding + CGFloat(index + 1) * (thumbnailSize + thumbnailSpacing)
-                } else if index >= oldViewTargetPosition {
-                    // oldView will be the middle, shift views to the right
-                    targetX = padding + CGFloat(index + 1) * (thumbnailSize + thumbnailSpacing)
-                } else {
-                    // The views before oldView stay in place
-                    targetX = padding + CGFloat(index) * (thumbnailSize + thumbnailSpacing)
+                // 如果当前位置 >= oldView的目标位置，需要右移
+                if currentPosition >= oldViewTargetPosition {
+                    targetPosition = currentPosition + 1
                 }
                 
-                viewsToMove.append((view: view, startX: currentX, endX: targetX))
-            }
-            
-            // 如果 newView 原本在 scrollView 中，需要调整它留下的空隙
-            if newViewOriginalIndex >= 0 {
-                // 重新计算，因为 newView 离开后的布局
-                for i in 0..<viewsToMove.count {
-                    let view = viewsToMove[i].view
-                    if view.item.index > newView.item.index {
-                        // 这些视图可以向左移动填补 newView 的空缺
-                        viewsToMove[i].endX -= (thumbnailSize + thumbnailSpacing)
-                    }
+                // 如果 newView 原本在这之前，需要左移填补空缺
+                if newViewOriginalPositionInScroll >= 0 && currentPosition > newViewOriginalPositionInScroll {
+                    targetPosition -= 1
+                }
+                
+                let targetX = padding + CGFloat(targetPosition) * (thumbnailSize + thumbnailSpacing)
+                
+                if currentX != targetX {
+                    viewsToMove.append((view: view, startX: currentX, endX: targetX))
                 }
             }
         }
         
-        // 7. 创建 oldView 的快照并计算最终布局
+        // 6. 创建快照用于动画
         guard let oldViewSnapshot = oldView.snapshotView(afterScreenUpdates: false) else {
             print("⚠️ Failed to create snapshot")
             return
@@ -1052,47 +1001,49 @@ extension MultiPersonCallView {
         
         oldViewSnapshot.frame = oldExpandedFrame
         addSubview(oldViewSnapshot)
-        
+        print("oldViewSnapshot.frame : \(oldViewSnapshot.frame)")
         // 隐藏原始 oldView
         oldView.isHidden = true
+        oldView.alpha = 0
         
+        // 7. 准备 oldView 的最终位置
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         
-        // 将真实的 oldView 提前放入 scrollView 的正确位置
         if let scrollView = scrollView {
+            // 移除旧的父视图关系
             oldView.removeFromSuperview()
             
-            // 根据 index 插入到正确的层级位置
-            let sortedViews = scrollView.subviews.compactMap { $0 as? CallStreamView }
-                .sorted { $0.item.index > $1.item.index }
+            // 添加到 scrollView
+            scrollView.addSubview(oldView)
+            oldView.translatesAutoresizingMaskIntoConstraints = false
             
-            var insertAtIndex = 0
-            for view in sortedViews {
-                if view.item.index < oldView.item.index {
-                    insertAtIndex += 1
-                } else {
-                    break
-                }
-            }
-            //TODO: - oldview 变为小流
-            scrollView.insertSubview(oldView, at: insertAtIndex)
+            // 设置正确的约束（使用计算出的目标位置）
+            let leadingConstant = padding + CGFloat(oldViewTargetPosition) * (thumbnailSize + thumbnailSpacing)
+            
+            // 在 switchExpandedViewWithSmartSpace 中修改
+            let oldViewConstraints = [
+                oldView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor, constant: leadingConstant),
+                oldView.centerYAnchor.constraint(equalTo: scrollView.centerYAnchor),
+                oldView.widthAnchor.constraint(equalToConstant: thumbnailSize),
+                oldView.heightAnchor.constraint(equalToConstant: thumbnailSize)
+            ]
+
+            // 添加到 activeConstraints 数组
+            activeConstraints.append(contentsOf: oldViewConstraints)
+            NSLayoutConstraint.activate(oldViewConstraints)
         }
         
+        // 重新布局展开状态
         layoutItemsForExpandedState()
         layoutIfNeeded()
         
         let newExpandedFrame = newView.frame
-        var oldThumbnailFrameInScrollView: CGRect = .zero
         var oldThumbnailFrameInMainView: CGRect = .zero
         
         if let scrollView = scrollView {
-            oldThumbnailFrameInScrollView = oldView.frame
             oldThumbnailFrameInMainView = scrollView.convert(oldView.frame, to: self)
-            
-            // 设置真实 oldView 的初始状态：完全透明但可见
-            oldView.alpha = 0
-            oldView.isHidden = false
+            oldView.isHidden = false  // 使其可见但透明
         }
         
         // 重置 newView 到动画开始位置
@@ -1101,53 +1052,39 @@ extension MultiPersonCallView {
         CATransaction.commit()
         
         // 8. 执行动画
-        // 第一步：快速为 oldView 腾出空间（如果需要）
+        // 第一阶段：为 oldView 腾出空间（如果需要）
         if needsSpaceAnimation && !viewsToMove.isEmpty {
             UIView.animate(withDuration: 0.25,
                           delay: 0,
                           options: [.curveEaseOut],
                           animations: {
-                // 快速移动视图，腾出空间
                 for (view, _, endX) in viewsToMove {
                     view.frame.origin.x = endX
                 }
             })
         }
         
-        self.scrollView?.addSubview(oldView)
-        oldView.translatesAutoresizingMaskIntoConstraints = false
-        
-        let leadingConstant = 12 + CGFloat(oldViewIndex) * (thumbnailSize + thumbnailSpacing)
-        
-        self.activeConstraints += [
-            oldView.leadingAnchor.constraint(equalTo: self.scrollView!.leadingAnchor, constant: leadingConstant),
-            oldView.centerYAnchor.constraint(equalTo: self.scrollView!.centerYAnchor),
-            oldView.widthAnchor.constraint(equalToConstant: thumbnailSize),
-            oldView.heightAnchor.constraint(equalToConstant: thumbnailSize)
-        ]
-        oldView.alpha = 0
-        // 第二步：主动画 - 使用纯线性动画
-        UIView.animate(withDuration: 0.37,
-                      delay: needsSpaceAnimation ? 0.1 : 0,
-                      options: [.curveLinear], // 使用线性曲线
+        // 第二阶段：主动画
+        UIView.animate(withDuration: 0.25,
+                      delay: needsSpaceAnimation ? 0.05 : 0,
+                      options: [.curveEaseInOut],
                       animations: {
-            // oldView 快照线性缩小到目标位置
+            // oldView 快照缩小到目标位置
             oldViewSnapshot.frame = oldThumbnailFrameInMainView
             
-            // 真实 oldView 线性渐显
+            // 真实 oldView 渐显
             oldView.alpha = 1.0
         }, completion: { _ in
             // 移除快照
             oldViewSnapshot.removeFromSuperview()
-            
         })
         
-        // newView 展开动画 - 同样使用线性动画
-        UIView.animate(withDuration: 0.39,
+        // newView 展开动画
+        UIView.animate(withDuration: 0.25,
                       delay: 0.05,
-                      options: [.curveLinear], // 线性曲线
+                      options: [.curveEaseInOut],
                       animations: {
-            // 线性展开到目标位置
+            // 展开到目标位置
             newView.frame = newExpandedFrame
             
             // 确保层级正确
@@ -1156,6 +1093,315 @@ extension MultiPersonCallView {
             // 确保视图可见
             newView.ensureVisible()
             self.updateAllDisplayModes()
+            
+            // 更新 scrollView 的 contentSize
+            if let scrollView = self.scrollView {
+                let viewCount = scrollView.subviews.compactMap { $0 as? CallStreamView }.count
+                let contentWidth = padding + CGFloat(viewCount) * (thumbnailSize + thumbnailSpacing) - thumbnailSpacing + padding
+                scrollView.contentSize = CGSize(width: contentWidth, height: thumbnailSize)
+            }
         })
+    }
+    
+    private func updateExpandedViewOnly(newExpandedView: CallStreamView) {
+        var expandedHeight: CGFloat = 0
+        
+        let heightWidthRatio: CGFloat = ScreenHeight/ScreenWidth // Square views
+        
+        if heightWidthRatio <= 16.0/9.0 {
+            // 屏幕高宽比正好是 16:9
+            expandedHeight = ScreenWidth * 2.0/3.0
+        } else {
+            // 屏幕高宽比大于 16:9（更高的屏幕）
+            expandedHeight = ScreenWidth - 24
+        }
+        // 只更新 expandedView 的约束，不重建整个 scrollView
+        NSLayoutConstraint.deactivate(activeConstraints.filter { constraint in
+            constraint.firstItem === expandedView || constraint.secondItem === expandedView
+        })
+        
+        // 添加新的展开视图约束
+        let expandedConstraints = [
+            newExpandedView.centerXAnchor.constraint(equalTo: centerXAnchor),
+            newExpandedView.centerYAnchor.constraint(equalTo: centerYAnchor),
+            newExpandedView.widthAnchor.constraint(equalToConstant: expandedHeight),
+            newExpandedView.heightAnchor.constraint(equalToConstant: expandedHeight)
+        ]
+        
+        activeConstraints.append(contentsOf: expandedConstraints)
+        NSLayoutConstraint.activate(expandedConstraints)
+    }
+}
+
+// MARK: - 添加用户处理
+extension MultiPersonCallView {
+    
+    /// 检测并添加新用户视图（从全局缓存中检测新增的视图）
+    func addNewUsersIfNeeded() {
+        // 1. 找出新增的视图（在缓存中但不在当前视图层级中的）
+        var newViews: [CallStreamView] = []
+        var existingViewIds = Set<String>()
+        
+        // 收集当前已显示的视图ID
+        for subview in subviews {
+            if let streamView = subview as? CallStreamView {
+                existingViewIds.insert(streamView.item.userId)
+            }
+        }
+        
+        // 检查scrollView中的视图
+        if let scrollView = scrollView {
+            for subview in scrollView.subviews {
+                if let streamView = subview as? CallStreamView {
+                    existingViewIds.insert(streamView.item.userId)
+                }
+            }
+        }
+        
+        // 找出新增的视图
+        for (userId, view) in CallKitManager.shared.canvasCache {
+            if !existingViewIds.contains(userId) {
+                newViews.append(view)
+            }
+        }
+        
+        // 如果没有新增视图，直接返回
+        guard !newViews.isEmpty else { return }
+        
+        // 2. 根据当前状态处理新增视图
+        if expandedView != nil {
+            // 展开状态下添加
+            addUsersInExpandedState(newViews)
+        } else {
+            // 正常状态下添加
+            addUsersInNormalState(newViews)
+        }
+    }
+    
+    /// 在正常状态下添加新用户
+    private func addUsersInNormalState(_ newViews: [CallStreamView]) {
+        // 为新视图添加手势处理
+        for view in newViews {
+            view.onTap = { [weak self] tappedView in
+                self?.handleItemTap(tappedView)
+            }
+            view.onPinchToShrink = { [weak self] view in
+                self?.handlePinchToShrink(view)
+            }
+            view.translatesAutoresizingMaskIntoConstraints = false
+            
+            // 添加到主视图
+            addSubview(view)
+            view.alpha = 0
+        }
+        
+        // 重新布局所有视图
+        layoutItemsForNormalState()
+        updateAllDisplayModes()
+        
+        // 动画显示新视图
+        UIView.animate(withDuration: 0.3, delay: 0, options: [.curveEaseOut], animations: {
+            for view in newViews {
+                view.alpha = 1.0
+            }
+            self.layoutIfNeeded()
+        })
+    }
+    
+    /// 在展开状态下添加新用户
+    private func addUsersInExpandedState(_ newViews: [CallStreamView]) {
+        guard let scrollView = scrollView, let expandedView = expandedView else {
+            // 如果不在展开状态，使用正常状态添加
+            addUsersInNormalState(newViews)
+            return
+        }
+        
+        // 1. 为新视图设置初始状态
+        for view in newViews {
+            view.displayMode = .hidden
+            view.alpha = 0
+            view.translatesAutoresizingMaskIntoConstraints = false
+            
+            // 添加手势处理
+            view.onTap = { [weak self] tappedView in
+                self?.handleItemTap(tappedView)
+            }
+            view.onPinchToShrink = { [weak self] view in
+                self?.handlePinchToShrink(view)
+            }
+            
+            // 添加到scrollView
+            scrollView.addSubview(view)
+        }
+        
+        // 2. 获取当前scrollView中的所有缩略图（不包括新添加的）
+        let existingThumbnails = scrollView.subviews
+            .compactMap { $0 as? CallStreamView }
+            .filter { !newViews.contains($0) }
+            .sorted { $0.item.index > $1.item.index }
+        
+        // 3. 合并所有缩略图并排序
+        let allThumbnails = (existingThumbnails + newViews)
+            .filter { $0 != expandedView }
+            .sorted { $0.item.index > $1.item.index }
+        
+        // 4. 重新布局
+        rebuildExpandedStateLayout(expandedView: expandedView, thumbnails: allThumbnails)
+        
+        // 5. 动画显示新添加的视图
+        UIView.animate(withDuration: 0.3, delay: 0, options: [.curveEaseOut], animations: {
+            for view in newViews {
+                view.alpha = 1.0
+            }
+            self.layoutIfNeeded()
+        }, completion: { _ in
+            // 更新显示模式
+            self.updateAllDisplayModes()
+            
+            // 如果需要，滚动到显示新添加的用户
+            if let lastNewView = newViews.last {
+                self.scrollToShowThumbnail(lastNewView)
+            }
+        })
+    }
+    
+    /// 重建展开状态的布局
+    private func rebuildExpandedStateLayout(expandedView: CallStreamView, thumbnails: [CallStreamView]) {
+        // 清除旧约束
+        NSLayoutConstraint.deactivate(activeConstraints)
+        activeConstraints.removeAll()
+        
+        let thumbnailSize: CGFloat = 72
+        let thumbnailSpacing: CGFloat = 6
+        let padding: CGFloat = 12
+        
+        // 计算展开视图尺寸
+        let expandedHeight = (ScreenHeight/ScreenWidth <= 16.0/9.0) ?
+            ScreenWidth * 2.0/3.0 : ScreenWidth - 24
+        
+        // 设置展开视图约束
+        expandedView.translatesAutoresizingMaskIntoConstraints = false
+        activeConstraints += [
+            expandedView.centerXAnchor.constraint(equalTo: centerXAnchor),
+            expandedView.centerYAnchor.constraint(equalTo: centerYAnchor, constant: -40),
+            expandedView.widthAnchor.constraint(equalToConstant: expandedHeight),
+            expandedView.heightAnchor.constraint(equalToConstant: expandedHeight)
+        ]
+        
+        // 设置scrollView约束
+        if let scrollView = scrollView {
+            activeConstraints += [
+                scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
+                scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
+                scrollView.topAnchor.constraint(equalTo: expandedView.bottomAnchor, constant: 12),
+                scrollView.heightAnchor.constraint(equalToConstant: thumbnailSize)
+            ]
+            
+            // 布局所有缩略图
+            for (index, view) in thumbnails.enumerated() {
+                let leadingConstant = padding + CGFloat(index) * (thumbnailSize + thumbnailSpacing)
+                
+                view.translatesAutoresizingMaskIntoConstraints = false
+                activeConstraints += [
+                    view.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor, constant: leadingConstant),
+                    view.centerYAnchor.constraint(equalTo: scrollView.centerYAnchor),
+                    view.widthAnchor.constraint(equalToConstant: thumbnailSize),
+                    view.heightAnchor.constraint(equalToConstant: thumbnailSize)
+                ]
+            }
+            
+            // 更新contentSize
+            let contentWidth = padding + CGFloat(thumbnails.count) * (thumbnailSize + thumbnailSpacing) - thumbnailSpacing + padding
+            scrollView.contentSize = CGSize(width: contentWidth, height: thumbnailSize)
+        }
+        
+        // 激活所有约束
+        NSLayoutConstraint.activate(activeConstraints)
+    }
+    
+    /// 滚动到显示指定的缩略图
+    private func scrollToShowThumbnail(_ thumbnail: CallStreamView) {
+        guard let scrollView = scrollView else { return }
+        
+        let thumbnailFrame = thumbnail.frame
+        let visibleRect = CGRect(
+            x: max(0, thumbnailFrame.origin.x - 6),
+            y: 0,
+            width: min(thumbnailFrame.width + 12, scrollView.contentSize.width),
+            height: thumbnailFrame.height
+        )
+        scrollView.scrollRectToVisible(visibleRect, animated: true)
+    }
+    
+    /// 改进的updateWithItems方法 - 只处理删除，添加通过addNewUsersIfNeeded处理
+    func updateWithItems(_ removeUsers: [String] = []) {
+        // 先检测并添加新用户
+        addNewUsersIfNeeded()
+        
+        // 如果没有要删除的用户，直接返回
+        guard !removeUsers.isEmpty else { return }
+        
+        // 原有的删除逻辑...
+        var viewsInScrollView: [CallStreamView] = []
+        let currentUserIds = Set(CallKitManager.shared.itemsCache.keys)
+        var viewsToRemove: [CallStreamView] = []
+        
+        // 检查 scrollView 中的 CallStreamView
+        if let scrollView = scrollView {
+            for subview in scrollView.subviews {
+                if let streamView = subview as? CallStreamView {
+                    if !currentUserIds.contains(streamView.item.userId) {
+                        viewsToRemove.append(streamView)
+                    } else {
+                        viewsInScrollView.append(streamView)
+                    }
+                }
+            }
+        }
+        
+        let isRemovingExpandedView = removeUsers.contains { $0 == expandedView?.item.userId ?? "" }
+        
+        if isRemovingExpandedView {
+            // 删除的是展开视图，需要回归常规状态
+            animateRemovalAndReturnToNormal(viewsToRemove: viewsToRemove)
+        } else if expandedView != nil {
+            // 在展开状态下删除非展开视图
+            animateRemovalInExpandedState(viewsToRemove: viewsToRemove, viewsInScrollView: viewsInScrollView)
+        } else {
+            // 在常规状态下删除视图
+            setupViews()
+        }
+
+        
+        updateAllDisplayModes()
+    }
+    
+    func animateRemovalInNormalState() {
+        
+    }
+    
+    /// 统一的刷新方法
+    func refreshViews() {
+        // 检测并添加新用户
+        addNewUsersIfNeeded()
+        
+        // 根据当前状态刷新布局
+        if expandedView != nil {
+            // 展开状态：获取所有缩略图并重建布局
+            if let scrollView = scrollView {
+                let thumbnails = scrollView.subviews
+                    .compactMap { $0 as? CallStreamView }
+                    .filter { $0 != expandedView }
+                    .sorted { $0.item.index > $1.item.index }
+                
+                rebuildExpandedStateLayout(expandedView: expandedView!, thumbnails: thumbnails)
+            }
+        } else {
+            // 正常状态：重新布局
+            layoutItemsForNormalState()
+        }
+        
+        updateAllDisplayModes()
+        layoutIfNeeded()
     }
 }

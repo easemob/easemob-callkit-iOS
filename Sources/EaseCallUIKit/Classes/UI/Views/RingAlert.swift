@@ -331,7 +331,7 @@ public class CallPopupView: UIView {
     
     func dismiss() {
         // 第一步：调整圆角并准备收缩
-        UIView.animate(withDuration: 0.2, animations: {
+        UIView.animate(withDuration: 0.15, animations: {
             // 先调整圆角
             self.callCardView.layer.cornerRadius = self.dynamicIslandCornerRadius
             // 淡出阴影
