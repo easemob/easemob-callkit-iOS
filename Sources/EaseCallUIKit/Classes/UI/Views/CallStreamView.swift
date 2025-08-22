@@ -210,7 +210,7 @@ public class CallStreamView: UIImageView {
             networkStatusView.image = UIImage(named: "network_3", in: .callBundle, with: nil)
         }
         
-        self.networkStatusView.isHidden = false
+//        self.networkStatusView.isHidden = false
     }
     
     func ensureVisible() {
@@ -222,7 +222,6 @@ public class CallStreamView: UIImageView {
         // Force layout update
         setNeedsLayout()
         layoutIfNeeded()
-        superview?.layoutIfNeeded()
     }
     
     public override func layoutSubviews() {

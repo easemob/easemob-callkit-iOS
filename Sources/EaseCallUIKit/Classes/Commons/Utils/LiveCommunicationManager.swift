@@ -79,6 +79,9 @@ class LiveCommunicationManager: NSObject {
     func endCall(){
         self.manager?.invalidate()
         self.manager = nil
+        if UIApplication.shared.applicationState == .background {
+            ChatClient.shared().applicationDidEnterBackground(UIApplication.shared)
+        }
         consoleLogInfo("[LiveCommunicationManager] destroy ConversationManager", type: .debug)
     }
 }

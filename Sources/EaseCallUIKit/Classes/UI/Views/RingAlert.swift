@@ -179,6 +179,10 @@ public class CallPopupView: UIView {
     // 灵动岛的位置和大小（iPhone 14 Pro系列）
     private let dynamicIslandFrame = CGRect(x: (UIScreen.main.bounds.width - 126) / 2, y: 20, width: 126, height: 37)
     
+    // 动画相关属性
+    private let dynamicIslandCornerRadius: CGFloat = 18.5  // 灵动岛的圆角（高度的一半）
+    private let normalCornerRadius: CGFloat = 12  // 正常展开后的圆角
+    
     // 约束引用
     private var cardTopConstraint: NSLayoutConstraint!
     private var cardLeadingConstraint: NSLayoutConstraint!
@@ -221,31 +225,29 @@ public class CallPopupView: UIView {
         
         // 设置呼叫卡片视图
         setupCallCardView()
-        
-        // 初始状态设置
-        callCardView.alpha = 1
-        callCardView.transform = CGAffineTransform(scaleX: 0.3, y: 0.3)
     }
     
     private func setupCallCardView() {
-        // 呼叫卡片样式
-        callCardView.layer.cornerRadius = 12
+        // 初始状态：与灵动岛相同的圆角
+        callCardView.layer.cornerRadius = dynamicIslandCornerRadius
+        callCardView.layer.masksToBounds = true
+        callCardView.clipsToBounds = true
+        
+        // 设置阴影（使用单独的阴影层以避免与masksToBounds冲突）
         callCardView.layer.shadowColor = UIColor.black.cgColor
-        callCardView.layer.shadowOpacity = 0.3
+        callCardView.layer.shadowOpacity = 0
         callCardView.layer.shadowOffset = CGSize(width: 0, height: 10)
         callCardView.layer.shadowRadius = 20
+        
         callCardView.translatesAutoresizingMaskIntoConstraints = false
+        callCardView.alpha = 0  // 初始透明
         addSubview(callCardView)
         
         // 设置初始约束（灵动岛位置）
-        let initialWidth = dynamicIslandFrame.width
-        let initialHeight = dynamicIslandFrame.height
-        
-        // 创建约束
         cardTopConstraint = callCardView.topAnchor.constraint(equalTo: topAnchor, constant: dynamicIslandFrame.origin.y)
         cardLeadingConstraint = callCardView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: dynamicIslandFrame.origin.x)
-        cardTrailingConstraint = callCardView.trailingAnchor.constraint(equalTo: leadingAnchor, constant: dynamicIslandFrame.origin.x + initialWidth)
-        cardHeightConstraint = callCardView.heightAnchor.constraint(equalToConstant: initialHeight)
+        cardTrailingConstraint = callCardView.trailingAnchor.constraint(equalTo: leadingAnchor, constant: dynamicIslandFrame.origin.x + dynamicIslandFrame.width)
+        cardHeightConstraint = callCardView.heightAnchor.constraint(equalToConstant: dynamicIslandFrame.height)
         
         // 激活约束
         NSLayoutConstraint.activate([
@@ -259,6 +261,7 @@ public class CallPopupView: UIView {
     // MARK: - Animation
     func show() {
         consoleLogInfo("CallPopupView show", type: .info)
+        
         // 确保视图在最前面
         if let window = UIApplication.shared.call.keyWindow {
             window.addSubview(self)
@@ -266,8 +269,12 @@ public class CallPopupView: UIView {
             UIApplication.shared.keyWindow?.addSubview(self)
         }
         
-//        // 强制初始布局
-//        self.layoutIfNeeded()
+        // 强制初始布局
+        self.layoutIfNeeded()
+        
+        // 初始状态设置
+        callCardView.alpha = 1
+        callCardView.layer.cornerRadius = dynamicIslandCornerRadius
         
         // 计算最终位置
         let statusBarHeight: CGFloat
@@ -283,59 +290,102 @@ public class CallPopupView: UIView {
         let finalTrailing = screenWidth - 12
         let finalHeight: CGFloat = 80
         
-        // 更新约束到最终位置
+        // 分两步动画
+        // 第一步：快速扩展并保持圆角
         cardTopConstraint.constant = finalTop
         cardLeadingConstraint.constant = finalLeading
         cardTrailingConstraint.constant = finalTrailing
         cardHeightConstraint.constant = finalHeight
         
-        // 执行动画
-        UIView.animate(withDuration: 0.4, delay: 0, options: .curveLinear, animations: {
+        // 使用弹性动画效果
+        UIView.animate(withDuration: 0.618,
+                      delay: 0,
+                      usingSpringWithDamping: 0.8,
+                      initialSpringVelocity: 0.5,
+                      options: [.curveEaseOut],
+                      animations: {
             // 背景淡入
             self.backgroundView.alpha = 0.3
             
-            // 卡片放大
-            self.callCardView.transform = .identity
-            
             // 应用约束变化
-//            self.layoutIfNeeded()
+            self.layoutIfNeeded()
+            
+            // 逐渐调整圆角
+            let progress = min(1.0, self.callCardView.frame.height / self.finalHeight)
+            self.callCardView.layer.cornerRadius = self.dynamicIslandCornerRadius +
+                (self.normalCornerRadius - self.dynamicIslandCornerRadius) * progress
+            
+            // 添加阴影动画
+            self.callCardView.layer.shadowOpacity = 0.3
         }) { _ in
-            // 确保布局正确
-            self.callCardView.setNeedsLayout()
-            self.callCardView.layoutIfNeeded()
+            // 第二步：微调圆角到最终状态
+            UIView.animate(withDuration: 0.2, animations: {
+                self.callCardView.layer.cornerRadius = self.normalCornerRadius
+            }) { _ in
+                // 确保布局正确
+                self.callCardView.setNeedsLayout()
+                self.callCardView.layoutIfNeeded()
+            }
         }
     }
     
     func dismiss() {
-        // 更新约束回到灵动岛位置
-        cardTopConstraint.constant = dynamicIslandFrame.origin.y
-        cardLeadingConstraint.constant = dynamicIslandFrame.origin.x
-        cardTrailingConstraint.constant = dynamicIslandFrame.origin.x + dynamicIslandFrame.width
-        cardHeightConstraint.constant = dynamicIslandFrame.height
-        
-        // 执行动画
-        UIView.animate(withDuration: 0.3, delay: 0, options: .curveEaseIn, animations: {
-            self.callCardView.transform = CGAffineTransform(scaleX: 0.3, y: 0.3)
-            self.backgroundView.alpha = 0
-            self.layoutIfNeeded()
+        // 第一步：调整圆角并准备收缩
+        UIView.animate(withDuration: 0.15, animations: {
+            // 先调整圆角
+            self.callCardView.layer.cornerRadius = self.dynamicIslandCornerRadius
+            // 淡出阴影
+            self.callCardView.layer.shadowOpacity = 0
         }) { _ in
-            self.removeFromSuperview()
+            // 第二步：收缩到灵动岛位置
+            self.cardTopConstraint.constant = self.dynamicIslandFrame.origin.y
+            self.cardLeadingConstraint.constant = self.dynamicIslandFrame.origin.x
+            self.cardTrailingConstraint.constant = self.dynamicIslandFrame.origin.x + self.dynamicIslandFrame.width
+            self.cardHeightConstraint.constant = self.dynamicIslandFrame.height
+            
+            UIView.animate(withDuration: 0.35,
+                          delay: 0,
+                          usingSpringWithDamping: 0.9,
+                          initialSpringVelocity: 0.5,
+                          options: [.curveEaseIn],
+                          animations: {
+                // 背景淡出
+                self.backgroundView.alpha = 0
+                
+                // 应用约束变化
+                self.layoutIfNeeded()
+                
+                // 轻微缩小效果（模拟进入灵动岛）
+                self.callCardView.transform = CGAffineTransform(scaleX: 0.95, y: 0.95)
+            }) { _ in
+                // 第三步：最终消失动画
+                UIView.animate(withDuration: 0.1, animations: {
+                    self.callCardView.alpha = 0
+                    self.callCardView.transform = CGAffineTransform(scaleX: 0.8, y: 0.8)
+                }) { _ in
+                    self.removeFromSuperview()
+                }
+            }
         }
     }
     
-//    public override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-//        super.touchesBegan(touches, with: event)
-//        // 处理触摸事件，防止误触
-//        if let touch = touches.first
-//        {
-//            let location = touch.location(in: self)
-//            if !callCardView.frame.contains(location) {
-//                // 如果点击不在呼叫卡片内，则不处理
-//                return
-//            }
-//        }
-//    }
+    // 辅助属性
+    private var finalHeight: CGFloat {
+        return 80
+    }
     
+    // MARK: - Touch Handling
+    public override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        super.touchesBegan(touches, with: event)
+        // 如果点击在卡片外部，可以考虑dismiss
+        if let touch = touches.first {
+            let location = touch.location(in: self)
+            if !callCardView.frame.contains(location) {
+                // 点击背景区域时dismiss（可选）
+                self.callCardAction?(.other)
+            }
+        }
+    }
 }
 
 // MARK: - 使用示例
