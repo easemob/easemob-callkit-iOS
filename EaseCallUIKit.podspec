@@ -8,7 +8,7 @@
 
 Pod::Spec.new do |s|
   s.name             = 'EaseCallUIKit'
-  s.version          = '0.1.0'
+  s.version          = '1.0.0'
   s.summary          = 'A short description of EaseCallUIKit.'
 
 # This description is used to generate tags and improve search results.
@@ -30,9 +30,11 @@ TODO: Add long description of the pod here.
 
   s.ios.deployment_target = '15.0'
 
-  s.source_files = 'Sources/EaseCallUIKit/Classes/**/*'
-  
-   s.resources = ['Sources/EaseCallUIKit/Classes/Resources/*.bundle']
+  s.source_files = 'Sources/EaseCallUIKit/Classes/**/*.{h,m,swift}'
+
+  s.resource_bundles = {
+    'EaseCallUIKit' => ['Sources/EaseCallUIKit/Classes/Resources/*.bundle']
+  }
   
   s.static_framework = true
   
