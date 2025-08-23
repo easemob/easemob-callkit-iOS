@@ -9,6 +9,7 @@
 import UIKit
 import EaseCallUIKit
 import QuickLook
+import AgoraRtcKit
 
 class ViewController: UIViewController {
     
@@ -17,9 +18,6 @@ class ViewController: UIViewController {
     @IBOutlet var inputField: UITextField!
         
     @IBOutlet var callButton: UIButton!
-    
-    @IBOutlet weak var userIdField: UITextField!
-    @IBOutlet weak var tokenField: UITextField!
     @IBOutlet weak var loginButton: UIButton!
     @IBOutlet weak var callTypeSegment: UISegmentedControl!
     @IBOutlet weak var logButton: UIButton!
@@ -28,7 +26,6 @@ class ViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         // Do any additional setup after loading the view, typically from a nib.
-//        CallKitManager.shared.currentUserInfo = CallUserProfile()
         self.callTypeSegment.selectedSegmentIndex = 0
         self.callTypeSegment.selectedSegmentTintColor = .systemBlue
         CallKitManager.shared.profileProvider = self
@@ -50,11 +47,6 @@ class ViewController: UIViewController {
     
     @IBAction func loginAction(_ sender: Any) {
         self.view.endEditing(true)
-        guard let userId = userIdField.text, !userId.isEmpty,
-              let token = tokenField.text, !token.isEmpty else {
-            self.showCallToast(toast: "Please enter a valid username and token")
-            return
-        }
         
         ChatClient.shared().login(withUsername: userId, token: token) { [weak self] userId,error  in
             if let error = error {
@@ -68,8 +60,6 @@ class ViewController: UIViewController {
                     profile.nickname = "\(userId)昵称"
                     CallKitManager.shared.currentUserInfo = profile
                 }
-                self?.userIdField.isHidden = true
-                self?.tokenField.isHidden = true
                 self?.loginButton.isHidden = true 
             }
         }
@@ -254,6 +244,10 @@ extension ViewController: CallServiceListener {
     }
     
     func remoteUserDidLeft(userId: String, uid: UInt, channelName: String, type: CallType) {
+        
+    }
+    
+    func onRtcEngineCreated(engine: AgoraRtcEngineKit) {
         
     }
 }

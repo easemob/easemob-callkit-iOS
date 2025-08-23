@@ -13,6 +13,7 @@ public class MultiPersonCallView: UIView {
     private var scrollView: UIScrollView?
     private var activeConstraints: [NSLayoutConstraint] = []
     public var touchOtherArea: (() -> Void)?
+    private var hasInitial: Bool = false
     
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -58,16 +59,12 @@ public class MultiPersonCallView: UIView {
                 self.animateToSingleViewLayout()
             } else {
                 // 重新布局展开状态的缩略图
-                self.updateScrollViewContent()
+                self.setupViews()
             }
         })
     }
 
     private func animateRemovalInExpandedState(viewsToRemove: [CallStreamView], viewsInScrollView: [CallStreamView]) {
-        // 从 canvasCache 中移除
-        for view in viewsToRemove {
-            CallKitManager.shared.canvasCache.removeValue(forKey: view.item.userId)
-        }
         
         // 如果只是从 scrollView 中删除缩略图
         if !viewsInScrollView.isEmpty {
@@ -175,7 +172,7 @@ public class MultiPersonCallView: UIView {
             self.scrollView = nil
             
             // 确保视图可见
-//            lastView.ensureVisible()
+            lastView.ensureVisible()
         })
     }
 
@@ -234,16 +231,14 @@ public class MultiPersonCallView: UIView {
             subview.removeFromSuperview()
         }
         for subview in subviews {
-            if let streamView = subview as? CallStreamView {
-                streamView.removeFromSuperview()
-            }
+            subview.removeFromSuperview()
         }
         scrollView?.removeFromSuperview()
         scrollView = nil
         
         self.addGestureHandlers()
-        layoutItemsForNormalState()
-        updateAllDisplayModes()
+        self.layoutItemsForNormalState()
+        self.updateAllDisplayModes()
 
     }
     
@@ -255,7 +250,6 @@ public class MultiPersonCallView: UIView {
             canvas.onPinchToShrink = { [weak self] view in
                 self?.handlePinchToShrink(view)
             }
-            canvas.translatesAutoresizingMaskIntoConstraints = false
         }
     }
     
@@ -279,7 +273,6 @@ public class MultiPersonCallView: UIView {
                 }
             }
         }
-        self.addGestureHandlers()
     }
     
     private func handleItemTap(_ tappedView: CallStreamView) {
@@ -340,12 +333,10 @@ public class MultiPersonCallView: UIView {
         let itemViews = CallKitManager.shared.canvasCache.values.sorted { $0.item.index > $1.item.index }
         // 确保所有视图都在当前视图层级中
         for view in itemViews {
-            if view.superview != self {
-                // 从原有父视图移除
-                view.removeFromSuperview()
-                // 添加到当前视图
-                addSubview(view)
-            }
+            // 从原有父视图移除
+            view.translatesAutoresizingMaskIntoConstraints = false
+            // 添加到当前视图
+            addSubview(view)
         }
         let count = itemViews.count
         let padding: CGFloat = 8
@@ -831,26 +822,47 @@ extension MultiPersonCallView {
     // 缩小动画也需要相应改进
     private func animateToNormalStateSmooth() {
         guard let currentExpanded = expandedView else { return }
-        
-        let expandedFrame = currentExpanded.frame
-        expandedView = nil
-        
-        CallKitManager.shared.itemsCache.values.forEach { $0.isExpanded = false }
-        var itemViews = CallKitManager.shared.canvasCache.values.sorted { $0.item.index > $1.item.index }
-
-        // 不在这里单独设置 displayMode，使用统一方法
-        updateAllDisplayModes()
-        
-        
-        // Sort and prepare views
-        itemViews.sort { $0.item.index < $1.item.index }
-        itemViews.forEach { view in
-            if view.superview != self {
-                view.removeFromSuperview()
-                addSubview(view)
+            
+            let expandedFrame = currentExpanded.frame
+            expandedView = nil
+            
+            CallKitManager.shared.itemsCache.values.forEach { $0.isExpanded = false }
+            
+            // 1. 先清理所有不在 canvasCache 中的视图
+            for subview in subviews {
+                if let streamView = subview as? CallStreamView {
+                    if CallKitManager.shared.canvasCache[streamView.item.userId] == nil {
+                        streamView.removeFromSuperview()
+                    }
+                }
             }
-            view.ensureVisible()
-        }
+            
+            // 清理 scrollView 中的残留视图
+            if let scrollView = scrollView {
+                for subview in scrollView.subviews {
+                    if let streamView = subview as? CallStreamView {
+                        if CallKitManager.shared.canvasCache[streamView.item.userId] == nil {
+                            streamView.removeFromSuperview()
+                        }
+                    }
+                }
+            }
+            
+            // 2. 获取当前有效的视图并统一排序（只排序一次）
+            let itemViews = CallKitManager.shared.canvasCache.values
+                .sorted { $0.item.index > $1.item.index }
+            
+            // 3. 确保所有视图都在主视图中
+            itemViews.forEach { view in
+                if view.superview != self {
+                    view.removeFromSuperview()
+                    addSubview(view)
+                }
+                view.ensureVisible()
+            }
+            
+            // 4. 更新显示模式
+            updateAllDisplayModes()
         
         // Get target frame
         CATransaction.begin()
@@ -1178,6 +1190,80 @@ extension MultiPersonCallView {
         }
     }
     
+    // 新增辅助方法：检查是否有新用户
+    private func checkForNewUsers() -> Bool {
+        var existingViewIds = Set<String>()
+        
+        // 收集当前已显示的视图ID
+        for subview in subviews {
+            if let streamView = subview as? CallStreamView {
+                existingViewIds.insert(streamView.item.userId)
+            }
+        }
+        
+        if let scrollView = scrollView {
+            for subview in scrollView.subviews {
+                if let streamView = subview as? CallStreamView {
+                    existingViewIds.insert(streamView.item.userId)
+                }
+            }
+        }
+        
+        // 检查是否有新用户
+        for (userId, _) in CallKitManager.shared.canvasCache {
+            if !existingViewIds.contains(userId) {
+                return true
+            }
+        }
+        
+        return false
+    }
+
+    // 处理删除逻辑
+    private func handleUserRemoval(_ removeUsers: [String]) {
+        // 原有的删除逻辑...
+        var viewsInScrollView: [CallStreamView] = []
+        let currentUserIds = Set(CallKitManager.shared.itemsCache.keys)
+        var viewsToRemove: [CallStreamView] = []
+        
+        // 检查 scrollView 中的 CallStreamView
+        if let scrollView = scrollView {
+            for subview in scrollView.subviews {
+                if let streamView = subview as? CallStreamView {
+                    if !currentUserIds.contains(streamView.item.userId) {
+                        viewsToRemove.append(streamView)
+                    } else {
+                        viewsInScrollView.append(streamView)
+                    }
+                }
+            }
+        }
+        
+        let isRemovingExpandedView = removeUsers.contains { $0 == expandedView?.item.userId ?? "" }
+        
+        if isRemovingExpandedView {
+            animateRemovalAndReturnToNormal(viewsToRemove: viewsToRemove)
+        } else if expandedView != nil {
+            animateRemovalInExpandedState(viewsToRemove: viewsToRemove, viewsInScrollView: viewsInScrollView)
+        } else {
+            setupViews()
+        }
+        
+        updateAllDisplayModes()
+    }
+
+    // 合并处理添加和删除
+    private func handleAddAndRemove(_ removeUsers: [String]) {
+        // 先处理删除
+        handleUserRemoval(removeUsers)
+        
+        // 延迟添加新用户，避免布局冲突
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            self?.addNewUsersIfNeeded()
+        }
+    }
+
+    
     /// 在正常状态下添加新用户
     private func addUsersInNormalState(_ newViews: [CallStreamView]) {
         // 为新视图添加手势处理
@@ -1204,7 +1290,7 @@ extension MultiPersonCallView {
             for view in newViews {
                 view.alpha = 1.0
             }
-            self.layoutIfNeeded()
+//            self.layoutIfNeeded()
         })
     }
     
@@ -1336,25 +1422,28 @@ extension MultiPersonCallView {
     /// 改进的updateWithItems方法 - 只处理删除，添加通过addNewUsersIfNeeded处理
     func updateWithItems(_ removeUsers: [String] = []) {
         // 先检测并添加新用户
-        addNewUsersIfNeeded()
+        if self.checkForNewUsers(),removeUsers.isEmpty {
+            addNewUsersIfNeeded()
+            return
+        }
         
         // 如果没有要删除的用户，直接返回
         guard !removeUsers.isEmpty else { return }
         
         // 原有的删除逻辑...
         var viewsInScrollView: [CallStreamView] = []
-        let currentUserIds = Set(CallKitManager.shared.itemsCache.keys)
         var viewsToRemove: [CallStreamView] = []
         
+        for user in removeUsers {
+            if let streamView = CallKitManager.shared.canvasCache[user] {
+                viewsToRemove.append(streamView)
+            }
+        }
         // 检查 scrollView 中的 CallStreamView
         if let scrollView = scrollView {
             for subview in scrollView.subviews {
                 if let streamView = subview as? CallStreamView {
-                    if !currentUserIds.contains(streamView.item.userId) {
-                        viewsToRemove.append(streamView)
-                    } else {
-                        viewsInScrollView.append(streamView)
-                    }
+                    viewsInScrollView.append(streamView)
                 }
             }
         }
@@ -1368,16 +1457,11 @@ extension MultiPersonCallView {
             // 在展开状态下删除非展开视图
             animateRemovalInExpandedState(viewsToRemove: viewsToRemove, viewsInScrollView: viewsInScrollView)
         } else {
-            // 在常规状态下删除视图
-            setupViews()
+            viewsToRemove.first?.removeFromSuperview()
+            self.setupViews()
         }
-
         
         updateAllDisplayModes()
-    }
-    
-    func animateRemovalInNormalState() {
-        
     }
     
     /// 统一的刷新方法

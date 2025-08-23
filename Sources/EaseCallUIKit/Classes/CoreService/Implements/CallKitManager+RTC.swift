@@ -366,28 +366,30 @@ extension CallKitManager: AgoraRtcEngineDelegate {
             if let call = self.callInfo {
                 if call.type == .groupCall {
                     if let currentVC = UIViewController.currentController as? CallMultiViewController {
-                        if let item = self.itemsCache.first(where: { $0.value.uid == UInt32(uid) })?.value {
+                        if let item = self.itemsCache.first(where: { $0.value.uid == UInt32(uid) })?.value,item.userId != ChatClient.shared().currentUsername ?? "" {
                             let userId = item.userId
                             for listener in self.listeners.allObjects {
                                 listener.remoteUserDidLeft?(userId: userId, channelName: call.channelName, type: call.type)
                             }
                             currentVC.callView.updateWithItems([userId])  // 先更新UI
                             self.itemsCache.removeValue(forKey: userId)   // 后清理缓存
-//                            self.canvasCache[userId]?.removeFromSuperview()
+                            self.canvasCache[userId]?.removeFromSuperview()
                             self.canvasCache.removeValue(forKey: userId)
+                            currentVC.callView.updateWithItems([userId]) 
                             consoleLogInfo("rtcEngine didOfflineOfUid: \(uid) userId:\(userId) reason: \(reason.rawValue)", type: .debug)
                         }
                         
                     } else {
-                        if let item = self.itemsCache.first(where: { $0.value.uid == UInt32(uid) })?.value {
+                        if let item = self.itemsCache.first(where: { $0.value.uid == UInt32(uid) })?.value ,item.userId != ChatClient.shared().currentUsername ?? "" {
                             let userId = item.userId
                             for listener in self.listeners.allObjects {
                                 listener.remoteUserDidLeft?(userId: item.userId, channelName: call.channelName, type: call.type)
                             }
-                            self.itemsCache.removeValue(forKey: userId)
                             (self.callVC as? CallMultiViewController)?.callView.updateWithItems([userId])
-//                            self.canvasCache[userId]?.removeFromSuperview()
+                            self.itemsCache.removeValue(forKey: userId)
+                            self.canvasCache[userId]?.removeFromSuperview()
                             self.canvasCache.removeValue(forKey: userId)
+                            (self.callVC as? CallMultiViewController)?.callView.updateWithItems([userId])
                             consoleLogInfo("rtcEngine didOfflineOfUid: \(uid) userId:\(userId) reason: \(reason.rawValue)", type: .debug)
                         }
                     }
