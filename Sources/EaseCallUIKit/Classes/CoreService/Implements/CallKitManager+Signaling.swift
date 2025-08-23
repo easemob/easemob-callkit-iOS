@@ -230,11 +230,15 @@ extension CallKitManager: ChatEventsListener {
                             self.stopConfirmBuildConnectionTimer(callId: callId)
                             if call.type == .groupCall {
                                 if result != kAcceptResult {
-                                    self.itemsCache.removeValue(forKey: message.from)
-                                    self.canvasCache.removeValue(forKey: message.from)
                                     if let vc = UIViewController.currentController as? CallMultiViewController {
                                         vc.callView.updateWithItems([message.from])
+                                    } else {
+                                        if let vc = self.callVC as? CallMultiViewController {
+                                            vc.callView.updateWithItems([message.from])
+                                        }
                                     }
+                                    self.itemsCache.removeValue(forKey: message.from)
+                                    self.canvasCache.removeValue(forKey: message.from)
                                 }
                             } else {
                                 if call.state == .dialing {
@@ -381,6 +385,9 @@ extension CallKitManager: ChatEventsListener {
     }
     
     func presentCalleeController(call: CallInfo) {
+        if UIViewController.currentController is CallMultiViewController || UIViewController.currentController is Call1v1AudioViewController || UIViewController.currentController is Call1v1VideoViewController {
+            return
+        }
         if call.state != .idle {
             var vc: UIViewController = UIViewController()
             switch call.type {

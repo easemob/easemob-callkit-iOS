@@ -79,6 +79,9 @@ open class CallMultiViewController: UIViewController {
             self.addCallTimer()
         }
         self.view.addSubViews([self.background, self.navigationBar,self.bottomView,self.callView])
+//        if let call = CallKitManager.shared.callInfo, (call.state == .answering || call.state == .dialing) {
+//            self.callView.updateWithItems()
+//        }
         self.bottomView.updateButtonSelectedStatus(selectedIndex: 3)
         self.callView.isHidden = !state
         // Do any additional setup after loading the view.

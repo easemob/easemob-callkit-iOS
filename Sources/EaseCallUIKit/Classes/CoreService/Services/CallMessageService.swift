@@ -138,7 +138,7 @@ import AgoraRtcKit
     
     /// Called when a call is connected.
     /// - Parameter engine: The AgoraRtcEngineKit instance used for the call.
-    @objc optional func onRtcEngineCreated(engine: AgoraRtcEngineKit?)
+    @objc optional func onRtcEngineCreated(engine: AgoraRtcEngineKit)
     
     /// Called when a call is received.
     /// - Parameters:

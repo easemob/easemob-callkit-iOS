@@ -137,7 +137,10 @@ public let CallKitVersion = "1.0.0"
             self.engine = AgoraRtcEngineKit.sharedEngine(withAppId: self.appID, delegate: self)
         }
         for listener in self.listeners.allObjects {
-            listener.onRtcEngineCreated?(engine: self.engine)
+            if let engine = self.engine {
+                listener.onRtcEngineCreated?(engine: engine)
+            }
+            
         }
 //        self.engine?.setParameters("{\"che.audio.sf.ainlpToLoadFlag\":1}")
 //        self.engine?.setParameters("{\"che.audio.sf.nlpAlgRoute\":11}")
