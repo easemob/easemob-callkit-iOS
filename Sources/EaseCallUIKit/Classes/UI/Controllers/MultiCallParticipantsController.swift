@@ -78,7 +78,9 @@ import UIKit
                 Task {
                     let profiles = await CallKitManager.shared.profileProvider?.fetchGroupProfiles(profileIds: [groupId])
                     if let profile = profiles?.first {
-                        if let group = ChatGroup(id: self.groupId) {
+                        self.groupName = profile.nickname
+                        self.groupAvatar = profile.avatarURL
+                        if let group = ChatGroup(id: self.groupId),self.groupName.isEmpty,self.groupAvatar.isEmpty {
                             self.groupName = profile.nickname
                             self.groupAvatar = profile.avatarURL
                         }
@@ -89,7 +91,9 @@ import UIKit
                 CallKitManager.shared.profileProviderOC?.fetchGroupProfiles(profileIds: [groupId]) { [weak self] profiles in
                     guard let `self` = self else { return }
                     if let profile = profiles.first {
-                        if let group = ChatGroup(id: self.groupId) {
+                        self.groupName = profile.nickname
+                        self.groupAvatar = profile.avatarURL
+                        if let group = ChatGroup(id: self.groupId),self.groupName.isEmpty,self.groupAvatar.isEmpty {
                             self.groupName = profile.nickname
                             self.groupAvatar = profile.avatarURL
                         }
