@@ -129,9 +129,6 @@ public let CallKitVersion = "1.0.0"
         }
         self.appID = ChatClient.shared().options.appId ?? ""
         if self.appID.isEmpty {
-            self.appID = "b7eb56ff293b43aa8bd92c23057d08fb"
-        }
-        if self.appID.isEmpty {
             return ChatError(description: "App ID is not set.", code: .invalidAppkey)
         } else {
             self.engine = AgoraRtcEngineKit.sharedEngine(withAppId: self.appID, delegate: self)
