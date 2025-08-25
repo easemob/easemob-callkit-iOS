@@ -74,7 +74,7 @@ public class CallStreamView: UIImageView {
         networkStatusView.layer.cornerRadius = 4
         networkStatusView.clipsToBounds = true
         networkStatusView.isHidden = true
-        imageView.addSubview(networkStatusView)
+        self.addSubview(networkStatusView)
         
         coverView.backgroundColor = UIColor.black.withAlphaComponent(0.3)
         coverView.translatesAutoresizingMaskIntoConstraints = false
@@ -178,6 +178,7 @@ public class CallStreamView: UIImageView {
         self.coverView.isHidden = !newItem.waiting
         self.imageCover.alpha = newItem.videoMuted ? 0.5 : 0.0
         self.bringSubviewToFront(self.userInfoView)
+        self.bringSubviewToFront(self.networkStatusView)
     }
     
     func updateUserInfo(newItem: CallStreamItem) {
@@ -209,7 +210,7 @@ public class CallStreamView: UIImageView {
         case .unknown:
             networkStatusView.image = UIImage(named: "network_3", in: .callBundle, with: nil)
         }
-        
+        self.bringSubviewToFront(self.networkStatusView)
 //        self.networkStatusView.isHidden = false
     }
     

@@ -145,12 +145,9 @@ import UIKit
                 return
             } else {
                 if let cursorResult = result?.0 {
-                    if self.cursor.isEmpty {
-                        self.participants.removeAll()
-                    }
                     self.cursor = cursorResult.cursor ?? ""
                     if let profiles = cursorResult.list {
-                        self.participants = profiles.map({
+                        self.participants.append(contentsOf: profiles.map({
                             let profile = CallUserProfile()
                             profile.id = $0.userId
                             if let user = CallKitManager.shared.usersCache[profile.id] {
@@ -158,7 +155,7 @@ import UIKit
                                 profile.avatarURL = user.avatarURL
                             }
                             return profile
-                        })
+                        }))
                     }
                     self.participants.removeAll { $0.id == ChatClient.shared().currentUsername ?? "" }
                     self.participants.removeAll { self.excludeUsers.contains($0.id) }
@@ -205,7 +202,12 @@ extension MultiCallParticipantsController: UITableViewDelegate,UITableViewDataSo
             self.participantsList.reloadData()
         }
         let count = self.participants.filter({ $0.selected }).count
+        let joinCount = CallKitManager.shared.canvasCache.count
         if count > 0 {
+            if joinCount+count > 16 {
+                self.showCallToast(toast: "Cannot start multi-call with more than 16 participants".call.localize)
+                return
+            }
             self.navigation.rightItem.isEnabled = true
             self.navigation.rightItem.title("call".call.localize+"(\(count))", .normal)
         } else {
@@ -215,7 +217,7 @@ extension MultiCallParticipantsController: UITableViewDelegate,UITableViewDataSo
     }
     
     public func tableView(_ tableView: UITableView, willDisplay cell: UITableViewCell, forRowAt indexPath: IndexPath) {
-        if !self.cursor.isEmpty {
+        if indexPath.row == self.participants.count - 1 && !self.cursor.isEmpty {
             self.fetchParticipants()
         }
         var unknownInfoIds = [String]()
