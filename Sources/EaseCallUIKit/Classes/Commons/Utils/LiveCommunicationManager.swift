@@ -45,7 +45,7 @@ class LiveCommunicationManager: NSObject {
             return
         }
         let config = ConversationManager.Configuration(
-            ringtoneName: "notes_of_the_optimistic",
+            ringtoneName: nil,
             iconTemplateImageData: UIImage(named: "AppIcon")?.pngData(),
             maximumConversationGroups: 1,
             maximumConversationsPerConversationGroup: 1,
