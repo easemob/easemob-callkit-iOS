@@ -88,14 +88,17 @@ open class CallMultiViewController: UIViewController {
         self.setupNavigationState()
         if let groupId = CallKitManager.shared.callInfo?.groupId, !groupId.isEmpty {
             let groupName = CallKitManager.shared.callInfo?.groupName ?? groupId
+            var avatarURL = CallKitManager.shared.callInfo?.groupAvatar ?? ""
             var showName = groupName
             if let chatGroup = ChatGroup(id: groupId) {
                 if !chatGroup.groupName.isEmpty {
                     showName = chatGroup.groupName
-                    let avatarURL = CallKitManager.shared.callInfo?.groupAvatar ??  chatGroup.groupAvatar
-                    self.navigationBar.avatarURL = avatarURL
+                    if avatarURL.isEmpty {
+                        avatarURL = chatGroup.groupAvatar
+                    }
                 }
             }
+            self.navigationBar.avatarURL = avatarURL
             self.navigationBar.title = showName
         }
         self.navigationBar.clickClosure = { [weak self] in
