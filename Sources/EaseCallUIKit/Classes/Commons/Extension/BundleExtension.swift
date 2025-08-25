@@ -29,13 +29,13 @@ public extension Bundle {
             }
 #if COCOAPODS
         return Bundle(for: CallAppearance.self)
-    .url(forResource: "CallResource", withExtension: "bundle")
+    .url(forResource: "EaseCallUIKit.bundle/CallResource", withExtension: "bundle")
     .flatMap { Bundle(url: $0) }!
 #elseif SWIFT_PACKAGE
         return Bundle.module
 #elseif STATIC_LIBRARY
         return Bundle.main
-    .url(forResource: "CallResource", withExtension: "bundle")
+    .url(forResource: "EaseCallUIKit.bundle/CallResource", withExtension: "bundle")
     .flatMap(Bundle.init(url:))!
 #else
         return Bundle(for: CallAppearance.self)
