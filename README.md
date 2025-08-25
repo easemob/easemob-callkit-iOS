@@ -314,7 +314,6 @@ class AppDelegate：UIResponder，UIApplicationDelegate {
                                 <segments>
                                     <segment title="audio"/>
                                     <segment title="video"/>
-                                    <segment title="group"/>
                                 </segments>
                                 <color key="tintColor" systemColor="systemBlueColor"/>
                                 <connections>
@@ -449,11 +448,7 @@ class ViewController: UIViewController {
             self.showCallToast(toast: "Please enter a valid username or group id")
             return
         }
-        if self.callType != .groupCall {
-            CallKitManager.shared.call(with: input, type: self.callType)
-        } else {
-            CallKitManager.shared.groupCall(groupId: input)
-        }
+        CallKitManager.shared.call(with: input, type: self.callType)
     }
 }
 
