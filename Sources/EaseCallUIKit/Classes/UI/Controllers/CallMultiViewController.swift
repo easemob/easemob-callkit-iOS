@@ -79,23 +79,23 @@ open class CallMultiViewController: UIViewController {
             self.addCallTimer()
         }
         self.view.addSubViews([self.background, self.navigationBar,self.bottomView,self.callView])
-//        if let call = CallKitManager.shared.callInfo, (call.state == .answering || call.state == .dialing) {
-//            self.callView.updateWithItems()
-//        }
         self.bottomView.updateButtonSelectedStatus(selectedIndex: 3)
         self.callView.isHidden = !state
         // Do any additional setup after loading the view.
         self.setupNavigationState()
         if let groupId = CallKitManager.shared.callInfo?.groupId, !groupId.isEmpty {
             let groupName = CallKitManager.shared.callInfo?.groupName ?? groupId
+            var avatarURL = CallKitManager.shared.callInfo?.groupAvatar ?? ""
             var showName = groupName
             if let chatGroup = ChatGroup(id: groupId) {
                 if !chatGroup.groupName.isEmpty {
                     showName = chatGroup.groupName
-                    let avatarURL = CallKitManager.shared.callInfo?.groupAvatar ??  chatGroup.groupAvatar
-                    self.navigationBar.avatarURL = avatarURL
+                    if avatarURL.isEmpty {
+                        avatarURL = chatGroup.groupAvatar
+                    }
                 }
             }
+            self.navigationBar.avatarURL = avatarURL
             self.navigationBar.title = showName
         }
         self.navigationBar.clickClosure = { [weak self] in
