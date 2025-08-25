@@ -28,12 +28,12 @@ public extension Array {
     }
     
     ///数组越界防护
-    subscript(safe idx: Index) -> Element? {
+    subscript(safely idx: Index) -> Element? {
         if idx < 0 { return nil }
         return idx < self.endIndex ? self[idx] : nil
     }
     
-    subscript(safe range: Range<Int>) -> ArraySlice<Element>? {
+    subscript(safely range: Range<Int>) -> ArraySlice<Element>? {
         if range.startIndex < 0 { return nil }
         return range.endIndex <= self.endIndex ? self[range.startIndex...range.endIndex]:nil
     }

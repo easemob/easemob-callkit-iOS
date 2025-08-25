@@ -300,9 +300,9 @@ extension CallNavigationBar: UICollectionViewDataSource,UICollectionViewDelegate
     public func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "EaseChatNavigationBarRightCell", for: indexPath) as? EaseChatNavigationBarRightCell
         if self.originalRenderRightImage {
-            cell?.imageView.image = self.rightImages[safe: indexPath.row]
+            cell?.imageView.image = self.rightImages[safely: indexPath.row]
         } else {
-            cell?.imageView.image = self.rightImages[safe: indexPath.row]?.withTintColor(Theme.style == .dark ? UIColor.callTheme.neutralColor98:UIColor.callTheme.neutralColor3)
+            cell?.imageView.image = self.rightImages[safely: indexPath.row]?.withTintColor(Theme.style == .dark ? UIColor.callTheme.neutralColor98:UIColor.callTheme.neutralColor3)
         }
         return cell ?? UICollectionViewCell()
     }
