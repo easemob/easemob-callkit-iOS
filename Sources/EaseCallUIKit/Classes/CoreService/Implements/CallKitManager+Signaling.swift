@@ -1036,7 +1036,9 @@ extension CallKitManager: CallMessageService {
         Task {
             let result = await ChatClient.shared().chatManager?.send(message, progress: nil)
             if let error = result?.1 {
-                self.handleError(error)
+                for listener in self.listeners.allObjects {
+                    listener.didOccurError?(error: CallError(CallError.IM(error: error), module: .im))
+                }
                 consoleLogInfo("Failed to send cancel call message: \(String(describing: error.errorDescription))", type: .error)
             }
         }
