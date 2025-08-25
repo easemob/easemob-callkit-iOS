@@ -264,10 +264,11 @@ class AppDelegate：UIResponder，UIApplicationDelegate {
         <!--View Controller-->
         <scene sceneID="ufC-wZ-h7g">
             <objects>
-                <viewController id="vXZ-lx-hvc" customClass="ViewController" customModule="EaseCallUIKitQuickStart"customModuleProvider="target" sceneMemberID="viewController">
+                <viewController id="vXZ-lx-hvc" customClass="ViewController" customModule="EaseCallUIKitQuickStart" customModuleProvider="target" sceneMemberID="viewController">
                     <layoutGuides>
                         <viewControllerLayoutGuide type="top" id="jyV-Pf-zRb"/>
                         <viewControllerLayoutGuide type="bottom" id="2fi-mo-0CV"/>
+                        <viewControllerLayoutGuide type="safeArea" id="safeAreaGuide"/>
                     </layoutGuides>
                     <view key="view" contentMode="scaleToFill" id="kh9-bI-dsS">
                         <rect key="frame" x="0.0" y="0.0" width="375" height="667"/>
@@ -278,6 +279,7 @@ class AppDelegate：UIResponder，UIApplicationDelegate {
                                 <color key="backgroundColor" systemColor="systemGray5Color"/>
                                 <constraints>
                                     <constraint firstAttribute="height" constant="40" id="kOp-K7-HeC"/>
+                                    <constraint firstAttribute="width" constant="225" id="textFieldWidth"/>
                                 </constraints>
                                 <color key="textColor" white="0.0" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                                 <fontDescription key="fontDescription" type="system" pointSize="18"/>
@@ -287,8 +289,8 @@ class AppDelegate：UIResponder，UIApplicationDelegate {
                                 <rect key="frame" x="161.5" y="254" width="52.5" height="35"/>
                                 <constraints>
                                     <constraint firstAttribute="height" constant="35" id="Qdf-ZL-nrv"/>
+                                    <constraint firstAttribute="width" constant="52.5" id="callButtonWidth"/>
                                 </constraints>
-                                <state key="normal" title="Button"/>
                                 <buttonConfiguration key="configuration" style="filled" title="Call"/>
                                 <connections>
                                     <action selector="callAction:" destination="vXZ-lx-hvc" eventType="touchUpInside" id="21A-e9-7bB"/>
@@ -298,8 +300,8 @@ class AppDelegate：UIResponder，UIApplicationDelegate {
                                 <rect key="frame" x="154" y="316" width="66" height="35"/>
                                 <constraints>
                                     <constraint firstAttribute="height" constant="35" id="X5z-2c-9KQ"/>
+                                    <constraint firstAttribute="width" constant="66" id="loginButtonWidth"/>
                                 </constraints>
-                                <state key="normal" title="Button"/>
                                 <buttonConfiguration key="configuration" style="filled" title="Login"/>
                                 <connections>
                                     <action selector="loginAction:" destination="vXZ-lx-hvc" eventType="touchUpInside" id="D5E-pO-2Jw"/>
@@ -308,7 +310,7 @@ class AppDelegate：UIResponder，UIApplicationDelegate {
                             <segmentedControl opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="top" segmentControlStyle="plain" selectedSegmentIndex="0" translatesAutoresizingMaskIntoConstraints="NO" id="KgU-kb-zgq">
                                 <rect key="frame" x="89" y="129" width="197" height="32"/>
                                 <constraints>
-                                    <constraint firstAttribute="height" constant="31" id="49T-gN-YNX"/>
+                                    <constraint firstAttribute="height" constant="32" id="49T-gN-YNX"/>
                                     <constraint firstAttribute="width" constant="197" id="64h-61-hN9"/>
                                 </constraints>
                                 <segments>
@@ -326,7 +328,6 @@ class AppDelegate：UIResponder，UIApplicationDelegate {
                                     <constraint firstAttribute="height" constant="35" id="fuc-9c-KcU"/>
                                     <constraint firstAttribute="width" constant="53" id="u4m-wu-cwy"/>
                                 </constraints>
-                                <state key="normal" title="Button"/>
                                 <buttonConfiguration key="configuration" style="filled" title="Log"/>
                                 <connections>
                                     <action selector="logAction:" destination="vXZ-lx-hvc" eventType="touchUpInside" id="QkB-ye-mNH"/>
@@ -337,14 +338,14 @@ class AppDelegate：UIResponder，UIApplicationDelegate {
                         <constraints>
                             <constraint firstItem="zid-qi-Z7H" firstAttribute="centerX" secondItem="kh9-bI-dsS" secondAttribute="centerX" id="3PV-gJ-xUs"/>
                             <constraint firstItem="zid-qi-Z7H" firstAttribute="top" secondItem="laE-OW-CWK" secondAttribute="bottom" constant="23" id="3d9-xN-rVV"/>
-                            <constraint firstItem="KgU-kb-zgq" firstAttribute="top" secondItem="jyV-Pf-zRb" secondAttribute="bottom" constant="109" id="3iR-bE-dsH"/>
+                            <constraint firstItem="KgU-kb-zgq" firstAttribute="top" secondItem="safeAreaGuide" secondAttribute="top" constant="109" id="3iR-bE-dsH"/>
                             <constraint firstItem="1TW-7c-QOv" firstAttribute="centerX" secondItem="kh9-bI-dsS" secondAttribute="centerX" id="7qi-nX-Ep7"/>
                             <constraint firstItem="KgU-kb-zgq" firstAttribute="centerX" secondItem="kh9-bI-dsS" secondAttribute="centerX" id="PaT-sj-EOF"/>
                             <constraint firstItem="0Qd-2k-2aV" firstAttribute="centerX" secondItem="kh9-bI-dsS" secondAttribute="centerX" id="Ptx-cV-DpW"/>
                             <constraint firstItem="laE-OW-CWK" firstAttribute="centerX" secondItem="kh9-bI-dsS" secondAttribute="centerX" id="ZDm-c5-ZIK"/>
                             <constraint firstItem="1TW-7c-QOv" firstAttribute="centerY" secondItem="kh9-bI-dsS" secondAttribute="centerY" id="a05-e3-vQV"/>
                             <constraint firstItem="0Qd-2k-2aV" firstAttribute="top" secondItem="1TW-7c-QOv" secondAttribute="bottom" constant="19" id="r8t-en-w10"/>
-                            <constraint firstItem="laE-OW-CWK" firstAttribute="top" secondItem="jyV-Pf-zRb" secondAttribute="bottom" constant="171" id="vBn-aQ-3Q3"/>
+                            <constraint firstItem="laE-OW-CWK" firstAttribute="top" secondItem="safeAreaGuide" secondAttribute="top" constant="171" id="vBn-aQ-3Q3"/>
                         </constraints>
                     </view>
                     <connections>

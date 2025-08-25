@@ -140,22 +140,22 @@ public extension UIColor {
     @objcMembers class ColorTheme: NSObject {
         
         internal static func switchHues(hues: [CGFloat]) {
-            if let primaryHue = hues[safe: 0] {
+            if let primaryHue = hues[safely: 0] {
                 self.primaryHue = primaryHue
             }
-            if let secondaryHue = hues[safe: 1] {
+            if let secondaryHue = hues[safely: 1] {
                 self.secondaryHue = secondaryHue
             }
-            if let errorHue = hues[safe: 2] {
+            if let errorHue = hues[safely: 2] {
                 self.errorHue = errorHue
             }
-            if let neutralHue = hues[safe: 3] {
+            if let neutralHue = hues[safely: 3] {
                 self.neutralHue = neutralHue
             }
-            if let neutralSpecialHue = hues[safe: 4] {
+            if let neutralSpecialHue = hues[safely: 4] {
                 self.neutralSpecialHue = neutralSpecialHue
             }
-            if let gradientEndHue = hues[safe: 5] {
+            if let gradientEndHue = hues[safely: 5] {
                 self.gradientEndHue = gradientEndHue
             }
         }

@@ -187,7 +187,7 @@ extension MultiCallParticipantsController: UITableViewDelegate,UITableViewDataSo
         if cell == nil {
             cell = GroupParticipantsCell(style: .default, reuseIdentifier: "GroupParticipantsCell")
         }
-        if let profile = self.participants[safe: indexPath.row] {
+        if let profile = self.participants[safely: indexPath.row] {
             cell?.refresh(profile: profile, keyword: "")
             cell?.nickName.textColor = .white
         }
@@ -201,7 +201,7 @@ extension MultiCallParticipantsController: UITableViewDelegate,UITableViewDataSo
     }
     
     @objc open func didSelectRowAt(indexPath: IndexPath) {
-        if let profile = self.participants[safe: indexPath.row] {
+        if let profile = self.participants[safely: indexPath.row] {
             profile.selected = !profile.selected
             self.participantsList.reloadData()
         }
@@ -225,7 +225,7 @@ extension MultiCallParticipantsController: UITableViewDelegate,UITableViewDataSo
             self.fetchParticipants()
         }
         var unknownInfoIds = [String]()
-        if let profile = self.participants[safe: indexPath.row] {
+        if let profile = self.participants[safely: indexPath.row] {
             if profile.nickname.isEmpty || profile.avatarURL.isEmpty {
                 unknownInfoIds.append(profile.id)
             }

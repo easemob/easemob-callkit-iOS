@@ -125,7 +125,7 @@ extension CallKitManager: AgoraRtcEngineDelegate {
             consoleLogInfo("rtcEngine networkQuality uid: \(uid) txQuality: \(txQuality.rawValue) rxQuality: \(rxQuality.rawValue) is unknown, skipping update", type: .debug)
             return
         }
-        let uids = [NSNumber(value: uid)]
+        let uids = [NSNumber(value: uid == 0 ? UInt32(uid):self.currentUserRTCUID)]
         // Get userId by RTC uid
         ChatClient.shared().getUserId(byRTCUIds: uids) { [weak self] relations, error in
             guard let `self` = self else { return }
