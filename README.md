@@ -154,7 +154,7 @@ let AppKey: String = <#AppKey#>
 ```
 - 将注册的AppKey填入其中。
 - 在终端cd到podfile所在的文件目录，复制代理到终端，执行`pod install`命令，等待成功后点击运行即可。
-- 将用户名以及token复制粘贴填写在输入框中->然后点击登录->选择呼叫类型->输入呼叫用户的userId->点击呼叫。
+- 将用户Id以及token复制粘贴填写在`PublicDefines.swift`中即可。注意需要安装两个设备两个用户登录测试
 - 若需发起群组通话，才需要[创建群组](https://v2-console.easemob.com/app/operation/management/micro/app/im-service/operative-service/group)，将已创建用户加入群组见下图，让其中一两个用户登录后，将群组id复制到输入框中点击呼叫即可。
 
 ![](./DocumentationImages/joinGroup.png)
