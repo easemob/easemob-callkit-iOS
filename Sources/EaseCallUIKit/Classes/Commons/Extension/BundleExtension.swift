@@ -31,19 +31,16 @@ public extension Bundle {
         CallResourceBundle = Bundle(for: CallAppearance.self)
                 .url(forResource: "EaseCallUIKit.bundle/CallResource", withExtension: "bundle")
                 .flatMap { Bundle(url: $0) }
-        return CallResourceBundle!
 #elseif SWIFT_PACKAGE
         CallResourceBundle = Bundle.module
-        return Bundle.module
 #elseif STATIC_LIBRARY
         CallResourceBundle = Bundle.main
                 .url(forResource: "EaseCallUIKit.bundle/CallResource", withExtension: "bundle")
                 .flatMap(Bundle.init(url:))!
-        return CallResourceBundle!
 #else
         CallResourceBundle = Bundle(for: CallAppearance.self)
-        return CallResourceBundle!
 #endif
+            return CallResourceBundle!
         }
     }
 }
