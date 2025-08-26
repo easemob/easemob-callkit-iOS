@@ -177,7 +177,9 @@ let AppKey: String = <#AppKey#>
 
 - 开通RTC功能  ![开通RTC功能](./DocumentationImages/open_rtc.png)
 
-- [创建IM用户并获取token](https://v2-console.easemob.com/app/operation/management/micro/app/im-service/operative-service/user),这里建议创建两个用户。![](./DocumentationImages/createUser.png),然后粘贴复制AppKey、userId、token到工程中`PublicDefines.swift`文件中.
+- [创建IM用户并获取token](https://v2-console.easemob.com/app/operation/management/micro/app/im-service/operative-service/user),这里建议创建两个用户。![](./DocumentationImages/createUser.png).
+
+- 使用`pod init`创建podfile文件,添加依赖`pod 'EaseCallUIKit'`，然后执行`pod install`命令
 
 注意：
    在生产环境中，为了安全考虑，你需要在你的应用服务器集成 获取 App Token API 和 获取用户 Token API 实现获取 Token 的业务逻辑，使你的用户从你的应用服务器获取 Token。
@@ -224,6 +226,7 @@ class AppDelegate：UIResponder，UIApplicationDelegate {
 </details>
 
 ### 第2步：登录IM SDK
+- 非必要步骤可以直接第三步粘贴代码运行，这里只是说明初始化后需要登录IMSDK
 
 <details>
 <summary>点击展开/收起登录代码</summary>
