@@ -1199,6 +1199,8 @@ extension ViewController: CallUserProfileProvider {
 
 - 登出IM账号的时候需要调用CallKitManager.shared.cleanUserDefaults()方法来清理CallKit相关的持久化数据，这些数据多用户后台或者锁屏时CallKit通信加入RTC频道用。
 
+- IM Console开启好友检查后会导致非好友不能callkit 一对一通话，群组音视频通话信令也会受影响（邀请使用群定向消息其他信令都是单聊消息）。建议先不开启后续SDK迭代会改造优化。
+
 # 自定义
 
 ## 1.修改UI可配置项
