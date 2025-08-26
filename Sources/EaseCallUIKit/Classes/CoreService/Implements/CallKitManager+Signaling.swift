@@ -121,6 +121,9 @@ extension CallKitManager: ChatEventsListener {
                                 self.callInfo?.calleeId = calleeId
                                 self.callInfo?.calleeDeviceId = ChatClient.shared().getDeviceConfig(nil).deviceUUID ?? ""
                             }
+                            for listener in self.listeners.allObjects {
+                                listener.onReceivedCall?(callType: callType, userId: message.from, extensionInfo: callExtension)
+                            }
                             self.calleeAnswerCaller(callId: callId, callerId: message.from, callerDeviceId: callerDevId)
                             self.startInvitationSignalTimer(callId: callId)
                         }
@@ -400,11 +403,9 @@ extension CallKitManager: ChatEventsListener {
             default:
                 break
             }
-            var root = UIApplication.shared.call.keyWindow?.rootViewController
-            if root == nil {
-                root = UIApplication.shared.keyWindow?.rootViewController
-            }
+            let root = UIApplication.shared.call.keyWindow?.rootViewController
             root?.present(vc, animated: true)
+            consoleLogInfo("Present callee page for callId: \(call.callId) root \(String(describing: root))", type: .info)
         }
     }
     

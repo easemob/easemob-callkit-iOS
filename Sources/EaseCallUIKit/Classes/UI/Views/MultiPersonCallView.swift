@@ -1044,11 +1044,13 @@ extension MultiPersonCallView {
             // 添加到 activeConstraints 数组
             activeConstraints.append(contentsOf: oldViewConstraints)
             NSLayoutConstraint.activate(oldViewConstraints)
+            oldView.removeFromSuperview()
         }
         
         // 重新布局展开状态
         layoutItemsForExpandedState()
-        layoutIfNeeded()
+        self.setNeedsLayout()
+        self.layoutIfNeeded()
         
         let newExpandedFrame = newView.frame
         var oldThumbnailFrameInMainView: CGRect = .zero
@@ -1112,6 +1114,10 @@ extension MultiPersonCallView {
                 let contentWidth = padding + CGFloat(viewCount) * (thumbnailSize + thumbnailSpacing) - thumbnailSpacing + padding
                 scrollView.contentSize = CGSize(width: contentWidth, height: thumbnailSize)
             }
+            // 重新布局展开状态
+            self.layoutItemsForExpandedState()
+            self.setNeedsLayout()
+            self.layoutIfNeeded()
         })
     }
     
