@@ -60,9 +60,11 @@
 
 您可以使用 CocoaPods 安装 EaseCallUIKit 作为 Xcode 项目的依赖项。
 
+CocoaPods 是 iOS 和 macOS 项目的依赖管理工具。它允许您轻松地将第三方库集成到您的项目中，并自动处理依赖关系。安装方法请自行询问AI或者搜索引擎。
+
 ## CocoaPods
 
-在podfile中添加如下依赖
+使用`pod init`命令创建podfile文件,在podfile中添加如下依赖
 
 <details>
 <summary>点击展开/收起 Podfile 配置代码</summary>
@@ -146,11 +148,15 @@ UI文件夹中包含所有UI组件，包括视图控制器、UIView、UITableVie
 
 - 开通RTC功能  ![开通RTC功能](./DocumentationImages/open_rtc.png)
 
-- [创建IM用户并获取token](https://v2-console.easemob.com/app/operation/management/micro/app/im-service/operative-service/user),这里建议创建两个用户。![](./DocumentationImages/createUser.png)
+- [创建IM用户并获取token](https://v2-console.easemob.com/app/operation/management/micro/app/im-service/operative-service/user),这里建议创建两个用户。![](./DocumentationImages/createUser.png)，将appkey用户id以及token粘贴在下面文件中
 
 - 在`PublicDefines.swift` 中找到
 ```Swift
 let AppKey: String = <#AppKey#>
+
+let userId: String = <#userId#>
+
+let token: String = <#token#>
 ```
 - 将注册的AppKey填入其中。
 - 在终端cd到podfile所在的文件目录，复制代理到终端，执行`pod install`命令，等待成功后点击运行即可。
@@ -206,21 +212,24 @@ Privacy - Camera Usage Description //相机权限    Camera privileges.
 <summary>点击展开/收起初始化代码</summary>
 
 ```Swift
+import UIKit
 import EaseCallUIKit
 
-@UIApplicationMain
-class AppDelegate：UIResponder，UIApplicationDelegate {
+@main
+class AppDelegate: UIResponder, UIApplicationDelegate {
 
-     var window: UIWindow？
 
-     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplicationLaunchOptionsKey: Any]?) -> Bool {
-        let option = ChatSDKOptions(appkey: AppKey)//首先需要初始化SDK
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        // Override point for customization after application launch.
+        let option = ChatSDKOptions(appkey: Appkey)//首先需要初始化SDK
         option.enableConsoleLog = true//开启日志
         option.isAutoLogin = false//此处只是示例项目，真实使用时参考环信Demo源码，自动登录更方便
         ChatClient.shared().initializeSDK(with: option)//初始化SDK
         CallKitManager.shared.setup()//初始化EaseCallUIKit
-     }
+        return true
+    }
 }
+
 ```
 
 </details>
