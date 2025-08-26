@@ -146,7 +146,7 @@ UI文件夹中包含所有UI组件，包括视图控制器、UIView、UITableVie
 
 - [注册环信AppKey](https://docs-im-beta.easemob.com/product/enable_and_configure_IM.html#%E8%8E%B7%E5%8F%96%E7%8E%AF%E4%BF%A1%E5%8D%B3%E6%97%B6%E9%80%9A%E8%AE%AF-im-%E7%9A%84%E4%BF%A1%E6%81%AF)
 
-- 开通RTC功能  ![开通RTC功能](./DocumentationImages/open_rtc.png)
+- 开通RTC功能  ![开通RTC功能](./DocumentationImages/open_rtc.png)，注意开通rtc功能后至少需要等待15min，数据同步到机房配置中，才可以使用appkey测试
 
 - [创建IM用户并获取token](https://v2-console.easemob.com/app/operation/management/micro/app/im-service/operative-service/user),这里建议创建两个用户。![](./DocumentationImages/createUser.png)，将appkey用户id以及token粘贴在下面文件中
 
@@ -181,7 +181,7 @@ let token: String = <#token#>
 
 - [注册环信AppKey](https://docs-im-beta.easemob.com/product/enable_and_configure_IM.html#%E8%8E%B7%E5%8F%96%E7%8E%AF%E4%BF%A1%E5%8D%B3%E6%97%B6%E9%80%9A%E8%AE%AF-im-%E7%9A%84%E4%BF%A1%E6%81%AF)
 
-- 开通RTC功能  ![开通RTC功能](./DocumentationImages/open_rtc.png)
+- 开通RTC功能  ![开通RTC功能](./DocumentationImages/open_rtc.png)，注意开通rtc功能后至少需要等待15min，数据同步到机房配置中，才可以使用appkey测试
 
 - [创建IM用户并获取token](https://v2-console.easemob.com/app/operation/management/micro/app/im-service/operative-service/user),这里建议创建两个用户。![](./DocumentationImages/createUser.png).
 
