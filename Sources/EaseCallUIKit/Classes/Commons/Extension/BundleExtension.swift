@@ -28,17 +28,21 @@ public extension Bundle {
                 return CallResourceBundle!
             }
 #if COCOAPODS
-        return Bundle(for: CallAppearance.self)
-    .url(forResource: "EaseCallUIKit.bundle/CallResource", withExtension: "bundle")
-    .flatMap { Bundle(url: $0) }!
+        CallResourceBundle = Bundle(for: CallAppearance.self)
+                .url(forResource: "EaseCallUIKit.bundle/CallResource", withExtension: "bundle")
+                .flatMap { Bundle(url: $0) }
+        return CallResourceBundle!
 #elseif SWIFT_PACKAGE
+        CallResourceBundle = Bundle.module
         return Bundle.module
 #elseif STATIC_LIBRARY
-        return Bundle.main
-    .url(forResource: "EaseCallUIKit.bundle/CallResource", withExtension: "bundle")
-    .flatMap(Bundle.init(url:))!
+        CallResourceBundle = Bundle.main
+                .url(forResource: "EaseCallUIKit.bundle/CallResource", withExtension: "bundle")
+                .flatMap(Bundle.init(url:))!
+        return CallResourceBundle!
 #else
-        return Bundle(for: CallAppearance.self)
+        CallResourceBundle = Bundle(for: CallAppearance.self)
+        return CallResourceBundle!
 #endif
         }
     }
