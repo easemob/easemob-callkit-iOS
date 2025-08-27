@@ -327,18 +327,15 @@ extension CallKitManager: ChatClientListener {
     
     public func userDidForbidByServer() {
         self.hangup()
-        self.callVC?.dismiss(animated: true)
     }
     
     public func userAccountDidRemoveFromServer() {
         self.hangup()
-        self.callVC?.dismiss(animated: true)
     }
     
     public func userAccountDidForced(toLogout aError: ChatError?) {
         if aError != nil {
             self.hangup()
-            self.callVC?.dismiss(animated: true)
         }
     }
     
