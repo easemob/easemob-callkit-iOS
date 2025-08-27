@@ -173,6 +173,8 @@ public class MultiPersonCallView: UIView {
             
             // 确保视图可见
             lastView.ensureVisible()
+            self.setupViews()
+            self.layoutIfNeeded()
         })
     }
 
@@ -222,6 +224,14 @@ public class MultiPersonCallView: UIView {
     
     func updateItem(_ item: CallStreamItem) {
         CallKitManager.shared.canvasCache[item.userId]?.updateItem(item)
+    }
+    
+    func updateUsersInfo(_ usersInfo: [String]) {
+        for userId in usersInfo {
+            if let item = CallKitManager.shared.itemsCache[userId] {
+                CallKitManager.shared.canvasCache[userId]?.updateItem(item)
+            }
+        }
     }
     
     // MARK: - Private Methods
@@ -900,8 +910,7 @@ extension MultiPersonCallView {
         }, completion: { _ in
             self.scrollView?.removeFromSuperview()
             self.scrollView = nil
-            self.layoutItemsForNormalState()
-            self.layoutIfNeeded()
+            self.setupViews()
             itemViews.forEach { $0.ensureVisible() }
         })
     }

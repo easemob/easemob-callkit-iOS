@@ -34,12 +34,12 @@ extension CallKitManager: ChatEventsListener {
         
         if let ext = message.ext as? [String: Any] {
             guard let msgType = ext[kMsgType] as? String,
-                  let callId = ext[kCallId] as? String,
-                  let callerDevId = ext[kCallerDevId] as? String
+                  let callId = ext[kCallId] as? String
                    else {
                 consoleLogInfo("Invalid call info in message id:\(message.messageId) : \(String(describing: message.ext))", type: .error)
                 return
             }
+            let callerDevId = ext[kCallerDevId] as? String ?? ""
             if message.from.lowercased() == ChatClient.shared().currentUsername?.lowercased() ?? "" {
                 consoleLogInfo("Call info from current user, ignoring message id:\(message.messageId)", type: .info)
                 return
@@ -87,6 +87,8 @@ extension CallKitManager: ChatEventsListener {
                         handleConfirmCalleeAction()
                     case CALL_ANSWER://主叫收到被叫接受/拒绝/忙碌通话
                         handleAnswerCallAction()
+                    case CALL_END:
+                        handleEndCallAction()
                     default:
                         consoleLogInfo("Unknown action type: \(action) in message id:\(message.messageId)", type: .error)
                     }
@@ -269,6 +271,44 @@ extension CallKitManager: ChatEventsListener {
                             consoleLogInfo("Current device:\(deviceId) Call answer on other device:\(callerDevId) messageId:\(message.messageId) callId:\(callId) call.callId:\(String(describing: self.callInfo?.callId))", type: .error)
                             self.receivedCalls.removeValue(forKey: callId)
                             self.stopInvitationSignalTimer(callId: callId)
+                        }
+                    }
+                    
+                    func handleEndCallAction() {
+                        if let call = self.callInfo,callId == call.callId {
+                            if call.type == .groupCall {
+                                if let currentVC = UIViewController.currentController as? CallMultiViewController {
+                                    if let item = self.itemsCache.first(where: { $0.value.userId == message.from })?.value,item.userId != ChatClient.shared().currentUsername ?? "" {
+                                        let userId = item.userId
+                                        for listener in self.listeners.allObjects {
+                                            listener.remoteUserDidLeft?(userId: userId, channelName: call.channelName, type: call.type)
+                                        }
+                                        currentVC.callView.updateWithItems([userId])  // 先更新UI
+                                        self.itemsCache.removeValue(forKey: userId)   // 后清理缓存
+                                        self.canvasCache[userId]?.removeFromSuperview()
+                                        self.canvasCache.removeValue(forKey: userId)
+                                        currentVC.callView.updateWithItems([userId])
+                                        consoleLogInfo("handleEndCallAction userId:\(userId) ", type: .debug)
+                                    }
+                                    
+                                } else {
+                                    if let item = self.itemsCache.first(where: { $0.value.userId == message.from })?.value ,item.userId != ChatClient.shared().currentUsername ?? "" {
+                                        let userId = item.userId
+                                        for listener in self.listeners.allObjects {
+                                            listener.remoteUserDidLeft?(userId: item.userId, channelName: call.channelName, type: call.type)
+                                        }
+                                        (self.callVC as? CallMultiViewController)?.callView.updateWithItems([userId])
+                                        self.itemsCache.removeValue(forKey: userId)
+                                        self.canvasCache[userId]?.removeFromSuperview()
+                                        self.canvasCache.removeValue(forKey: userId)
+                                        (self.callVC as? CallMultiViewController)?.callView.updateWithItems([userId])
+                                        consoleLogInfo("handleEndCallAction userId:\(userId) ", type: .debug)
+                                    }
+                                }
+                            } else {
+                                consoleLogInfo("Call ended by remote user:\(message.from) for callId: \(callId)", type: .info)
+                                self.updateCallEndReason(.hangup)
+                            }
                         }
                     }
                 }
@@ -1051,6 +1091,40 @@ extension CallKitManager: CallMessageService {
         }
     }
     
+    public func terminateCall() {
+        if let call = self.callInfo {
+            if call.callId.isEmpty {
+                consoleLogInfo("Invalid parameters for terminating call: callId: \(call.callId)", type: .error)
+                self.handleBusinessError(CallError.CallBusiness(error: .signaling, message: "Invalid parameters for terminating call"))
+                return
+            }
+            if call.type != .groupCall {
+                var to = call.callerId
+                if ChatClient.shared().currentUsername ?? "" == call.callerId {
+                    to = call.calleeId
+                }
+                self.sendTerminateSignal(callId: call.callId, to: to)
+            } else {
+                let ids = CallKitManager.shared.itemsCache.keys.filter { $0 != ChatClient.shared().currentUsername ?? "" }
+                for id in ids {
+                    self.sendTerminateSignal(callId: call.callId, to: id)
+                }
+            }
+            
+        }
+    }
+    
+    func sendTerminateSignal(callId: String, to: String) {
+        Task {
+            let message = ChatMessage(conversationID: to, body: ChatCMDMessageBody(action: kCall), ext: [kCallId:callId,kMsgType: kMsgTypeValue,kAction:CALL_END])
+            message.deliverOnlineOnly = true
+            let result = await ChatClient.shared().chatManager?.send(message, progress: nil)
+            if let error = result?.1 {
+                consoleLogInfo("Failed to send terminate call message: \(String(describing: error.errorDescription))", type: .error)
+            }
+        }
+    }
+    
     /// Confirm the ring for a call from the caller.
     /// - Parameters:
     ///   - callId: The unique identifier for the call.
@@ -1175,6 +1249,7 @@ extension CallKitManager: CallMessageService {
             switch call.state {
             case .answering:
                 self.updateCallEndReason(.hangup)
+                self.terminateCall()
             case .dialing:
                 if call.type == .groupCall {
                     let inviteGroupUserTimerKeys = GlobalTimerManager.shared.timerCache.keys.filter { $0.components(separatedBy: " users:").count > 0 }
