@@ -274,7 +274,7 @@ extension CallKitManager: AgoraRtcEngineDelegate {
         AudioPlayerManager.shared.stopAudio()
         //Setting remote video render qutity for the user who just joined
         let type = self.getStreamRenderQuality(with: UInt(self.canvasCache.count))
-        if let call = self.callInfo {
+        if let call = self.callInfo,!call.callId.isEmpty {
             call.state = .answering
             if call.type == .groupCall {
                 //Add the user to the RTC throttler
@@ -362,7 +362,7 @@ extension CallKitManager: AgoraRtcEngineDelegate {
         //On remote user leaving the RTC channel
         consoleLogInfo("rtcEngine didOfflineOfUid: \(uid) reason: \(reason.rawValue)", type: .debug)
         DispatchQueue.main.async {
-            if let call = self.callInfo {
+            if let call = self.callInfo,!call.callId.isEmpty {
                 if call.type == .groupCall {
                     if let currentVC = UIViewController.currentController as? CallMultiViewController {
                         if let item = self.itemsCache.first(where: { $0.value.uid == UInt32(uid) })?.value,item.userId != ChatClient.shared().currentUsername ?? "" {
@@ -411,7 +411,7 @@ extension CallKitManager: AgoraRtcEngineDelegate {
     public func rtcEngine(_ engine: AgoraRtcEngineKit, remoteVideoStateChangedOfUid uid: UInt, state: AgoraVideoRemoteState, reason: AgoraVideoRemoteReason, elapsed: Int) {
         consoleLogInfo("rtcEngine remoteVideoStateChangedOfUid: \(uid) state: \(state.rawValue) reason: \(reason.rawValue) elapsed: \(elapsed)", type: .debug)
         // Handle remote video state changes with proper uid and reason
-        if let call = self.callInfo {
+        if let call = self.callInfo,!call.callId.isEmpty {
             if call.type == .groupCall {
                 self.rtcThrottler.addUID(uid) { [weak self] uids in
                     guard let `self` = self else { return }
@@ -526,7 +526,7 @@ extension CallKitManager: AgoraRtcEngineDelegate {
             if userId.isEmpty || error != nil {
                 userId = "uid-\(uid)"
             }
-            if let call = self.callInfo {
+            if let call = self.callInfo,!call.callId.isEmpty {
                 if call.type == .groupCall {//Update audio state in multi call
                     if let streamView = self.canvasCache[userId],let item = self.itemsCache[userId] {
                         item.audioMuted = muted
