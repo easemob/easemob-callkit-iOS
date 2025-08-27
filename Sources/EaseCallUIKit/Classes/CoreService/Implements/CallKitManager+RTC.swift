@@ -122,7 +122,6 @@ extension CallKitManager: AgoraRtcEngineDelegate {
     public func rtcEngine(_ engine: AgoraRtcEngineKit, networkQuality uid: UInt, txQuality: AgoraNetworkQuality, rxQuality: AgoraNetworkQuality) {
         //When transport network quality is unknown, we skip the update
         if txQuality == .unknown {//If the quality is unknown, we skip the update
-            consoleLogInfo("rtcEngine networkQuality uid: \(uid) txQuality: \(txQuality.rawValue) rxQuality: \(rxQuality.rawValue) is unknown, skipping update", type: .debug)
             return
         }
         let uids = [NSNumber(value: uid == 0 ? UInt32(uid):self.currentUserRTCUID)]
@@ -134,7 +133,6 @@ extension CallKitManager: AgoraRtcEngineDelegate {
                 userId = "uid-\(uid)"
             }
             if let call = self.callInfo {
-                consoleLogInfo("rtcEngine networkQuality uid: \(uid) txQuality: \(txQuality.rawValue) rxQuality: \(rxQuality.rawValue)", type: .debug)
                 if call.type == .groupCall {
                     if let streamView = self.canvasCache[userId],let item = self.itemsCache[userId] {
                         item.networkStatus = mirrorNetworkQuality(txQuality)
@@ -332,6 +330,7 @@ extension CallKitManager: AgoraRtcEngineDelegate {
                                 controller.callView.updateWithItems()
                             }
                         }
+                        self.providerFetchUsersInfo(relations?.values.map { $0 } ?? [])
                     }
                 }
                 
@@ -604,6 +603,86 @@ extension CallKitManager: AgoraRtcEngineDelegate {
 //        default:
 //            break
 //        }
+    }
+    
+    private func providerFetchUsersInfo(_ userIds: [String]) {
+
+        var unknownInfoIds = [String]()
+        for userId in userIds {
+            if let profile = CallKitManager.shared.usersCache[userId] {
+                if profile.nickname.isEmpty || profile.avatarURL.isEmpty {
+                    unknownInfoIds.append(userId)
+                }
+            } else {
+                unknownInfoIds.append(userId)
+            }
+        }
+        
+        if CallKitManager.shared.profileProvider != nil,CallKitManager.shared.profileProviderOC == nil {
+            Task {
+                if let profiles = await CallKitManager.shared.profileProvider?.fetchUserProfiles(profileIds: unknownInfoIds) {
+                    for profile in profiles {
+                        if let user = CallKitManager.shared.usersCache[profile.id] {
+                            user.nickname = profile.nickname
+                            user.avatarURL = profile.avatarURL
+                        }
+                        if let cacheUser = CallKitManager.shared.usersCache[profile.id] {
+                            cacheUser.nickname = profile.nickname
+                            cacheUser.avatarURL = profile.avatarURL
+                        } else {
+                            let user = CallUserProfile()
+                            user.id = profile.id
+                            user.nickname = profile.nickname
+                            user.avatarURL = profile.avatarURL
+                            user.selected = profile.selected
+                            CallKitManager.shared.usersCache[profile.id] = user
+                        }
+                    }
+                }
+                let ids = unknownInfoIds
+                DispatchQueue.main.async {
+                    if let controller = UIViewController.currentController as? CallMultiViewController {
+                        controller.callView.updateUsersInfo(ids)
+                    } else {
+                        if let controller = self.callVC as? CallMultiViewController {
+                            controller.callView.updateUsersInfo(ids)
+                        }
+                    }
+                }
+            }
+        } else {
+            DispatchQueue.global().async {
+                CallKitManager.shared.profileProviderOC?.fetchProfiles(profileIds: unknownInfoIds,completion: { [weak self] profiles in
+                    guard let `self` = self else { return }
+                    for profile in profiles {
+                        if let user = CallKitManager.shared.usersCache[profile.id] {
+                            user.nickname = profile.nickname
+                            user.avatarURL = profile.avatarURL
+                        }
+                        if let cacheUser = CallKitManager.shared.usersCache[profile.id] {
+                            cacheUser.nickname = profile.nickname
+                            cacheUser.avatarURL = profile.avatarURL
+                        } else {
+                            let user = CallUserProfile()
+                            user.id = profile.id
+                            user.nickname = profile.nickname
+                            user.avatarURL = profile.avatarURL
+                            user.selected = profile.selected
+                            CallKitManager.shared.usersCache[profile.id] = user
+                        }
+                    }
+                    DispatchQueue.main.async {
+                        if let controller = UIViewController.currentController as? CallMultiViewController {
+                            controller.callView.updateUsersInfo(unknownInfoIds)
+                        } else {
+                            if let controller = self.callVC as? CallMultiViewController {
+                                controller.callView.updateUsersInfo(unknownInfoIds)
+                            }
+                        }
+                    }
+                })
+            }
+        }
     }
     
 }
