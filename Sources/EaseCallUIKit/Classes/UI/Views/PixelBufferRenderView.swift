@@ -126,6 +126,7 @@ public class PixelBufferRenderView: DragFloatView {
     }
     
     private func configLayers() {
+        self.clipsToBounds = true
         self.layer.addSublayer(displayLayer)
         displayLayer.frame = self.bounds
         displayLayer.zPosition = 0
@@ -238,28 +239,46 @@ public class PixelBufferRenderView: DragFloatView {
     }
     
     private func layoutDisplayer() {
-        guard videoWidth > 0, videoHeight > 0, !self.frame.size.equalTo(CGSize.zero) else {
+        guard videoWidth > 0, videoHeight > 0 else {
             return
         }
-
-        let viewWidth = self.frame.size.width
-        let viewHeight = self.frame.size.height
+        
+        let viewWidth = self.bounds.size.width
+        let viewHeight = self.bounds.size.height
+        
+        // 确保view尺寸有效
+        guard viewWidth > 0, viewHeight > 0 else {
+            print("Warning: View bounds are invalid - width: \(viewWidth), height: \(viewHeight)")
+            return
+        }
 
         let videoRatio = CGFloat(videoWidth) / CGFloat(videoHeight)
         let viewRatio = viewWidth / viewHeight
 
         var videoSize = CGSize.zero
+        var xOffset: CGFloat = 0
+        var yOffset: CGFloat = 0
+        
+        
         if videoRatio >= viewRatio {
+            // 视频更宽，以view高度为准，视频宽度会超出view
             videoSize.height = viewHeight
             videoSize.width = videoSize.height * videoRatio
+            // 水平居中，垂直填满
+            xOffset = (viewWidth - videoSize.width) / 2
+            yOffset = 0
         } else {
+            // 视频更高，以view宽度为准，视频高度会超出view
             videoSize.width = viewWidth
             videoSize.height = videoSize.width / videoRatio
+            // 垂直居中，水平填满
+            xOffset = 0
+            yOffset = (viewHeight - videoSize.height) / 2
         }
 
-        let xOffset = max(0, (viewWidth - videoSize.width) / 2)
-        let yOffset = max(0, (viewHeight - videoSize.height) / 2)
         let renderRect = CGRect(x: xOffset, y: yOffset, width: videoSize.width, height: videoSize.height)
+        
+       
 
         if !renderRect.equalTo(displayLayer.frame) {
             displayLayer.frame = renderRect
