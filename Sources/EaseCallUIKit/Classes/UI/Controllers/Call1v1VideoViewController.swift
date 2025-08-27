@@ -265,18 +265,10 @@ open class Call1v1VideoViewController: UIViewController {
         case .flip_front: CallKitManager.shared.switchCamera()
         case .camera_on:
             CallKitManager.shared.enableLocalVideo(true)
-            if CallKitManager.shared.isVideoExchanged {
-                self.floatView.updateVideoState(false)
-            } else {
-                self.callView.updateVideoState(false)
-            }
+            self.callView.updateVideoState(false)
         case .camera_off:
             CallKitManager.shared.enableLocalVideo(false)
-            if CallKitManager.shared.isVideoExchanged {
-                self.floatView.updateVideoState(true)
-            } else {
-                self.callView.updateVideoState(true)
-            }
+            self.callView.updateVideoState(true)
         case .speaker_on: CallKitManager.shared.turnSpeakerOn(on: true)
         case .speaker_off: CallKitManager.shared.turnSpeakerOn(on: false)
         case .decline:
