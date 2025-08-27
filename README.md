@@ -234,14 +234,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
 </details>
 
-### 第2步：登录IM SDK
+### 第二步：登录IM SDK
 - 非必要步骤可以直接第三步粘贴代码运行，这里只是说明初始化后需要登录IMSDK
 
 <details>
 <summary>点击展开/收起登录代码</summary>
 
 ``` Swift
-        ChatClient.shared().login(withUsername: userId, token: token) { [weak self] userId,error  in
+        ChatClient.shared().login(withUsername: <#userId#>, token: <#token#>) { [weak self] userId,error  in
             if let error = error {
                 self?.showCallToast(toast: "Login failed: \(error.errorDescription ?? "")")
             } else {
@@ -502,7 +502,7 @@ extension ViewController: QLPreviewControllerDataSource {
 ```Swift
     //已经集成了环信IMSDK 即已经import HyphenateChat
     private func setupCallKit() {
-        let options = EMOptions(appkey: appKey)
+        let options = EMOptions(appkey: <#appKey#>)
         #if DEBUG
         options.apnsCertName = "Your_APNS_Developer"
         options.pushKitCertName = "YourVoipDev"
@@ -520,7 +520,7 @@ extension ViewController: QLPreviewControllerDataSource {
 
     //没有集成环信IMSDK，只想使用CallKit
     private func setupCallKit() {
-        let options = ChatSDKOptions(appkey: appKey)
+        let options = ChatSDKOptions(appkey: <#appKey#>)
         #if DEBUG
         options.apnsCertName = "Your_APNS_Developer"
         options.pushKitCertName = "YourVoipDev"
@@ -546,7 +546,7 @@ extension ViewController: QLPreviewControllerDataSource {
 <summary>点击展开/收起登录代码</summary>
 
 ```Swift
-            ChatClient.shared().login(withUsername: userId, token: token) { [weak self] userId,error  in
+            ChatClient.shared().login(withUsername: <#userId#>, token: <#token#>) { [weak self] userId,error  in
             if let error = error {
                 self?.showCallToast(toast: "Login failed: \(error.errorDescription ?? "")")
             } else {
