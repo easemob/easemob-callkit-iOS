@@ -171,6 +171,9 @@ open class CallMultiViewController: UIViewController {
                 consoleLogInfo("CallMultiViewController: Current user not found in items cache.", type: .error)
                 return
             }
+            if let call = CallKitManager.shared.callInfo,call.state != .answering {
+                return
+            }
             CallKitManager.shared.setupLocalVideo()
             CallKitManager.shared.enableLocalVideo(true)
             item.videoMuted = false

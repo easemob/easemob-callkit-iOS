@@ -172,13 +172,14 @@ extension CallKitManager: ChatEventsListener {
                         self.stopInvitationSignalTimer(callId: callId)
                         self.stopConfirmBuildConnectionTimer(callId: callId)
                         self.stopRingTimer(callId: callId)
-                        if let call = self.callInfo, call.callId == callId,call.state != .answering {
+                        if let call = self.callInfo, call.callId == callId,call.state == .ringing {
                             consoleLogInfo("Call canceled with callId: \(callId)", type: .info)
                             self.updateCallEndReason(.remoteCancel)
+                            self.dismissCurrentCallPage()
                         } else {
+                            consoleLogInfo("Call canceled with callId: \(callId) state:\(String(describing: self.callInfo?.state)) call.callId:\(String(describing: self.callInfo?.callId))", type: .info)
                             self.receivedCalls.removeValue(forKey: callId)
                         }
-                        self.dismissCurrentCallPage()
                     }
                     
                     func handleConfirmCalleeAction() {
@@ -204,8 +205,10 @@ extension CallKitManager: ChatEventsListener {
                                         self.joinChannel(channelName: self.callInfo?.channelName ?? "") { [weak self] success in
                                             guard let `self` = self else { return }
                                             if success {
-                                                CallKitManager.shared.callInfo?.state = .answering
-                                                self.presentCalleeController(call: call)
+                                                DispatchQueue.main.async {
+                                                    CallKitManager.shared.callInfo?.state = .answering
+                                                    self.presentCalleeController(call: call)
+                                                }
                                             }
                                             consoleLogInfo("join channel with result: \(success)", type: .error)
                                         }
@@ -233,17 +236,27 @@ extension CallKitManager: ChatEventsListener {
                         if let call = self.callInfo, deviceId == callerDevId, call.callId == callId {
                             self.stopInvitationSignalTimer(callId: callId)
                             self.stopConfirmBuildConnectionTimer(callId: callId)
+                            if result == kBusyResult {
+                                UIViewController.currentController?.showCallToast(toast: "The other party busy".call.localize)
+                            }
+                            if result == kRefuseResult {
+                                UIViewController.currentController?.showCallToast(toast: "The other party refused ".call.localize)
+                            }
                             if call.type == .groupCall {
                                 if result != kAcceptResult {
+                                    var multiCallVC: CallMultiViewController?
                                     if let vc = UIViewController.currentController as? CallMultiViewController {
-                                        vc.callView.updateWithItems([message.from])
+                                        multiCallVC = vc
                                     } else {
                                         if let vc = self.callVC as? CallMultiViewController {
-                                            vc.callView.updateWithItems([message.from])
+                                            multiCallVC = vc
                                         }
                                     }
+                                    multiCallVC?.callView.updateWithItems([message.from])
                                     self.itemsCache.removeValue(forKey: message.from)
+                                    self.canvasCache[message.from]?.removeFromSuperview()
                                     self.canvasCache.removeValue(forKey: message.from)
+                                    multiCallVC?.callView.updateWithItems([message.from])
                                 }
                             } else {
                                 if call.state == .dialing {
@@ -712,11 +725,18 @@ extension CallKitManager: CallMessageService {
                 return
             }
             
-            if currentVC is MultiCallParticipantsController ||
-                currentVC.presentedViewController is MultiCallParticipantsController {
-                consoleLogInfo("MultiCallParticipantsController is already presented", type: .error)
-                self.handleBusinessError(CallError.CallBusiness(error: .state, message: "MultiCallParticipantsController is already presented"))
-                return
+            if !currentVC.isKind(of: CallMultiViewController.self)  {
+                if self.callVC != nil {
+                    consoleLogInfo("Must invite users in CallMultiViewController.", type: .error)
+                    self.handleBusinessError(CallError.CallBusiness(error: .state, message: "Must invite users in CallMultiViewController."))
+                    return
+                } else {
+                    if currentVC is MultiCallParticipantsController {
+                        consoleLogInfo("Cannot invite users in MultiCallParticipantsController.", type: .error)
+                        self.handleBusinessError(CallError.CallBusiness(error: .state, message: "Cannot invite users in MultiCallParticipantsController."))
+                        return
+                    }
+                }
             }
             
             var excludeUsers: [String] = []
@@ -1169,6 +1189,7 @@ extension CallKitManager: CallMessageService {
     ///   - calleeDeviceId: The device ID of the callee.
     ///   - result: The result of the call, such as "accept", "busy", or "refuse".
     public func callerConfirmAnswer(callId: String,calleeId: String,calleeDeviceId: String,result: String) {
+        
         if callId.isEmpty || calleeId.isEmpty || calleeDeviceId.isEmpty || result.isEmpty {
             consoleLogInfo("Invalid parameters for confirming answer: callId: \(callId), calleeId: \(calleeId), calleeDeviceId: \(calleeDeviceId), result: \(result)", type: .error)
             self.handleBusinessError(CallError.CallBusiness(error: .signaling, message: "Invalid parameters for confirming answer"))
@@ -1369,10 +1390,10 @@ extension CallKitManager: CallMessageService {
         let result = self.engine?.joinChannel(byToken: self.token, channelId: channelName, uid: UInt(uid), mediaOptions: config, joinSuccess: { [weak self] channel, uid, elapsed in
             guard let `self` = self else { return  }
             consoleLogInfo("\(currentUser) joined channel: \(channel) with uid: \(uid) elapsed: \(elapsed): account \(ChatClient.shared().currentUsername ?? "")", type: .debug)
-            DispatchQueue.main.async {
-                self.joinedThenPresentCallVC()
-            }
             if uid == self.currentUserRTCUID {
+                DispatchQueue.main.async {
+                    self.joinedThenPresentCallVC()
+                }
                 self.hadJoinedChannel = true
                 self.updateCallEndReason(.abnormalEnd,false)
             }

@@ -15,7 +15,7 @@ public let CallKitVersion = "1.0.0"
 
 @objcMembers public class CallKitManager: NSObject {
     /// Cache for user profiles
-    public var usersCache: [String: CallUserProfile] = [:]
+    public var usersCache: [String: CallProfileProtocol] = [:]
     
     /// CallKitManager shared instance
     public static let shared = CallKitManager()
@@ -50,7 +50,13 @@ public let CallKitVersion = "1.0.0"
     public internal(set) var callVC: UIViewController?
     
     /// Current user profile information
-    public var currentUserInfo: CallProfileProtocol?
+    public var currentUserInfo: CallProfileProtocol? {
+        didSet {
+            if let info = currentUserInfo {
+                usersCache[ChatClient.shared().currentUsername ?? ""] = info
+            }
+        }
+    }
     
     /// Current user token for Agora SDK
     @CallUserDefault("CallKitManager.token", defaultValue: "") public var token: String
