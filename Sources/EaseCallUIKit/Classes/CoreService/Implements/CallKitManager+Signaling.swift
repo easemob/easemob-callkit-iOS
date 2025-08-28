@@ -1319,7 +1319,7 @@ extension CallKitManager: CallMessageService {
                             let users = keyComponents.last?.components(separatedBy: ",") ?? [].filter({ $0 != "start" && $0 != "timer" })
                             var calleeId = ""
                             let callees = users.joined(separator: ",")
-                            if callees.count > 1 {
+                            if users.count > 1 {
                                 calleeId = callees
                             } else {
                                 calleeId = users.first ?? ""
