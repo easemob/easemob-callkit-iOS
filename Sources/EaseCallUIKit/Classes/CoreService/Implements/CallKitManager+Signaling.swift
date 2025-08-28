@@ -172,13 +172,14 @@ extension CallKitManager: ChatEventsListener {
                         self.stopInvitationSignalTimer(callId: callId)
                         self.stopConfirmBuildConnectionTimer(callId: callId)
                         self.stopRingTimer(callId: callId)
-                        if let call = self.callInfo, call.callId == callId,call.state != .answering {
+                        if let call = self.callInfo, call.callId == callId,call.state == .ringing {
                             consoleLogInfo("Call canceled with callId: \(callId)", type: .info)
                             self.updateCallEndReason(.remoteCancel)
+                            self.dismissCurrentCallPage()
                         } else {
+                            consoleLogInfo("Call canceled with callId: \(callId) state:\(String(describing: self.callInfo?.state)) call.callId:\(String(describing: self.callInfo?.callId))", type: .info)
                             self.receivedCalls.removeValue(forKey: callId)
                         }
-                        self.dismissCurrentCallPage()
                     }
                     
                     func handleConfirmCalleeAction() {
@@ -204,8 +205,10 @@ extension CallKitManager: ChatEventsListener {
                                         self.joinChannel(channelName: self.callInfo?.channelName ?? "") { [weak self] success in
                                             guard let `self` = self else { return }
                                             if success {
-                                                CallKitManager.shared.callInfo?.state = .answering
-                                                self.presentCalleeController(call: call)
+                                                DispatchQueue.main.async {
+                                                    CallKitManager.shared.callInfo?.state = .answering
+                                                    self.presentCalleeController(call: call)
+                                                }
                                             }
                                             consoleLogInfo("join channel with result: \(success)", type: .error)
                                         }
@@ -233,17 +236,27 @@ extension CallKitManager: ChatEventsListener {
                         if let call = self.callInfo, deviceId == callerDevId, call.callId == callId {
                             self.stopInvitationSignalTimer(callId: callId)
                             self.stopConfirmBuildConnectionTimer(callId: callId)
+                            if result == kBusyResult {
+                                UIViewController.currentController?.showCallToast(toast: "The other party busy".call.localize)
+                            }
+                            if result == kRefuseResult {
+                                UIViewController.currentController?.showCallToast(toast: "The other party refused ".call.localize)
+                            }
                             if call.type == .groupCall {
                                 if result != kAcceptResult {
+                                    var multiCallVC: CallMultiViewController?
                                     if let vc = UIViewController.currentController as? CallMultiViewController {
-                                        vc.callView.updateWithItems([message.from])
+                                        multiCallVC = vc
                                     } else {
                                         if let vc = self.callVC as? CallMultiViewController {
-                                            vc.callView.updateWithItems([message.from])
+                                            multiCallVC = vc
                                         }
                                     }
+                                    multiCallVC?.callView.updateWithItems([message.from])
                                     self.itemsCache.removeValue(forKey: message.from)
+                                    self.canvasCache[message.from]?.removeFromSuperview()
                                     self.canvasCache.removeValue(forKey: message.from)
+                                    multiCallVC?.callView.updateWithItems([message.from])
                                 }
                             } else {
                                 if call.state == .dialing {
@@ -640,7 +653,8 @@ extension CallKitManager: CallMessageService {
             kChannelName: channelName,
             kTs: Int(Date().timeIntervalSince1970 * 1000),
             kCallDuration: 0,
-            kCallEndReason: CallEndReason.remoteNoResponse.rawValue
+            kCallEndReason: CallEndReason.remoteNoResponse.rawValue,
+            "callerNickname": self.currentUserInfo?.nickname ?? ""
         ]
         
         if extensionInfo != nil {
@@ -712,11 +726,18 @@ extension CallKitManager: CallMessageService {
                 return
             }
             
-            if currentVC is MultiCallParticipantsController ||
-                currentVC.presentedViewController is MultiCallParticipantsController {
-                consoleLogInfo("MultiCallParticipantsController is already presented", type: .error)
-                self.handleBusinessError(CallError.CallBusiness(error: .state, message: "MultiCallParticipantsController is already presented"))
-                return
+            if !currentVC.isKind(of: CallMultiViewController.self)  {
+                if self.callVC != nil {
+                    consoleLogInfo("Must invite users in CallMultiViewController.", type: .error)
+                    self.handleBusinessError(CallError.CallBusiness(error: .state, message: "Must invite users in CallMultiViewController."))
+                    return
+                } else {
+                    if currentVC is MultiCallParticipantsController {
+                        consoleLogInfo("Cannot invite users in MultiCallParticipantsController.", type: .error)
+                        self.handleBusinessError(CallError.CallBusiness(error: .state, message: "Cannot invite users in MultiCallParticipantsController."))
+                        return
+                    }
+                }
             }
             
             var excludeUsers: [String] = []
@@ -895,7 +916,8 @@ extension CallKitManager: CallMessageService {
                           "groupName": groupName,
                           "groupAvatar": groupAvatar],
             kCallDuration: 0,
-            kCallEndReason: CallEndReason.remoteNoResponse.rawValue
+            kCallEndReason: CallEndReason.remoteNoResponse.rawValue,
+            "callerNickname": self.currentUserInfo?.nickname ?? ""
         ]
         
         let json = CallKitManager.shared.currentUserInfo?.toJsonObject() ?? [:]
@@ -922,7 +944,7 @@ extension CallKitManager: CallMessageService {
             if let error = result?.1 {
                 self.handleError(error)
                 consoleLogInfo("Failed to send group call message: \(String(describing: error.errorDescription))", type: .error)
-                self.callStartTimerStop(callId: callId + " users:" + ids.joined(separator: "-"))
+                self.callStartTimerStop(callId: callId + " users:" + ids.joined(separator: ","))
                 return
             }
             
@@ -930,7 +952,7 @@ extension CallKitManager: CallMessageService {
             self.callInfo?.inviteMessageId = result?.0?.messageId ?? ""
             
             // Start timer
-            let timerKey = callId + " users:" + ids.joined(separator: "-")
+            let timerKey = callId + " users:" + ids.joined(separator: ",")
             self.callStartTimerStart(callId: timerKey)
             
             // Join channel after successful signaling (only if not already in call)
@@ -969,7 +991,8 @@ extension CallKitManager: CallMessageService {
                           "groupName": groupName,
                           "groupAvatar": groupAvatar],
             kCallDuration: 0,
-            kCallEndReason: CallEndReason.remoteNoResponse.rawValue
+            kCallEndReason: CallEndReason.remoteNoResponse.rawValue,
+            "callerNickname": self.currentUserInfo?.nickname ?? ""
         ]
         
         let json = CallKitManager.shared.currentUserInfo?.toJsonObject() ?? [:]
@@ -996,7 +1019,7 @@ extension CallKitManager: CallMessageService {
             if let error = result?.1 {
                 self.handleError(error)
                 consoleLogInfo("Failed to send group call message: \(String(describing: error.errorDescription))", type: .error)
-                self.callStartTimerStop(callId: callId + " users:" + ids.joined(separator: "-"))
+                self.callStartTimerStop(callId: callId + " users:" + ids.joined(separator: ","))
                 
                 return
             }
@@ -1005,7 +1028,7 @@ extension CallKitManager: CallMessageService {
             self.callInfo?.inviteMessageId = result?.0?.messageId ?? ""
             
             // Start timer
-            let timerKey = callId + " users:" + ids.joined(separator: "-")
+            let timerKey = callId + " users:" + ids.joined(separator: ",")
             self.callStartTimerStart(callId: timerKey)
         }
     }
@@ -1073,7 +1096,21 @@ extension CallKitManager: CallMessageService {
                 new
             }
         }
-        let message = ChatMessage(conversationID: calleeId, body: ChatCMDMessageBody(action: kCall), ext: ext)
+        var to = calleeId
+        if let info = self.callInfo,info.type == .groupCall {
+            to = self.callInfo?.groupId ?? ""
+        }
+        let message = ChatMessage(conversationID: to, body: ChatCMDMessageBody(action: kCall), ext: ext)
+        message.deliverOnlineOnly = false
+        if self.callInfo?.type ?? .singleAudio == .groupCall {
+            let users = calleeId.components(separatedBy: ",")
+            message.chatType = .groupChat
+            if !users.isEmpty {
+                message.receiverList = users
+            } else {
+                message.receiverList = [calleeId]
+            }
+        }
         Task {
             let result = await ChatClient.shared().chatManager?.send(message, progress: nil)
             if let error = result?.1 {
@@ -1106,9 +1143,13 @@ extension CallKitManager: CallMessageService {
                 self.sendTerminateSignal(callId: call.callId, to: to)
             } else {
                 let ids = CallKitManager.shared.itemsCache.keys.filter { $0 != ChatClient.shared().currentUsername ?? "" }
-                for id in ids {
-                    self.sendTerminateSignal(callId: call.callId, to: id)
+                var to: String = ""
+                if ids.count == 1 {
+                    to = ids.first ?? ""
+                } else {
+                    to = ids.joined(separator: ",")
                 }
+                self.sendTerminateSignal(callId: call.callId, to: to)
             }
             
         }
@@ -1116,8 +1157,24 @@ extension CallKitManager: CallMessageService {
     
     func sendTerminateSignal(callId: String, to: String) {
         Task {
-            let message = ChatMessage(conversationID: to, body: ChatCMDMessageBody(action: kCall), ext: [kCallId:callId,kMsgType: kMsgTypeValue,kAction:CALL_END])
+            var conversationId = to
+            if let call = self.callInfo {
+                if call.type == .groupCall {
+                    conversationId = call.groupId ?? ""
+                }
+            }
+            let message = ChatMessage(conversationID: conversationId, body: ChatCMDMessageBody(action: kCall), ext: [kCallId:callId,kMsgType: kMsgTypeValue,kAction:CALL_END])
             message.deliverOnlineOnly = true
+            if self.callInfo?.type ?? .singleAudio  == .groupCall {
+                message.chatType = .groupChat
+                if to.contains(",") {
+                    let users = to.components(separatedBy: ",")
+                    message.receiverList = users
+                } else {
+                    message.receiverList = [to]
+                }
+            }
+            
             let result = await ChatClient.shared().chatManager?.send(message, progress: nil)
             if let error = result?.1 {
                 consoleLogInfo("Failed to send terminate call message: \(String(describing: error.errorDescription))", type: .error)
@@ -1169,6 +1226,7 @@ extension CallKitManager: CallMessageService {
     ///   - calleeDeviceId: The device ID of the callee.
     ///   - result: The result of the call, such as "accept", "busy", or "refuse".
     public func callerConfirmAnswer(callId: String,calleeId: String,calleeDeviceId: String,result: String) {
+        
         if callId.isEmpty || calleeId.isEmpty || calleeDeviceId.isEmpty || result.isEmpty {
             consoleLogInfo("Invalid parameters for confirming answer: callId: \(callId), calleeId: \(calleeId), calleeDeviceId: \(calleeDeviceId), result: \(result)", type: .error)
             self.handleBusinessError(CallError.CallBusiness(error: .signaling, message: "Invalid parameters for confirming answer"))
@@ -1258,10 +1316,15 @@ extension CallKitManager: CallMessageService {
                         let callId = keyComponents.first ?? ""
                         
                         if callId.hasSuffix(call.callId) {
-                            let users = keyComponents.last?.components(separatedBy: "-") ?? [].filter({ $0 != "start" && $0 != "timer" })
-                            for user in users {
-                                self.cancelCall(callId: call.callId, calleeId:user)
+                            let users = keyComponents.last?.components(separatedBy: ",") ?? [].filter({ $0 != "start" && $0 != "timer" })
+                            var calleeId = ""
+                            let callees = users.joined(separator: ",")
+                            if users.count > 1 {
+                                calleeId = callees
+                            } else {
+                                calleeId = users.first ?? ""
                             }
+                            self.cancelCall(callId: call.callId, calleeId:calleeId)
                         } else {
                             consoleLogInfo("Group Call Caller Cancel ID mismatch: \(call.callId) != \(callId)", type: .error)
                         }
@@ -1369,9 +1432,6 @@ extension CallKitManager: CallMessageService {
         let result = self.engine?.joinChannel(byToken: self.token, channelId: channelName, uid: UInt(uid), mediaOptions: config, joinSuccess: { [weak self] channel, uid, elapsed in
             guard let `self` = self else { return  }
             consoleLogInfo("\(currentUser) joined channel: \(channel) with uid: \(uid) elapsed: \(elapsed): account \(ChatClient.shared().currentUsername ?? "")", type: .debug)
-            DispatchQueue.main.async {
-                self.joinedThenPresentCallVC()
-            }
             if uid == self.currentUserRTCUID {
                 self.hadJoinedChannel = true
                 self.updateCallEndReason(.abnormalEnd,false)
@@ -1603,7 +1663,7 @@ extension CallKitManager: TimerServiceListener {
                             var removeUsers: [String] = []
                             for key in inviteGroupUserTimerKeys {
                                 if timerIdentify == key,seconds >= CallKitManager.shared.config.ringTimeOut {
-                                    var users = key.components(separatedBy: " users:").last?.components(separatedBy: "-") ?? []
+                                    var users = key.components(separatedBy: " users:").last?.components(separatedBy: ",") ?? []
                                     users.removeAll { $0 == "start" || $0 == "timer" }
                                     for userId in users {
                                         if let item = self.itemsCache[userId],item.waiting {

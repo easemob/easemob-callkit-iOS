@@ -63,6 +63,7 @@ open class Call1v1VideoViewController: UIViewController {
     
     public lazy var callView: PixelBufferRenderView = {
         let bigView = PixelBufferRenderView(frame: self.view.bounds).tag(localStreamTag).backgroundColor(.clear).cornerRadius(12)
+        bigView.userId = ChatClient.shared().currentUsername ?? ""
         bigView.dragEnable = false
         bigView.clickDragViewBlock = { [weak self] dragView in
             self?.callViewClicked(dragView: dragView)
@@ -72,6 +73,7 @@ open class Call1v1VideoViewController: UIViewController {
     
     public lazy var floatView: PixelBufferRenderView = {
         let drag = PixelBufferRenderView(frame: CGRect(x: ScreenWidth - 12 - 108, y: NavigationHeight + 12, width: 108, height: 192)).cornerRadius(12).backgroundColor(.clear).tag(remoteStreamTag)
+        drag.userId = (self.role == .caller ? CallKitManager.shared.callInfo?.calleeId : CallKitManager.shared.callInfo?.callerId) ?? ""
         drag.dragEnable = true
         drag.freeRect = CGRect(x: 12, y: NavigationHeight+12, width: ScreenWidth - 24, height: ScreenHeight-NavigationHeight-BottomBarHeight-12-96-16)
         drag.isKeepBounds = true

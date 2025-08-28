@@ -198,6 +198,10 @@ public class CallStreamView: UIImageView {
     }
     
     func updateNetworkStatus(_ status: CallNetworkStatus) {
+        if self.item.waiting {
+            self.networkStatusView.isHidden = true
+            return
+        }
         coverView.isHidden = true
         coverView.removeFromSuperview()
         switch status {
