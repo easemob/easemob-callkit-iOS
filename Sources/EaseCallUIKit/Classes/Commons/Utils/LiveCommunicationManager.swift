@@ -112,6 +112,7 @@ extension LiveCommunicationManager: PKPushRegistryDelegate {
     // MARK: - 处理呼叫到来
     private func handleIncomingCall(payload: PKPushPayload) {
         let custom = payload.dictionaryPayload["e"] as? Dictionary<String, Any>
+        print("payload dictionary: \(String(describing: custom))")
         var callId = ""
         if let id = custom?[kCallId] as? String {
             callId = id
