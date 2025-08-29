@@ -126,6 +126,17 @@ public let CallKitVersion = "1.0.0"
         if #available(iOS 17.4, *) {
             LiveCommunicationManager.shared.setupPushKit()
         }
+        NotificationCenter.default.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { [weak self] _ in
+            if let info = self?.callInfo, info.state == .ringing {
+                if let controller = UIViewController.currentController {
+                    if self?.callInfo?.calleeId == ChatClient.shared().currentUsername {
+                        if !(controller is CallMultiViewController || controller is Call1v1AudioViewController || controller is Call1v1VideoViewController) {
+                            self?.presentCalleeController(call: info)
+                        }
+                    }
+                }
+            }
+        }
 //        return nil
     }
     
@@ -145,6 +156,7 @@ public let CallKitVersion = "1.0.0"
             }
             
         }
+        self.engine?.enableAudio()
 //        self.engine?.setParameters("{\"che.audio.sf.ainlpToLoadFlag\":1}")
 //        self.engine?.setParameters("{\"che.audio.sf.nlpAlgRoute\":11}")
 //        self.engine?.setParameters("{\"che.audio.agc.enable\":true}")

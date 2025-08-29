@@ -1508,8 +1508,6 @@ extension CallKitManager: CallMessageService {
             let result = self.engine?.leaveChannel()
             consoleLogInfo("quitCall leaveChannel result: \(String(describing: result))", type: .debug)
             self.engine?.stopPreview()
-            self.engine?.disableVideo()
-            self.engine?.disableAudio()
             self.callInfo?.callId = ""
             self.callInfo?.callerId = ""
             self.callInfo?.callerDeviceId = ""
