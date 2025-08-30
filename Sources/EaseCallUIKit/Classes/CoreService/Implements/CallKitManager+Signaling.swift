@@ -41,7 +41,7 @@ extension CallKitManager: ChatEventsListener {
             }
             let callerDevId = ext[kCallerDevId] as? String ?? ""
             if message.from.lowercased() == ChatClient.shared().currentUsername?.lowercased() ?? "" {
-                consoleLogInfo("Call info from current user, ignoring message id:\(message.messageId)", type: .info)
+                consoleLogInfo("Call info from current user, ignoring message id:\(message.messageId) ext:\(String(describing: message.ext))", type: .info)
                 return
             }
             let defaultCalleeId = ChatClient.shared().getDeviceConfig(nil).deviceUUID ?? ""
@@ -201,7 +201,11 @@ extension CallKitManager: ChatEventsListener {
                                                     LiveCommunicationManager.shared.endCall()
                                                 }
                                         }
-                                        UIViewController.currentController?.showCallToast(toast: "Connecting".call.localize)
+                                        if let currentVC = UIViewController.currentController {
+                                            if !(currentVC is Call1v1AudioViewController || currentVC is Call1v1VideoViewController || currentVC is CallMultiViewController) {
+                                                UIViewController.currentController?.showCallToast(toast: "Connecting".call.localize)
+                                            }
+                                        }
                                         self.joinChannel(channelName: self.callInfo?.channelName ?? "") { [weak self] success in
                                             guard let `self` = self else { return }
                                             if success {
@@ -441,7 +445,11 @@ extension CallKitManager: ChatEventsListener {
     }
     
     func presentCalleeController(call: CallInfo) {
-        if UIViewController.currentController is CallMultiViewController || UIViewController.currentController is Call1v1AudioViewController || UIViewController.currentController is Call1v1VideoViewController {
+        let currentVC = UIViewController.currentController
+        if currentVC is CallMultiViewController || currentVC is Call1v1AudioViewController || currentVC is Call1v1VideoViewController {
+            (currentVC as? Call1v1AudioViewController)?.updateBottomState()
+            (currentVC as? Call1v1VideoViewController)?.updateBottomState()
+            (currentVC as? CallMultiViewController)?.updateBottomState()
             return
         }
         if call.state != .idle {
@@ -463,7 +471,11 @@ extension CallKitManager: ChatEventsListener {
     }
     
     private func presentCallerPage(call: CallInfo) {
-        if UIViewController.currentController is CallMultiViewController || UIViewController.currentController is Call1v1AudioViewController || UIViewController.currentController is Call1v1VideoViewController {
+        let currentVC = UIViewController.currentController
+        if currentVC is CallMultiViewController || currentVC is Call1v1AudioViewController || currentVC is Call1v1VideoViewController {
+            (currentVC as? Call1v1AudioViewController)?.updateBottomState()
+            (currentVC as? Call1v1VideoViewController)?.updateBottomState()
+            (currentVC as? CallMultiViewController)?.updateBottomState()
             return
         }
         startRingTimer(callId: call.callId)
@@ -1351,7 +1363,21 @@ extension CallKitManager: CallMessageService {
             } else {
                 self.enableLocalVideo(false)
             }
+            self.engine?.enableAudio()
+            self.enableLocalAudio(true)
             self.answerCall(callId: call.callId, callerId: call.callerId, result: kAcceptResult, callerDeviceId: call.callerDeviceId)
+        }
+    }
+    
+    func updateLiveCommunicationStateIfNeeded() {
+        if let currentVC = UIViewController.currentController {
+            if currentVC is Call1v1AudioViewController || currentVC is Call1v1VideoViewController || currentVC is CallMultiViewController {
+                if #available(iOS 17.4, *),self.config.enableVOIP {
+                    if LiveCommunicationManager.shared.manager != nil {
+                        LiveCommunicationManager.shared.performAction(type: .join)
+                    }
+                }
+            }
         }
     }
     
@@ -1439,6 +1465,10 @@ extension CallKitManager: CallMessageService {
             completion(true)
         }) ?? 0
         if result != 0 {
+            if abs(result) == 17 {
+                completion(true)
+                return
+            }
             self.quitCall()
             consoleLogInfo("\(currentUser) failed to join channel: \(channelName) error code: \(result) token:\(String(describing: self.token))", type: .error)
             GlobalTimerManager.shared.invalidate()
@@ -1459,6 +1489,7 @@ extension CallKitManager: CallMessageService {
         if let call = self.callInfo {
             switch call.type  {
             case .singleVideo:
+                self.engine?.enableAudio()
                 self.engine?.enableVideo()
             case .singleAudio:
                 self.engine?.enableAudio()
@@ -1482,6 +1513,8 @@ extension CallKitManager: CallMessageService {
             self.hadJoinedChannel = false
             AudioPlayerManager.shared.playAudio(from: "busy")
             DispatchQueue.main.async {
+                self.callVC?.dismiss(animated: false)
+                self.callVC = nil
                 AudioPlayerManager.shared.stopAudio()
                 UIApplication.shared.isIdleTimerDisabled = false
                 if let currentVC = UIViewController.currentController, (currentVC is Call1v1AudioViewController || currentVC is Call1v1VideoViewController ) {
@@ -1493,8 +1526,6 @@ extension CallKitManager: CallMessageService {
                         }
                     }
                 }
-                self.callVC?.dismiss(animated: false)
-                self.callVC = nil
                 self.popup?.dismiss()
                 FloatingAudioView.removeFromWindow()
                 self.cleanUICache()

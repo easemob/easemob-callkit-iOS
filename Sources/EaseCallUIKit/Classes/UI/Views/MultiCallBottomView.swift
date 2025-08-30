@@ -223,7 +223,7 @@ public class MultiCallBottomView: UIView {
     }
     
     // MARK: - Animation Methods
-    private func animateToExpandedState() {
+    func animateToExpandedState() {
         guard !isExpanded else { return }
         isExpanded = true
         

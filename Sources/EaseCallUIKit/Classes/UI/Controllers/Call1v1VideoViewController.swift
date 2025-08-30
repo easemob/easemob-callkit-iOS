@@ -151,6 +151,12 @@ open class Call1v1VideoViewController: UIViewController {
         self.floatView.updateVideoState(true)
     }
     
+    func updateBottomState() {
+        if self.connected {
+            self.bottomView.animateToExpandedState()
+        }
+    }
+    
     private func setupNavigationState() {
         if self.role != .callee {
             self.navigationBar.subtitle = "calling".call.localize
@@ -277,7 +283,15 @@ open class Call1v1VideoViewController: UIViewController {
             handleCallEnd()
             self.dismiss(animated: true)
         case .accept:
-            CallKitManager.shared.accept()
+            if #available(iOS 17.4, *),CallKitManager.shared.config.enableVOIP {
+                if LiveCommunicationManager.shared.manager != nil {
+                    CallKitManager.shared.updateLiveCommunicationStateIfNeeded()
+                } else {
+                    CallKitManager.shared.accept()
+                }
+            } else {
+                CallKitManager.shared.accept()
+            }
             self.addCallTimer()
         case .end:
             handleCallEnd()

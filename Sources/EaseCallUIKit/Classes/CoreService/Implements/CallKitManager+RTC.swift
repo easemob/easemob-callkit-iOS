@@ -27,6 +27,12 @@ extension CallKitManager: CallActionService {
     /// Enable or disable local audio stream
     /// - Parameter enable: true to enable local audio, false to disable
     func enableLocalAudio(_ enable: Bool) {
+        if #available(iOS 17.4, *),self.config.enableVOIP {
+            if LiveCommunicationManager.shared.manager != nil {
+                LiveCommunicationManager.shared.currentUserMute = !enable
+                LiveCommunicationManager.shared.performAction(type: .mute)
+            }
+        }
         let result = self.engine?.muteLocalAudioStream(!enable)
         consoleLogInfo("muteLocalAudioStream result: \(String(describing: result))", type: .debug)
     }
@@ -275,7 +281,9 @@ extension CallKitManager: AgoraRtcEngineDelegate {
         //Setting remote video render qutity for the user who just joined
         let type = self.getStreamRenderQuality(with: UInt(self.canvasCache.count))
         if let call = self.callInfo,!call.callId.isEmpty {
-            call.state = .answering
+            if call.callerId == ChatClient.shared().currentUsername ?? "" {
+                call.state = .answering
+            }
             if call.type == .groupCall {
                 //Add the user to the RTC throttler
                 self.rtcThrottler.addUID(uid) { [weak self] uids in

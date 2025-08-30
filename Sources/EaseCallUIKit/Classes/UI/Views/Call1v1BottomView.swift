@@ -174,6 +174,9 @@ public class Call1v1BottomView: UIView {
     
     // MARK: - State Management
     func setState(_ state: Call1v1BottomViewState, animated: Bool = true) {
+        if currentState == state {
+            return
+        }
         let previousState = currentState
         currentState = state
         
@@ -225,6 +228,9 @@ public class Call1v1BottomView: UIView {
     }
     
     private func animateToState(_ state: Call1v1BottomViewState, from previousState: Call1v1BottomViewState) {
+        if state == previousState {
+            return
+        }
         switch state {
         case .incoming:
             setButtonsForState(state, animated: true)
