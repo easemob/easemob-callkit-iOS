@@ -107,6 +107,12 @@ open class CallMultiViewController: UIViewController {
         CallKitManager.shared.enableLocalVideo(false)
     }
     
+    func updateBottomState() {
+        if self.connected {
+            self.bottomView.animateToExpandedState()
+        }
+    }
+    
     private func setupNavigationState() {
         if self.role != .callee {
             self.navigationBar.subtitle = "calling".call.localize
@@ -199,7 +205,15 @@ open class CallMultiViewController: UIViewController {
                 GlobalTimerManager.shared.registerListener(self, timerIdentify: "call-\(call.channelName)-answering-timer")
                 GlobalTimerManager.shared.registerListener(CallKitManager.shared, timerIdentify: "call-\(call.channelName)-answering-timer")
             }
-            CallKitManager.shared.accept()
+            if #available(iOS 17.4, *),CallKitManager.shared.config.enableVOIP {
+                if LiveCommunicationManager.shared.manager != nil {
+                    CallKitManager.shared.updateLiveCommunicationStateIfNeeded()
+                } else {
+                    CallKitManager.shared.accept()
+                }
+            } else {
+                CallKitManager.shared.accept()
+            }
             self.callView.isHidden = false
         case .end:
             if let call = CallKitManager.shared.callInfo {

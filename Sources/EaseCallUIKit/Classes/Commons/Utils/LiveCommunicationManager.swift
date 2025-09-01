@@ -12,6 +12,12 @@ import AVFAudio
 import LiveCommunicationKit
 #endif
 
+enum LiveCommunicationKitActionType: String {
+    case join = "join"
+    case end = "end"
+    case mute = "mute"
+}
+
 @available(iOS 17.4, *)
 class LiveCommunicationManager: NSObject {
     // 添加单例
@@ -21,6 +27,10 @@ class LiveCommunicationManager: NSObject {
     private var pushRegistry: PKPushRegistry?
     
     var manager: ConversationManager?
+    
+    private var uuid: UUID?
+    
+    var currentUserMute: Bool = false // 当前用户是否静音
     
     // 私有化初始化方法，确保单例
     private override init() {
@@ -70,6 +80,7 @@ class LiveCommunicationManager: NSObject {
                 try await manager?.reportNewIncomingConversation(uuid: uuid, update: update)
                 consoleLogInfo("[LiveCommunicationManager] successfully reported new incoming call: \(callerName) uuid: \(uuid.uuidString) type: \(type.rawValue)", type: .debug)
                 CallKitManager.shared.callInfo?.state = .ringing
+                self.uuid = uuid
             } catch {
                 consoleLogInfo("[LiveCommunicationManager] failed to report new incoming call: \(error.localizedDescription)", type: .error)
             }
@@ -180,6 +191,32 @@ extension LiveCommunicationManager: PKPushRegistryDelegate {
         }
         LiveCommunicationManager.shared.reportIncomingCall(uuid: uuid!, callerName: callerNickname.isEmpty ? callerID:callerNickname,call: callType)
     }
+    
+    func performAction(type: LiveCommunicationKitActionType) {
+        guard let uuid = self.uuid else {
+            consoleLogInfo("[LiveCommunicationManager] performAction failed: uuid is nil", type: .error)
+            return
+        }
+        var conversationAction: ConversationAction?
+        switch type {
+        case .join:
+            conversationAction = JoinConversationAction(conversationUUID: uuid)
+        case .mute:
+            conversationAction = MuteConversationAction(conversationUUID: uuid, isMuted: self.currentUserMute)
+        case .end:
+            conversationAction = EndConversationAction(conversationUUID: uuid)
+        }
+        if let action = conversationAction {
+            Task {
+                do {
+                    try await manager?.perform([action])
+                    consoleLogInfo("[LiveCommunicationManager] successfully performAction: \(type.rawValue)", type: .debug)
+                } catch {
+                    consoleLogInfo("[LiveCommunicationManager] failed to performAction: \(error.localizedDescription)", type: .error)
+                }
+            }
+        }
+    }
 }
 
 @available(iOS 17.4, *)
@@ -215,10 +252,15 @@ extension LiveCommunicationManager: ConversationManagerDelegate
     }
     
     private func joinAction(action: JoinConversationAction) {
-        DispatchQueue.main.async {
-            UIViewController.currentController?.showCallToast(toast: "Connecting".call.localize)
-        }
-        if let call = CallKitManager.shared.callInfo,!call.callId.isEmpty {
+        if let call = CallKitManager.shared.callInfo,!call.callId.isEmpty,call.state == .ringing {
+            DispatchQueue.main.async {
+                if let currentVC = UIViewController.currentController {
+                    if !(currentVC is Call1v1AudioViewController || currentVC is Call1v1VideoViewController || currentVC is CallMultiViewController) {
+                        UIViewController.currentController?.showCallToast(toast: "Connecting".call.localize)
+                    }
+                }
+            }
+            
             CallKitManager.shared.accept()
             action.fulfill()
         } else {
@@ -231,7 +273,9 @@ extension LiveCommunicationManager: ConversationManagerDelegate
         // 静音操作
         if let call = CallKitManager.shared.callInfo {
             if call.state == .answering {
-                CallKitManager.shared.enableLocalAudio(!action.isMuted)
+                if UIApplication.shared.applicationState == .background || UIApplication.shared.applicationState == .inactive {
+                    CallKitManager.shared.enableLocalAudio(!action.isMuted)
+                }
                 action.fulfill()
             } else {
                 consoleLogInfo("[LiveCommunicationManager] call is not answering", type: .error)

@@ -60,7 +60,6 @@ public class Call1v1AudioViewController: UIViewController {
         self.bottomView.didTapButton = { [weak self] in
             self?.bottomClick(type: $0)
         }
-      
     }
     
     public override func viewIsAppearing(_ animated: Bool) {
@@ -76,6 +75,16 @@ public class Call1v1AudioViewController: UIViewController {
             GlobalTimerManager.shared.registerListener(self, timerIdentify: "call-\(call.channelName)-answering-timer")
             GlobalTimerManager.shared.registerListener(CallKitManager.shared, timerIdentify: "call-\(call.channelName)-answering-timer")
         }
+    }
+    
+    func updateBottomState() {
+        CallKitManager.shared.enableLocalAudio(true)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: {
+            if CallKitManager.shared.callInfo?.state ?? .idle == .answering,self.bottomView.currentState == .connected {
+                return
+            }
+            self.bottomView.setState(self.bottomView.currentState, animated: false)
+        })
     }
     
     private func setupBottomsState() {
@@ -122,7 +131,15 @@ public class Call1v1AudioViewController: UIViewController {
             self.dismiss(animated: true, completion: nil)
             CallKitManager.shared.hangup()
         case .accept:
-            CallKitManager.shared.accept()
+            if #available(iOS 17.4, *),CallKitManager.shared.config.enableVOIP {
+                if LiveCommunicationManager.shared.manager != nil {
+                    CallKitManager.shared.updateLiveCommunicationStateIfNeeded()
+                } else {
+                    CallKitManager.shared.accept()
+                }
+            } else {
+                CallKitManager.shared.accept()
+            }
             self.addCallTimer()
         case .end:
             if let call = CallKitManager.shared.callInfo {
