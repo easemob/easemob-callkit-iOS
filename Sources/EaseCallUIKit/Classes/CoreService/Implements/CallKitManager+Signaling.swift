@@ -180,10 +180,9 @@ extension CallKitManager: ChatEventsListener {
                         } else {
                             consoleLogInfo("Call canceled with callId: \(callId) state:\(String(describing: self.callInfo?.state)) call.callId:\(String(describing: self.callInfo?.callId))", type: .info)
                             if let call = self.receivedCalls[callId],self.callInfo == nil {
-                                self.callInfo = call
-                                self.updateCallEndReason(.remoteCancel)
+                                self.updateCallEndReason(.remoteCancel,true, call)
                             }
-                            self.receivedCalls.removeValue(forKey: callId)
+                            
                         }
                     }
                     
@@ -359,9 +358,16 @@ extension CallKitManager: ChatEventsListener {
     /// - Parameters:
     ///   - reason: The reason for ending the call.``CallEndReason``
     ///   - immediateCallback: If true, the update will immediately notify listeners with the updated message.
-    func updateCallEndReason(_ reason: CallEndReason, _ immediateCallback: Bool = true) {
+    ///   - callInfo: If provided, this CallInfo will be used for the callback instead of self.callInfo.
+    func updateCallEndReason(_ reason: CallEndReason, _ immediateCallback: Bool = true, _ callInfo: CallInfo? = nil) {
         consoleLogInfo("Update call end reason to: \(reason.rawValue)", type: .info)
-        if let info = self.callInfo,let message = ChatClient.shared().chatManager?.getMessageWithMessageId(info.inviteMessageId) {
+        var info: CallInfo?
+        if self.callInfo != nil,!(self.callInfo?.callId.isEmpty ?? false) {
+            info = self.callInfo
+        } else {
+            info = callInfo
+        }
+        if let message = ChatClient.shared().chatManager?.getMessageWithMessageId(info?.inviteMessageId ?? "") {
             let ext = message.ext ?? [:]
             var newExt = ext
             newExt[kCallEndReason] = reason.rawValue
@@ -375,10 +381,16 @@ extension CallKitManager: ChatEventsListener {
                     consoleLogInfo("Failed to update call reason:\(reason.rawValue): \(String(describing: error.errorDescription))", type: .error)
                 } else {
                     if immediateCallback {
-                        for listener in self.listeners.allObjects {
-                            listener.didUpdateCallEndReason?(reason: reason, info: info)
+                        if let callbackInfo = info {
+                            for listener in self.listeners.allObjects {
+                                listener.didUpdateCallEndReason?(reason: reason, info: callbackInfo)
+                            }
+                            if !(self.callInfo?.callId.isEmpty ?? false) {
+                                self.quitCall()
+                            } else {
+                                self.receivedCalls.removeValue(forKey: callbackInfo.callId)
+                            }
                         }
-                        self.quitCall()
                     }
                 }
             }
