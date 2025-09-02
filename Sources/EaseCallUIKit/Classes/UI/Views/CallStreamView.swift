@@ -27,7 +27,11 @@ public class CallStreamView: UIImageView {
             if self.item.isExpanded {
                 self.networkStatusView.isHidden = false
             } else {
-                self.networkStatusView.isHidden = displayMode == .hidden
+                if self.superview?.isKind(of: UIScrollView.self) == true {
+                    self.userInfoView.displayMode = .hidden
+                } else {
+                    self.networkStatusView.isHidden = displayMode == .hidden
+                }
                 if self.item.waiting {
                     self.networkStatusView.isHidden = true
                 }
@@ -183,6 +187,12 @@ public class CallStreamView: UIImageView {
         self.bringSubviewToFront(self.userInfoView)
         self.bringSubviewToFront(self.networkStatusView)
         self.networkStatusView.isHidden = newItem.waiting
+        
+        if self.superview?.isKind(of: UIScrollView.self) == true {
+            self.userInfoView.displayMode = .hidden
+        } else {
+            self.userInfoView.displayMode = self.displayMode
+        }
     }
     
     func updateUserInfo(newItem: CallStreamItem) {
@@ -193,6 +203,11 @@ public class CallStreamView: UIImageView {
             self.userInfoView.nickname = nickname
         } else {
             self.userInfoView.nickname = newItem.userId
+        }
+        if self.superview?.isKind(of: UIScrollView.self) == true {
+            self.userInfoView.displayMode = .hidden
+        } else {
+            self.userInfoView.displayMode = self.displayMode
         }
     }
     
