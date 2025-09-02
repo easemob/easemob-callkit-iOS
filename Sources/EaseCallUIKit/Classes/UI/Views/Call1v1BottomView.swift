@@ -65,11 +65,13 @@ public class Call1v1BottomView: UIView {
     private lazy var muteButton: CallButtonView = {
         let button = createCallButton(
             data: CallButtonData(
-                title: "Mic on".call.localize,
+                title: "Mic".call.localize,
+                status: "on".call.localize,
+                selectedStatus: "off".call.localize,
                 imageName: "mic_on",
                 selectedImageName: "mic_off",
                 color: nil,
-                selectedTitle: "Mic off".call.localize
+                selectedTitle: "Mic".call.localize
             ),
             tag: muteTag
         )
@@ -79,11 +81,13 @@ public class Call1v1BottomView: UIView {
     private lazy var speakerButton: CallButtonView = {
         let button = createCallButton(
             data: CallButtonData(
-                title: "Speaker on".call.localize,
+                title: "Speaker".call.localize,
+                status: "on".call.localize,
+                selectedStatus: "off".call.localize,
                 imageName: "speaker_on",
                 selectedImageName: "speaker_off",
                 color: nil,
-                selectedTitle: "Speaker off".call.localize
+                selectedTitle: "Speaker".call.localize
             ),
             tag: speakerTag
         )
@@ -397,9 +401,18 @@ public class Call1v1BottomView: UIView {
         return type
     }
     
-    private func toggleMuteButton() {
+    func toggleMuteButton() {
         guard let data = muteButton.data else { return }
         data.isSelected = !data.isSelected
+        muteButton.configure(data: data)
+        
+        // Update tag based on state
+        muteButton.tag = Int(data.isSelected ? CallButtonType.mic_off.rawValue : CallButtonType.mic_on.rawValue)
+    }
+    
+    func updateMuteState(isMuted: Bool) {
+        guard let data = muteButton.data else { return }
+        data.isSelected = isMuted
         muteButton.configure(data: data)
         
         // Update tag based on state

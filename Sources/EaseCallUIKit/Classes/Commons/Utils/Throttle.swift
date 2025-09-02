@@ -41,3 +41,44 @@ class RTCCallbackThrottler {
     }
 }
 
+
+
+/// A utility class to debounce actions, delaying execution until a specified time interval has passed without further calls.
+/// Useful for handling events like rapid successive clicks, executing only the last one after a quiet period.
+class Debouncer {
+    private let delay: TimeInterval
+    private var timer: Timer?
+    private let queue: DispatchQueue
+    
+    /// Initializes the Debouncer.
+    /// - Parameters:
+    ///   - delay: The time interval to wait before executing the action after the last call (in seconds).
+    ///   - queue: The dispatch queue on which to execute the debounced actions. Defaults to main queue.
+    init(delay: TimeInterval, queue: DispatchQueue = .main) {
+        self.delay = delay
+        self.queue = queue
+    }
+    
+    /// Debounces the given action: schedules it to run after the delay, canceling any previous scheduled action.
+    /// - Parameter action: The closure to execute after the debounce delay.
+    func debounce(_ action: @escaping () -> Void) {
+        // Cancel any existing timer
+        timer?.invalidate()
+        timer = nil
+        
+        // Schedule a new timer on the specified queue
+        timer = Timer(timeInterval: delay, repeats: false) { [weak self] _ in
+            guard let self = self else { return }
+            action()
+            self.timer = nil
+        }
+        
+        // Ensure the timer runs on the correct queue
+        queue.async {
+            RunLoop.current.add(self.timer!, forMode: .default)
+        }
+    }
+    
+    
+}
+

@@ -29,8 +29,18 @@ extension CallKitManager: CallActionService {
     func enableLocalAudio(_ enable: Bool) {
         if #available(iOS 17.4, *),self.config.enableVOIP {
             if LiveCommunicationManager.shared.manager != nil {
-                LiveCommunicationManager.shared.currentUserMute = !enable
-                LiveCommunicationManager.shared.performAction(type: .mute)
+                if UIApplication.shared.applicationState == .active {
+                    LiveCommunicationManager.shared.currentUserMute = !enable
+                    LiveCommunicationManager.shared.performAction(type: .mute)
+                } else {
+                    if let controller = UIViewController.currentController as? Call1v1AudioViewController {
+                        controller.bottomView.updateMuteState(isMuted: !enable)
+                    } else {
+                        if let controller = self.callVC as? Call1v1AudioViewController {
+                            controller.bottomView.updateMuteState(isMuted: !enable)
+                        }
+                    }
+                }
             }
         }
         let result = self.engine?.muteLocalAudioStream(!enable)
@@ -130,7 +140,7 @@ extension CallKitManager: AgoraRtcEngineDelegate {
         if txQuality == .unknown {//If the quality is unknown, we skip the update
             return
         }
-        let uids = [NSNumber(value: uid == 0 ? UInt32(uid):self.currentUserRTCUID)]
+        let uids = [NSNumber(value: uid != 0 ? UInt32(uid):self.currentUserRTCUID)]
         // Get userId by RTC uid
         ChatClient.shared().getUserId(byRTCUIds: uids) { [weak self] relations, error in
             guard let `self` = self else { return }

@@ -137,6 +137,9 @@ public let CallKitVersion = "1.0.0"
                 }
             }
         }
+        NotificationCenter.default.addObserver(forName: UIApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.hangup()
+        }
 //        return nil
     }
     
@@ -150,6 +153,11 @@ public let CallKitVersion = "1.0.0"
         } else {
             self.engine = AgoraRtcEngineKit.sharedEngine(withAppId: self.appID, delegate: self)
         }
+        let configuration = AgoraVideoEncoderConfiguration()
+        configuration.orientationMode = .fixedPortrait
+        configuration.dimensions = CGSize(width: 1280, height: 720)
+        configuration.frameRate = .fps30
+        self.engine?.setVideoEncoderConfiguration(configuration)
         for listener in self.listeners.allObjects {
             if let engine = self.engine {
                 listener.onRtcEngineCreated?(engine: engine)
@@ -157,15 +165,6 @@ public let CallKitVersion = "1.0.0"
             
         }
         self.engine?.enableAudio()
-//        self.engine?.setParameters("{\"che.audio.sf.ainlpToLoadFlag\":1}")
-//        self.engine?.setParameters("{\"che.audio.sf.nlpAlgRoute\":11}")
-//        self.engine?.setParameters("{\"che.audio.agc.enable\":true}")
-//        self.engine?.setParameters("{\"che.audio.agc.targetlevelBov\":3}")
-//        self.engine?.setParameters("{\"che.audio.agc.compressionGain\":18}")
-//        self.engine?.setParameters("{\"che.audio.sf.nsEnable\":1}")
-//        self.engine?.setParameters("{\"che.audio.sf.nsngAlgRoute\":10}")
-//        self.engine?.setParameters("{\"che.audio.sf.nsngPredefAgg\":11}")
-//        self.engine?.setParameters("{\"che.audio.sf.statNsFastNsSpeechTrigThreshold\":50}")
         self.engine?.enable(inEarMonitoring: true)
         self.engine?.enableAudioVolumeIndication(618, smooth: 10, reportVad: true)
         self.engine?.setDefaultAudioRouteToSpeakerphone(true)
