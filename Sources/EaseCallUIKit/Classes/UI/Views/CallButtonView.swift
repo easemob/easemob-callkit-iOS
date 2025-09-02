@@ -9,7 +9,8 @@
 @objc public class CallButtonView: UIView {
     
     private let imageView = UIImageView().contentMode(.scaleAspectFit).backgroundColor(.clear)
-    private let label = UILabel()
+    private let nameLabel = UILabel()  // 第一行：名称标签（如 "Mike"）
+    private let statusLabel = UILabel()  // 第二行：状态标签（如 "on/off"）
     public let containerView = UIView()
     public var allowSelection: Bool = true
     public var buttonTag = 0
@@ -21,7 +22,7 @@
     private var containerCornerRadius: CGFloat = 0
     
     // 存储约束以便动态调整
-    private var labelTopConstraint: NSLayoutConstraint!
+    private var nameLabelTopConstraint: NSLayoutConstraint!
     
     // iconTitleSpace 设置为可修改的计算属性
     public var iconTitleSpace: CGFloat = 4
@@ -50,32 +51,51 @@
         imageView.translatesAutoresizingMaskIntoConstraints = false
         containerView.addSubview(imageView)
         
-        // 标签
-        label.textColor = .white
-        label.font = UIFont.systemFont(ofSize: 12)
-        label.textAlignment = .center
-        label.numberOfLines = 0
-        label.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(label)
+        // 名称标签（第一行）
+        nameLabel.textColor = .white
+        nameLabel.font = UIFont.systemFont(ofSize: 11)
+        nameLabel.textAlignment = .center
+        nameLabel.numberOfLines = 1
+        nameLabel.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(nameLabel)
         
-        // 创建标签顶部约束并存储引用
-        labelTopConstraint = label.topAnchor.constraint(equalTo: containerView.bottomAnchor, constant: iconTitleSpace)
+        // 状态标签（第二行）
+        statusLabel.textColor = .white
+        statusLabel.font = UIFont.systemFont(ofSize: 11)  // 稍小的字体
+        statusLabel.textAlignment = .center
+        statusLabel.numberOfLines = 1
+        statusLabel.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(statusLabel)
+        
+        // 创建名称标签顶部约束并存储引用
+        nameLabelTopConstraint = nameLabel.topAnchor.constraint(equalTo: containerView.bottomAnchor, constant: iconTitleSpace)
         
         // 约束
         NSLayoutConstraint.activate([
+            // 容器视图约束
             containerView.topAnchor.constraint(equalTo: topAnchor),
             containerView.centerXAnchor.constraint(equalTo: centerXAnchor),
             containerView.widthAnchor.constraint(equalTo: widthAnchor),
             containerView.heightAnchor.constraint(equalTo: widthAnchor),
             
+            // 图标约束
             imageView.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 9),
             imageView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -9),
             imageView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 9),
             imageView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -9),
             
-            labelTopConstraint, // 使用存储的约束
-            label.centerXAnchor.constraint(equalTo: centerXAnchor),
-            label.bottomAnchor.constraint(lessThanOrEqualTo: bottomAnchor)
+            // 名称标签约束
+            nameLabelTopConstraint, // 使用存储的约束
+            nameLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
+            nameLabel.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor),
+            nameLabel.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor),
+            
+            // 状态标签约束
+            statusLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 2),
+            statusLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
+            statusLabel.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor),
+            statusLabel.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor),
+            statusLabel.bottomAnchor.constraint(lessThanOrEqualTo: bottomAnchor)
         ])
         
         containerView.layer.cornerRadius = self.containerCornerRadius
@@ -85,7 +105,7 @@
     
     // 更新图标与标题之间的间距
     private func updateIconTitleSpacing() {
-        labelTopConstraint.constant = iconTitleSpace
+        nameLabelTopConstraint.constant = iconTitleSpace
         layoutIfNeeded()
     }
     
@@ -108,11 +128,13 @@
         if allowSelection {
             containerView.backgroundColor = data.isSelected ? UIColor.callTheme.barrageLightColor5:UIColor.callTheme.barrageDarkColor9
             imageView.image = UIImage(named: data.isSelected ? data.selectedImageName:data.imageName, in: .callBundle, with: nil)
-            label.text = data.isSelected ? data.selectedTitle:data.title
+            nameLabel.text = data.title
+            statusLabel.text = data.isSelected ? data.selectedStatus : data.status
         } else {
             containerView.backgroundColor = data.color
             imageView.image = UIImage(named: data.imageName, in: .callBundle, with: nil)
-            label.text = data.title
+            nameLabel.text = data.title
+            statusLabel.text = data.status
         }
     }
     
@@ -121,10 +143,21 @@
         if animated {
             UIView.animate(withDuration: 0.3) {
                 self.iconTitleSpace = spacing
+                self.updateIconTitleSpacing()
             }
         } else {
             self.iconTitleSpace = spacing
+            self.updateIconTitleSpacing()
         }
+    }
+    
+    // 便捷方法：更新标签样式
+    public func setLabelStyles(nameFontSize: CGFloat = 12, statusFontSize: CGFloat = 11,
+                               nameColor: UIColor = .white, statusColor: UIColor = .white) {
+        nameLabel.font = UIFont.systemFont(ofSize: nameFontSize)
+        nameLabel.textColor = nameColor
+        statusLabel.font = UIFont.systemFont(ofSize: statusFontSize)
+        statusLabel.textColor = statusColor
     }
 }
 
@@ -147,20 +180,42 @@
 }
 
 @objc public class CallButtonData: NSObject {
-    var title: String
-    var selectedTitle: String?
+    var title: String  // 第一行文字（如 "Mike"）
+    var status: String  // 第二行文字（如 "off"）
+    var selectedStatus: String  // 选中时的第二行文字（如 "on"）
+    var selectedTitle: String?  // 选中时的第一行文字（可选）
     var imageName: String
     var selectedImageName: String
     var color: UIColor?
     var isSelected: Bool = false
     
-    public init(title: String, imageName: String, selectedImageName: String, color: UIColor? = nil, selectedTitle: String? = nil) {
+    public init(title: String,
+                status: String = "",
+                selectedStatus: String = "",
+                imageName: String,
+                selectedImageName: String,
+                color: UIColor? = nil,
+                selectedTitle: String? = nil) {
         self.title = title
+        self.status = status
+        self.selectedStatus = selectedStatus.isEmpty ? status : selectedStatus
         self.imageName = imageName
         self.selectedImageName = selectedImageName
         self.color = color
         self.selectedTitle = selectedTitle
         super.init()
     }
-
 }
+
+// 使用示例
+/*
+let micButton = CallButtonView(frame: CGRect(x: 0, y: 0, width: 60, height: 80))
+let micData = CallButtonData(
+    title: "Mike",
+    status: "off",
+    selectedStatus: "on",
+    imageName: "mic_off",
+    selectedImageName: "mic_on"
+)
+micButton.configure(data: micData)
+*/

@@ -30,11 +30,17 @@ open class CallMultiViewController: UIViewController {
     }
     
     public lazy var callView: MultiPersonCallView = {
-        MultiPersonCallView(frame: CGRect(x: 0, y: NavigationHeight+23, width: ScreenWidth, height: ScreenHeight-NavigationHeight-54-96-20-23)).backgroundColor(.clear)
+        MultiPersonCallView(frame: CGRect(x: 0, y: NavigationHeight+23, width: ScreenWidth, height:self.connected ? ScreenHeight-NavigationHeight-self.bottomView.frame.height-23:ScreenHeight-NavigationHeight-54-96-20-23)).backgroundColor(.clear)
     }()
     
     public lazy var bottomView: MultiCallBottomView = {
-        MultiCallBottomView(frame: CGRect(x: 0, y: ScreenHeight-218-BottomBarHeight, width: ScreenWidth, height: 218+BottomBarHeight), connected: self.connected).backgroundColor(.clear)
+        let bottomBar = MultiCallBottomView(frame: CGRect(x: 0, y: ScreenHeight-218-BottomBarHeight, width: ScreenWidth, height: 218+BottomBarHeight), connected: self.connected).backgroundColor(.clear)
+        
+        bottomBar.animationToExpand = { [weak self] in
+            guard let `self` = self else { return }
+            self.callView.frame = CGRect(x: 0, y: NavigationHeight+23, width: ScreenWidth, height: ScreenHeight-NavigationHeight-bottomBar.frame.height-23)
+        }
+        return bottomBar
     }()
     
     private var connected: Bool {
@@ -109,6 +115,7 @@ open class CallMultiViewController: UIViewController {
     
     func updateBottomState() {
         if self.connected {
+            self.callView.isHidden = !self.connected
             self.bottomView.animateToExpandedState()
         }
     }

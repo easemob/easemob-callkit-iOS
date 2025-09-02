@@ -18,10 +18,10 @@ public class MultiCallBottomView: UIView {
     private var isExpanded = false
     
     public var buttonData = [
-        CallButtonData(title: "Flip".call.localize, imageName: "flip_back", selectedImageName: "flip_front"),
-        CallButtonData(title: "Mic on".call.localize, imageName: "mic_on", selectedImageName: "mic_off",selectedTitle: "Mic off".call.localize),
-        CallButtonData(title: "Speaker on".call.localize, imageName: "speaker_on", selectedImageName: "speaker_off", selectedTitle: "Speaker off".call.localize),
-        CallButtonData(title: "Camera on".call.localize, imageName: "camera_on", selectedImageName: "camera_off", selectedTitle: "Camera off".call.localize),
+        CallButtonData(title: "Flip".call.localize, imageName: "flip_back", selectedImageName: "flip_front", selectedTitle: "Flip".call.localize),
+        CallButtonData(title: "Mic".call.localize, status: "on".call.localize, selectedStatus: "off".call.localize, imageName: "mic_on", selectedImageName: "mic_off",selectedTitle: "Mic".call.localize),
+        CallButtonData(title: "Speaker".call.localize, status: "on".call.localize, selectedStatus: "off".call.localize, imageName: "speaker_on", selectedImageName: "speaker_off", selectedTitle: "Speaker".call.localize),
+        CallButtonData(title: "Camera".call.localize,status: "on".call.localize, selectedStatus: "off".call.localize, imageName: "camera_on", selectedImageName: "camera_off", selectedTitle: "Camera".call.localize),
         CallButtonData(title: "End".call.localize, imageName: "phone_hang", selectedImageName: "phone_hang", color: UIColor.callTheme.errorColor7)
     ]
     
@@ -34,6 +34,7 @@ public class MultiCallBottomView: UIView {
     private let bottomButtonWidth: CGFloat = 70
     
     public var didTapButton: ((CallButtonType) -> Void)?
+    public var animationToExpand: (() -> Void)?
     
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -77,6 +78,7 @@ public class MultiCallBottomView: UIView {
             buttonView.setNeedsLayout()
             buttonView.layoutIfNeeded()
         }
+        self.animationToExpand?()
     }
     
     required init?(coder: NSCoder) {
@@ -99,6 +101,9 @@ public class MultiCallBottomView: UIView {
                 buttonView.allowSelection = false // End Call 按钮不允许选中变化图片文字
             } else {
                 buttonView.allowSelection = true // 其他按钮允许选中
+            }
+            if index == 0 {
+                data.isSelected = true
             }
             buttonView.configure(data: data)
             buttonView.tag = index
@@ -232,6 +237,7 @@ public class MultiCallBottomView: UIView {
         // 1. 隐藏底部按钮
         UIView.animate(withDuration: 0.3) {
             self.frame = CGRect(x: 0, y: ScreenHeight - self.bottomButtonHeight - 16 - BottomBarHeight, width: ScreenWidth, height: self.bottomButtonHeight+16)
+            self.animationToExpand?()
             self.declineButton.alpha = 0
             self.acceptButton.alpha = 0
         }

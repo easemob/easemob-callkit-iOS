@@ -128,15 +128,16 @@ extension CallKitManager: ChatEventsListener {
                             }
                             self.calleeAnswerCaller(callId: callId, callerId: message.from, callerDeviceId: callerDevId)
                             self.startInvitationSignalTimer(callId: callId)
+                            self.updateCallEndReason(.remoteCancel)
                         }
                     }
                     
                     func handleAlertAction() {
-                        if let call = self.callInfo {
-                            if ChatClient.shared().getDeviceConfig(nil).deviceUUID == callerDevId {//主叫回给被叫
-                                self.confirmRing(callId: callId, calleeId: message.from, calleeDeviceId: calleeDevId, is_valid: call.callId == callId)
+                        if ChatClient.shared().getDeviceConfig(nil).deviceUUID == callerDevId {//主叫回给被叫
+                            if let call = self.callInfo {
+                                self.confirmRing(callId: callId, calleeId: message.from, calleeDeviceId: calleeDevId, is_valid: call.callId == callId && call.state == .dialing)
                             } else {
-                                consoleLogInfo("Current device:\(call.callerDeviceId) Call accept on other device:\(calleeDevId) messageId:\(message.messageId) ext:\(String(describing: ext))", type: .error)
+                                self.confirmRing(callId: callId, calleeId: message.from, calleeDeviceId: calleeDevId, is_valid: false)
                             }
                         }
                     }
@@ -174,11 +175,14 @@ extension CallKitManager: ChatEventsListener {
                         self.stopRingTimer(callId: callId)
                         if let call = self.callInfo, call.callId == callId,call.state == .ringing {
                             consoleLogInfo("Call canceled with callId: \(callId)", type: .info)
-                            self.updateCallEndReason(.remoteCancel)
                             self.dismissCurrentCallPage()
+                            self.updateCallEndReason(.remoteCancel)
                         } else {
                             consoleLogInfo("Call canceled with callId: \(callId) state:\(String(describing: self.callInfo?.state)) call.callId:\(String(describing: self.callInfo?.callId))", type: .info)
-                            self.receivedCalls.removeValue(forKey: callId)
+                            if let call = self.receivedCalls[callId],self.callInfo == nil {
+                                self.updateCallEndReason(.remoteCancel,true, call)
+                            }
+                            
                         }
                     }
                     
@@ -206,6 +210,7 @@ extension CallKitManager: ChatEventsListener {
                                                 UIViewController.currentController?.showCallToast(toast: "Connecting".call.localize)
                                             }
                                         }
+                                        self.setupLocalVideo()
                                         self.joinChannel(channelName: self.callInfo?.channelName ?? "") { [weak self] success in
                                             guard let `self` = self else { return }
                                             if success {
@@ -324,7 +329,12 @@ extension CallKitManager: ChatEventsListener {
                                 }
                             } else {
                                 consoleLogInfo("Call ended by remote user:\(message.from) for callId: \(callId)", type: .info)
-                                self.updateCallEndReason(.hangup)
+                                switch call.state {
+                                case .ringing:
+                                    self.updateCallEndReason(.remoteCancel)
+                                default:
+                                    self.updateCallEndReason(.hangup)
+                                }
                             }
                         }
                     }
@@ -348,9 +358,16 @@ extension CallKitManager: ChatEventsListener {
     /// - Parameters:
     ///   - reason: The reason for ending the call.``CallEndReason``
     ///   - immediateCallback: If true, the update will immediately notify listeners with the updated message.
-    func updateCallEndReason(_ reason: CallEndReason, _ immediateCallback: Bool = true) {
+    ///   - callInfo: If provided, this CallInfo will be used for the callback instead of self.callInfo.
+    func updateCallEndReason(_ reason: CallEndReason, _ immediateCallback: Bool = true, _ callInfo: CallInfo? = nil) {
         consoleLogInfo("Update call end reason to: \(reason.rawValue)", type: .info)
-        if let info = self.callInfo,let message = ChatClient.shared().chatManager?.getMessageWithMessageId(info.inviteMessageId) {
+        var info: CallInfo?
+        if self.callInfo != nil,!(self.callInfo?.callId.isEmpty ?? false) {
+            info = self.callInfo
+        } else {
+            info = callInfo
+        }
+        if let message = ChatClient.shared().chatManager?.getMessageWithMessageId(info?.inviteMessageId ?? "") {
             let ext = message.ext ?? [:]
             var newExt = ext
             newExt[kCallEndReason] = reason.rawValue
@@ -364,10 +381,16 @@ extension CallKitManager: ChatEventsListener {
                     consoleLogInfo("Failed to update call reason:\(reason.rawValue): \(String(describing: error.errorDescription))", type: .error)
                 } else {
                     if immediateCallback {
-                        for listener in self.listeners.allObjects {
-                            listener.didUpdateCallEndReason?(reason: reason, info: info)
+                        if let callbackInfo = info {
+                            for listener in self.listeners.allObjects {
+                                listener.didUpdateCallEndReason?(reason: reason, info: callbackInfo)
+                            }
+                            if !(self.callInfo?.callId.isEmpty ?? false) {
+                                self.quitCall()
+                            } else {
+                                self.receivedCalls.removeValue(forKey: callbackInfo.callId)
+                            }
                         }
-                        self.quitCall()
                     }
                 }
             }
@@ -381,6 +404,9 @@ extension CallKitManager: ChatEventsListener {
             user = CallUserProfile()
             user?.id = call.callerId
             user?.nickname = call.callerId
+        }
+        if call.state != .ringing {
+            return
         }
         switch UIApplication.shared.applicationState {
         case .active:
@@ -1320,6 +1346,8 @@ extension CallKitManager: CallMessageService {
             case .answering:
                 self.updateCallEndReason(.hangup)
                 self.terminateCall()
+                call.state = .idle
+                GlobalTimerManager.shared.invalidate()
             case .dialing:
                 if call.type == .groupCall {
                     let inviteGroupUserTimerKeys = GlobalTimerManager.shared.timerCache.keys.filter { $0.components(separatedBy: " users:").count > 0 }
@@ -1328,7 +1356,8 @@ extension CallKitManager: CallMessageService {
                         let callId = keyComponents.first ?? ""
                         
                         if callId.hasSuffix(call.callId) {
-                            let users = keyComponents.last?.components(separatedBy: ",") ?? [].filter({ $0 != "start" && $0 != "timer" })
+                            let trails = keyComponents.last?.components(separatedBy: "-") ?? []
+                            let users = trails.first?.components(separatedBy: ",") ?? []
                             var calleeId = ""
                             let callees = users.joined(separator: ",")
                             if users.count > 1 {
@@ -1343,6 +1372,8 @@ extension CallKitManager: CallMessageService {
                     }
                 } else {
                     self.cancelCall(callId: call.callId, calleeId:call.calleeId)
+                    call.state = .idle
+                    GlobalTimerManager.shared.invalidate()
                 }
                 self.updateCallEndReason(.cancel)
             case .ringing:
@@ -1350,6 +1381,10 @@ extension CallKitManager: CallMessageService {
                 self.updateCallEndReason(.refuse)
             default:
                 break
+            }
+        } else {
+            if #available(iOS 17.4, *),self.config.enableVOIP, LiveCommunicationManager.shared.manager != nil {
+                LiveCommunicationManager.shared.endCall()
             }
         }
     }

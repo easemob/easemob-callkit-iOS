@@ -83,7 +83,7 @@ public class Call1v1AudioViewController: UIViewController {
             if CallKitManager.shared.callInfo?.state ?? .idle == .answering,self.bottomView.currentState == .connected {
                 return
             }
-            self.bottomView.setState(self.bottomView.currentState, animated: false)
+            self.bottomView.setState(.connected, animated: false)
         })
     }
     

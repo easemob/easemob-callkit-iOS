@@ -28,6 +28,9 @@ public class CallStreamView: UIImageView {
                 self.networkStatusView.isHidden = false
             } else {
                 self.networkStatusView.isHidden = displayMode == .hidden
+                if self.item.waiting {
+                    self.networkStatusView.isHidden = true
+                }
             }
         }
     }
@@ -179,9 +182,11 @@ public class CallStreamView: UIImageView {
         self.imageCover.alpha = newItem.videoMuted ? 0.5 : 0.0
         self.bringSubviewToFront(self.userInfoView)
         self.bringSubviewToFront(self.networkStatusView)
+        self.networkStatusView.isHidden = newItem.waiting
     }
     
     func updateUserInfo(newItem: CallStreamItem) {
+        self.networkStatusView.isHidden = newItem.waiting
         self.item = newItem
         let nickname = CallKitManager.shared.usersCache[newItem.userId]?.nickname ?? newItem.userId
         if !nickname.isEmpty {
