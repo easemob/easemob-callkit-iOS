@@ -1727,8 +1727,9 @@ extension CallKitManager: TimerServiceListener {
                             var removeUsers: [String] = []
                             for key in inviteGroupUserTimerKeys {
                                 if timerIdentify == key,seconds >= CallKitManager.shared.config.ringTimeOut {
-                                    var users = key.components(separatedBy: " users:").last?.components(separatedBy: ",") ?? []
-                                    users.removeAll { $0 == "start" || $0 == "timer" }
+                                    let keyComponents = key.components(separatedBy: " users:")
+                                    let trails = keyComponents.last?.components(separatedBy: "-") ?? []
+                                    let users = trails.first?.components(separatedBy: ",") ?? []
                                     for userId in users {
                                         if let item = self.itemsCache[userId],item.waiting {
                                             removeUsers.append(userId)
