@@ -753,7 +753,9 @@ extension CallKitManager: AgoraVideoFrameDelegate {
     }
     
     public func onRenderVideoFrame(_ videoFrame: AgoraOutputVideoFrame, uid: UInt, channelId: String) -> Bool {// This method is called when remote video frame is rendered.
-        UIApplication.shared.isIdleTimerDisabled = true
+        DispatchQueue.main.async {
+            UIApplication.shared.isIdleTimerDisabled = true
+        }
         if let call = self.callInfo {
             if call.type == .singleVideo {
                 if let controller = UIViewController.currentController as? Call1v1VideoViewController{
