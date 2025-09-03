@@ -318,8 +318,7 @@ extension CallKitManager: AgoraRtcEngineDelegate {
                                 item.uid = UInt32(truncating: uidKey)
                                 item.waiting = false
                                 streamView.updateUserInfo(newItem: item)
-                                engine.setRemoteVideoStream(uid, type: type)
-                                consoleLogInfo("rtcEngine didJoinedOfUid: setRemoteVideoStream \(uid) userId:\(userId) uidKey:\(uidKey) uidNotFound:\(uidNotFound) userIdNotFound:\(userIdNotFound)", type: .debug)
+                                consoleLogInfo("rtcEngine didJoinedOfUid: setRemoteVideoStream userId:\(userId) uidKey:\(uidKey) uidNotFound:\(uidNotFound) userIdNotFound:\(userIdNotFound)", type: .debug)
                             } else {
                                 userIdNotFound = true
                             }
@@ -328,8 +327,7 @@ extension CallKitManager: AgoraRtcEngineDelegate {
                                 first.uid = UInt32(truncating: uidKey)
                                 first.waiting = false
                                 canvasCache[first.userId]?.updateUserInfo(newItem: first)
-                                engine.setRemoteVideoStream(uid, type: type)
-                                consoleLogInfo("rtcEngine didJoinedOfUid: setRemoteVideoStream \(uid) userId:\(userId) uidKey:\(uidKey) uidNotFound:\(uidNotFound) userIdNotFound:\(userIdNotFound)", type: .debug)
+                                consoleLogInfo("rtcEngine didJoinedOfUid: setRemoteVideoStream userId:\(userId) uidKey:\(uidKey) uidNotFound:\(uidNotFound) userIdNotFound:\(userIdNotFound)", type: .debug)
                             } else {
                                 uidNotFound = true
                             }
@@ -345,8 +343,7 @@ extension CallKitManager: AgoraRtcEngineDelegate {
                                     listener.remoteUserDidJoined?(userId: userId, channelName: call.channelName, type: call.type)
                                 }
                             }
-                            consoleLogInfo("rtcEngine didJoinedOfUid: setRemoteVideoStream \(uid) userId:\(userId) uidKey:\(uidKey) uidNotFound:\(uidNotFound) userIdNotFound:\(userIdNotFound)", type: .debug)
-                            engine.setRemoteVideoStream(uid, type: type)
+                            consoleLogInfo("rtcEngine didJoinedOfUid: setRemoteVideoStream  userId:\(userId) uidKey:\(uidKey) uidNotFound:\(uidNotFound) userIdNotFound:\(userIdNotFound)", type: .debug)
                         }
                         if let currentVC = UIViewController.currentController as? CallMultiViewController {
                             currentVC.callView.updateWithItems()
@@ -467,7 +464,7 @@ extension CallKitManager: AgoraRtcEngineDelegate {
                             switch videoState {// Handle different states of remote video.Starting&unmute, stopped&mute
                             case .starting,.decoding:
                                 if uidNotFound,userIdNotFound {
-                                    let item = CallStreamItem(userId: userId, index: 1, isExpanded: false)
+                                    let item = CallStreamItem(userId: userId, index: self.itemsCache.count+1, isExpanded: false)
                                     item.waiting = false
                                     item.uid = UInt32(truncating: uidKey)
                                     self.itemsCache[userId] = item
@@ -485,9 +482,9 @@ extension CallKitManager: AgoraRtcEngineDelegate {
                                     item.videoMuted = false
                                     item.uid = UInt32(truncating: uidKey)
                                     streamView.updateItem(item)
-                                    self.setupRemoteVideoView(userId: userId, uid: uid)
+                                    self.setupRemoteVideoView(userId: userId, uid: uidKey.uintValue)
                                 }
-                                consoleLogInfo("remoteVideoStateChangedOfUid: \(uid) userId:\(userId) state: starting", type: .debug)
+                                consoleLogInfo("remoteVideoStateChangedOfUid: \(uidKey.uintValue) userId:\(userId) state: starting", type: .debug)
                                 
                             case .stopped:
                                 let videoReason = infos.first(where: { $0.uid == uidKey.uintValue })?.reason ?? .remoteMuted
@@ -554,14 +551,17 @@ extension CallKitManager: AgoraRtcEngineDelegate {
                     ChatClient.shared().getUserId(byRTCUIds: infos.map { NSNumber(value: $0.uid ) }) { [weak self] relations, error in
                         guard let `self` = self else { return }
                         
-                        for (uid,user) in relations ?? [:] {
-                            let mute = infos.first(where: { $0.uid == uid.uintValue })?.muted ?? false
+                        for (uidKey,user) in relations ?? [:] {
+                            let mute = infos.first(where: { $0.uid == uidKey.uintValue })?.muted ?? false
                             if let streamView = self.canvasCache[user],let item = self.itemsCache[user] {
+                                item.uid = uidKey.uint32Value
+                                item.userId = user
                                 item.audioMuted = mute
                                 streamView.updateItem(item)
                             } else {
                                 let item = CallStreamItem(userId: user, index: self.itemsCache.count + 1, isExpanded: false)
                                 item.audioMuted = mute
+                                item.uid = uidKey.uint32Value
                                 self.itemsCache[user] = item
                                 let view = CallStreamView(item: item)
                                 self.canvasCache[user] = view
@@ -576,7 +576,7 @@ extension CallKitManager: AgoraRtcEngineDelegate {
                                     }
                                 }
                             }
-                            consoleLogInfo("rtcEngine didAudioMuted: \(muted) byUid: \(uid) userId:\(user)", type: .debug)
+                            consoleLogInfo("rtcEngine didAudioMuted: \(muted) byUid: \(uidKey) userId:\(user)", type: .debug)
                         }
                     }
                 }
