@@ -491,7 +491,7 @@ extension CallKitManager: AgoraRtcEngineDelegate {
                                 consoleLogInfo("remoteVideoStateChangedOfUid: \(uidKey.uintValue) userId:\(userId) state: starting", type: .debug)
                                 
                             case .stopped:
-                                let videoReason = infos.first(where: { $0.uid == uidKey.uintValue })?.reason ?? .remoteMuted
+                                let videoReason = info.reason
                                 if let streamView = self.canvasCache[userId],let item = self.itemsCache[userId] {
                                     if videoReason == .remoteMuted {// Remote video muted
                                         item.videoMuted = true
