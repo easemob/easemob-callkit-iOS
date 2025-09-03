@@ -28,9 +28,9 @@ struct RTCAudioMuteInfo {
 
 class RTCCallbackThrottler {
     // 分别存储不同类型的待处理信息
-    private var pendingVideoStates: [UInt: RTCVideoStateInfo] = [:]
-    private var pendingUserJoins: [UInt: RTCUserJoinInfo] = [:]
-    private var pendingAudioMutes: [UInt: RTCAudioMuteInfo] = [:]
+    private var pendingVideoStates: [RTCVideoStateInfo] = []
+    private var pendingUserJoins: [RTCUserJoinInfo] = []
+    private var pendingAudioMutes: [RTCAudioMuteInfo] = []
     
     // 为不同类型的回调使用不同的定时器
     private var videoStateTimer: Timer?
@@ -56,7 +56,7 @@ class RTCCallbackThrottler {
                                          reason: reason,
                                          elapsed: elapsed)
         
-        pendingVideoStates[uid] = stateInfo
+        pendingVideoStates.append(stateInfo)
         
         if pendingVideoStates.count >= maxBatchSize {
             processVideoStateBatch(completion: completion)
@@ -75,7 +75,7 @@ class RTCCallbackThrottler {
         lock.lock()
         defer { lock.unlock() }
         
-        let statesToProcess = Array(pendingVideoStates.values)
+        let statesToProcess = Array(pendingVideoStates)
         pendingVideoStates.removeAll()
         videoStateTimer?.invalidate()
         videoStateTimer = nil
@@ -92,7 +92,7 @@ class RTCCallbackThrottler {
         defer { lock.unlock() }
         
         let joinInfo = RTCUserJoinInfo(uid: uid, elapsed: elapsed)
-        pendingUserJoins[uid] = joinInfo
+        pendingUserJoins.append(joinInfo)
         
         if pendingUserJoins.count >= maxBatchSize {
             processUserJoinBatch(completion: completion)
@@ -111,7 +111,7 @@ class RTCCallbackThrottler {
         lock.lock()
         defer { lock.unlock() }
         
-        let joinsToProcess = Array(pendingUserJoins.values)
+        let joinsToProcess = Array(pendingUserJoins)
         pendingUserJoins.removeAll()
         userJoinTimer?.invalidate()
         userJoinTimer = nil
@@ -128,7 +128,7 @@ class RTCCallbackThrottler {
         defer { lock.unlock() }
         
         let muteInfo = RTCAudioMuteInfo(uid: uid, muted: muted)
-        pendingAudioMutes[uid] = muteInfo
+        pendingAudioMutes.append(muteInfo)
         
         if pendingAudioMutes.count >= maxBatchSize {
             processAudioMuteBatch(completion: completion)
@@ -147,7 +147,7 @@ class RTCCallbackThrottler {
         lock.lock()
         defer { lock.unlock() }
         
-        let mutesToProcess = Array(pendingAudioMutes.values)
+        let mutesToProcess = Array(pendingAudioMutes)
         pendingAudioMutes.removeAll()
         audioMuteTimer?.invalidate()
         audioMuteTimer = nil
@@ -183,6 +183,15 @@ class RTCCallbackThrottler {
     
     func clear() {
         flushAll()
+    }
+    
+    func clearUserPendings(with uid: UInt) {
+        lock.lock()
+        defer { lock.unlock() }
+        
+        pendingUserJoins.removeAll { $0.uid == uid }
+        pendingAudioMutes.removeAll { $0.uid == uid }
+        pendingVideoStates.removeAll { $0.uid == uid }
     }
 }
 

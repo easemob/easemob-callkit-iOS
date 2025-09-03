@@ -289,7 +289,6 @@ extension CallKitManager: AgoraRtcEngineDelegate {
         consoleLogInfo("rtcEngine didJoinedOfUid: \(uid) elapsed: \(elapsed)", type: .debug)
         AudioPlayerManager.shared.stopAudio()
         //Setting remote video render qutity for the user who just joined
-        let type = self.getStreamRenderQuality(with: UInt(self.canvasCache.count))
         if let call = self.callInfo,!call.callId.isEmpty {
             if call.callerId == ChatClient.shared().currentUsername ?? "" {
                 call.state = .answering
@@ -306,7 +305,9 @@ extension CallKitManager: AgoraRtcEngineDelegate {
                             consoleLogInfo("Failed to get userId by RTC UIDs: \(error.errorDescription ?? "Unknown error")", type: .error)
                             return
                         }
-                        for (uidKey, userId) in relations ?? [:] {
+                        for info in infos {
+                            let uidKey = NSNumber(value: info.uid)
+                            let userId = relations?[uidKey] ?? ""
                             //Find and remove any existing timers related to this user
                             CallKitManager.shared.stopRingTimer(callId: call.callId)
                             CallKitManager.shared.stopConfirmBuildConnectionTimer(callId: call.callId)
@@ -383,6 +384,7 @@ extension CallKitManager: AgoraRtcEngineDelegate {
     public func rtcEngine(_ engine: AgoraRtcEngineKit, didOfflineOfUid uid: UInt, reason: AgoraUserOfflineReason) {
         //On remote user leaving the RTC channel
         consoleLogInfo("rtcEngine didOfflineOfUid: \(uid) reason: \(reason.rawValue)", type: .debug)
+        self.rtcThrottler.clearUserPendings(with: uid)
         DispatchQueue.main.async {
             if let call = self.callInfo,!call.callId.isEmpty {
                 if call.type == .groupCall {
@@ -447,7 +449,9 @@ extension CallKitManager: AgoraRtcEngineDelegate {
                             consoleLogInfo("Failed to get userId by RTC UIDs: \(error.errorDescription ?? "Unknown error")", type: .error)
                             return
                         }
-                        for (uidKey, userId) in relations ?? [:] {
+                        for info in infos {
+                            let uidKey = NSNumber(value: info.uid)
+                            let userId = relations?[uidKey] ?? ""
                             var userIdNotFound = false
                             if let streamView = self.canvasCache[userId],let item = self.itemsCache[userId]  {
                                 item.uid = UInt32(truncating: uidKey)
@@ -460,7 +464,7 @@ extension CallKitManager: AgoraRtcEngineDelegate {
                             if self.itemsCache.values.first(where: { $0.uid == UInt32(truncating: uidKey) }) == nil {
                                 uidNotFound = true
                             }
-                            let videoState = infos.first(where: { $0.uid == uidKey.uintValue })?.state ?? .stopped
+                            let videoState = info.state
                             switch videoState {// Handle different states of remote video.Starting&unmute, stopped&mute
                             case .starting,.decoding:
                                 if uidNotFound,userIdNotFound {
@@ -487,7 +491,7 @@ extension CallKitManager: AgoraRtcEngineDelegate {
                                 consoleLogInfo("remoteVideoStateChangedOfUid: \(uidKey.uintValue) userId:\(userId) state: starting", type: .debug)
                                 
                             case .stopped:
-                                let videoReason = infos.first(where: { $0.uid == uidKey.uintValue })?.reason ?? .remoteMuted
+                                let videoReason = info.reason
                                 if let streamView = self.canvasCache[userId],let item = self.itemsCache[userId] {
                                     if videoReason == .remoteMuted {// Remote video muted
                                         item.videoMuted = true
@@ -500,7 +504,6 @@ extension CallKitManager: AgoraRtcEngineDelegate {
                                 break
                             }
                         }
-                        
                     }
                 }
             }
@@ -550,9 +553,10 @@ extension CallKitManager: AgoraRtcEngineDelegate {
                     guard let `self` = self else { return }
                     ChatClient.shared().getUserId(byRTCUIds: infos.map { NSNumber(value: $0.uid ) }) { [weak self] relations, error in
                         guard let `self` = self else { return }
-                        
-                        for (uidKey,user) in relations ?? [:] {
-                            let mute = infos.first(where: { $0.uid == uidKey.uintValue })?.muted ?? false
+                        for info in infos {
+                            let uidKey = NSNumber(value: info.uid)
+                            let user = relations?[uidKey] ?? ""
+                            let mute = info.muted
                             if let streamView = self.canvasCache[user],let item = self.itemsCache[user] {
                                 item.uid = uidKey.uint32Value
                                 item.userId = user
@@ -578,6 +582,7 @@ extension CallKitManager: AgoraRtcEngineDelegate {
                             }
                             consoleLogInfo("rtcEngine didAudioMuted: \(muted) byUid: \(uidKey) userId:\(user)", type: .debug)
                         }
+                        
                     }
                 }
                 
