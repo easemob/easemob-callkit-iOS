@@ -77,7 +77,32 @@ public class MultiPersonCallView: UIView {
     }
 
     private func animateRemovalInExpandedState(viewsToRemove: [CallStreamView], viewsInScrollView: [CallStreamView]) {
-        self.isAnimating = true
+        // 先从缓存中移除
+        for view in viewsToRemove {
+            CallKitManager.shared.canvasCache.removeValue(forKey: view.item.userId)
+        }
+        
+        let remainingCount = CallKitManager.shared.canvasCache.count
+        
+        // 如果只剩1个，转换到单视图布局
+        if remainingCount == 1 {
+            self.animateToSingleViewLayout()
+            return  // 提前返回，避免后续操作
+        }
+        
+        // 如果没有展开视图了，返回正常状态
+        if let expandedView = expandedView, viewsToRemove.contains(expandedView) {
+            self.animateRemovalAndReturnToNormal(viewsToRemove: viewsToRemove)
+            return
+        }
+        
+        // 确保 scrollView 存在
+        guard let scrollView = scrollView else {
+            // 如果 scrollView 丢失，重建展开状态
+            self.layoutItemsForExpandedState()
+            self.setAnimating(false)
+            return
+        }
         
         var completionCount = 0
         let totalAnimations = (!viewsInScrollView.isEmpty ? 1 : 0) +
@@ -207,7 +232,11 @@ public class MultiPersonCallView: UIView {
 
     // 更新 scrollView 中的内容布局
     private func updateScrollViewContent() {
-        guard let scrollView = scrollView, let expandedView = expandedView else { return }
+        guard let scrollView = scrollView, let expandedView = expandedView else {
+            // 如果没有展开视图，应该回到正常状态
+            layoutItemsForNormalState()
+            return
+        }
         
         NSLayoutConstraint.deactivate(activeConstraints)
         activeConstraints.removeAll()
@@ -1134,6 +1163,7 @@ extension MultiPersonCallView {
         oldView.isHidden = true
         oldView.alpha = 0
         
+        
         // 7. 准备 oldView 的最终位置
         CATransaction.begin()
         CATransaction.setDisableActions(true)
@@ -1167,6 +1197,7 @@ extension MultiPersonCallView {
         layoutItemsForExpandedState()
         self.setNeedsLayout()
         self.layoutIfNeeded()
+        Thread.sleep(forTimeInterval: 0.01)
         
         let newExpandedFrame = newView.frame
         var oldThumbnailFrameInMainView: CGRect = .zero
@@ -1368,7 +1399,7 @@ extension MultiPersonCallView {
         } else if expandedView != nil {
             animateRemovalInExpandedState(viewsToRemove: viewsToRemove, viewsInScrollView: viewsInScrollView)
         } else {
-            setupViews()
+            layoutItemsForNormalState()
         }
         
         updateAllDisplayModes()

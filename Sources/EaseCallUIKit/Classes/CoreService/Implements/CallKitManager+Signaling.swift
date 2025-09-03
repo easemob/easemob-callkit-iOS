@@ -136,14 +136,16 @@ extension CallKitManager: ChatEventsListener {
                         if ChatClient.shared().getDeviceConfig(nil).deviceUUID == callerDevId {//主叫回给被叫
                             if let call = self.callInfo {
                                 var stateJudgement = false
+                                
+                                var userInvited = true
                                 if call.type == .groupCall {
+                                    userInvited = self.callInfo?.inviteUsers.contains(message.from) ?? false
                                     if call.state == .answering || call.state == .dialing {
                                         stateJudgement = true
                                     }
                                 } else {
                                     stateJudgement = call.state == .dialing
                                 }
-                                let userInvited = self.callInfo?.inviteUsers.contains(message.from) ?? false
                                 self.confirmRing(callId: callId, calleeId: message.from, calleeDeviceId: calleeDevId, is_valid: call.callId == callId && stateJudgement && userInvited)
                             } else {
                                 self.confirmRing(callId: callId, calleeId: message.from, calleeDeviceId: calleeDevId, is_valid: false)
@@ -1510,7 +1512,9 @@ extension CallKitManager: CallMessageService {
             consoleLogInfo("\(currentUser) joined channel: \(channel) with uid: \(uid) elapsed: \(elapsed): account \(ChatClient.shared().currentUsername ?? "")", type: .debug)
             if uid == self.currentUserRTCUID {
                 self.hadJoinedChannel = true
-                self.updateCallEndReason(.abnormalEnd,false)
+                DispatchQueue.global().asyncAfter(deadline: .now() + 2.4, execute: {
+                    self.updateCallEndReason(.abnormalEnd,false)
+                })
             }
             completion(true)
         }) ?? 0
