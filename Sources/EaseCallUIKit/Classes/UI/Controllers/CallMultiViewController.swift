@@ -281,7 +281,7 @@ open class CallMultiViewController: UIViewController {
         let point = touch.location(in: self.view)
         
         // 检查是否点击在 callView 内
-        if self.callView.frame.contains(point) {
+        if self.callView.frame.contains(point),!self.callView.isHidden {
             // 将点转换为 callView 的坐标系
             let pointInCallView = touch.location(in: self.callView)
             

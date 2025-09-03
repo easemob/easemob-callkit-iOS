@@ -487,11 +487,13 @@ extension CallKitManager: ChatEventsListener {
     }
     
     func presentCalleeController(call: CallInfo) {
+        consoleLogInfo("Present callee controller for callId: \(call.callId)", type: .info)
         let currentVC = UIViewController.currentController
         if currentVC is CallMultiViewController || currentVC is Call1v1AudioViewController || currentVC is Call1v1VideoViewController {
             (currentVC as? Call1v1AudioViewController)?.updateBottomState()
             (currentVC as? Call1v1VideoViewController)?.updateBottomState()
             (currentVC as? CallMultiViewController)?.updateBottomState()
+            consoleLogInfo("Call page already presented for callId: \(call.callId)", type: .info)
             return
         }
         if call.state != .idle {
@@ -507,8 +509,10 @@ extension CallKitManager: ChatEventsListener {
                 break
             }
             let root = UIApplication.shared.call.keyWindow?.rootViewController
-            root?.present(vc, animated: true)
-            consoleLogInfo("Present callee page for callId: \(call.callId) root \(String(describing: root))", type: .info)
+            root?.present(vc, animated: true, completion: {
+                consoleLogInfo("Present callee page for callId: \(call.callId) root \(String(describing: root))", type: .info)
+            })
+            
         }
     }
     
@@ -533,7 +537,9 @@ extension CallKitManager: ChatEventsListener {
             break
         }
         DispatchQueue.main.asyncAfter(wallDeadline: .now()+0.25) {
-            UIApplication.shared.call.keyWindow?.rootViewController?.present(vc, animated: true)
+            UIApplication.shared.call.keyWindow?.rootViewController?.present(vc, animated: true,completion: {
+                consoleLogInfo("Present caller page for callId: \(call.callId)", type: .info)
+            })
         }
     }
     
