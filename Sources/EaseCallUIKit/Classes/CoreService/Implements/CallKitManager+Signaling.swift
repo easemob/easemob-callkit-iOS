@@ -87,7 +87,7 @@ extension CallKitManager: ChatEventsListener {
                         handleConfirmCalleeAction()
                     case CALL_ANSWER://主叫收到被叫接受/拒绝/忙碌通话
                         handleAnswerCallAction()
-                    case CALL_END:
+                    case CALL_END://退出通话
                         handleEndCallAction()
                     default:
                         consoleLogInfo("Unknown action type: \(action) in message id:\(message.messageId)", type: .error)
@@ -509,9 +509,16 @@ extension CallKitManager: ChatEventsListener {
                 break
             }
             let root = UIApplication.shared.call.keyWindow?.rootViewController
-            root?.present(vc, animated: true, completion: {
-                consoleLogInfo("Present callee page for callId: \(call.callId) root \(String(describing: root))", type: .info)
-            })
+//            if let tab = root as? UITabBarController, let selected = tab.selectedViewController {
+//
+//                selected.present(vc, animated: true, completion: {
+//                    consoleLogInfo("Present callee page for callId: \(call.callId) root \(String(describing: root))", type: .info)
+//                })
+//            } else {
+            UIViewController.currentController?.present(vc, animated: true, completion: {
+                    consoleLogInfo("Present callee page for callId: \(call.callId) root \(String(describing: root))", type: .info)
+                })
+//            }
             
         }
     }

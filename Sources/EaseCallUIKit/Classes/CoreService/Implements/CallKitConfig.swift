@@ -35,4 +35,8 @@ import Foundation
 //            CallAppearance.backgroundImage = backgroundImage
 //        }
 //    }
+    
+    public var maximumConversationGroups: Int = 1
+    
+    public var maximumConversationsPerConversationGroup: Int = 1
 }

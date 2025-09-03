@@ -15,7 +15,7 @@ public let CallKitVersion = "1.0.0"
 
 @objcMembers public class CallKitManager: NSObject {
     /// Cache for user profiles
-    public var usersCache: [String: CallProfileProtocol] = [:]
+    @CallAtomicUnfairLock public var usersCache: [String: CallProfileProtocol] = [:]
     
     /// CallKitManager shared instance
     public static let shared = CallKitManager()
@@ -58,7 +58,7 @@ public let CallKitVersion = "1.0.0"
         }
     }
     
-    /// Current user token for Agora SDK
+    /// Current user token for AgoraRTC SDK
     @CallUserDefault("CallKitManager.token", defaultValue: "") public var token: String
     
     /// Current user RTC UID
@@ -123,7 +123,7 @@ public let CallKitVersion = "1.0.0"
         consoleLogInfo("CallKitManager setup completed", type: .info)
         self.checkCameraPermission()
         self.checkMicrophonePermission()
-        if #available(iOS 17.4, *) {
+        if #available(iOS 17.4, *),self.config.enableVOIP {
             LiveCommunicationManager.shared.setupPushKit()
         }
         NotificationCenter.default.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { [weak self] _ in
