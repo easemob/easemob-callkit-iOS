@@ -30,6 +30,7 @@
     override init(frame: CGRect) {
         super.init(frame: frame)
         self.containerCornerRadius = frame.width / 2
+        setupUI()
     }
     
     convenience public init(frame: CGRect, iconTitleSpace: CGFloat = 4) {
@@ -123,7 +124,7 @@
         didTap?(self)
     }
     
-    func configure(data: CallButtonData) {
+    @MainActor func configure(data: CallButtonData) {
         self.data = data
         if allowSelection {
             containerView.backgroundColor = data.isSelected ? UIColor.callTheme.barrageLightColor5:UIColor.callTheme.barrageDarkColor9

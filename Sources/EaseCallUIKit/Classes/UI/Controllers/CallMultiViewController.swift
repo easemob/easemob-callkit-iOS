@@ -81,10 +81,12 @@ open class CallMultiViewController: UIViewController {
     open override func viewDidLoad() {
         super.viewDidLoad()
         let state = self.connected
+        self.view.addSubViews([self.background, self.navigationBar,self.bottomView,self.callView])
         if state {
             self.addCallTimer()
+        } else {
+            self.bottomView.isCallConnected = false
         }
-        self.view.addSubViews([self.background, self.navigationBar,self.bottomView,self.callView])
         self.bottomView.updateButtonSelectedStatus(selectedIndex: 3)
         self.callView.isHidden = !state
         // Do any additional setup after loading the view.
@@ -117,6 +119,7 @@ open class CallMultiViewController: UIViewController {
         if self.connected {
             self.callView.isHidden = !self.connected
             self.bottomView.animateToExpandedState()
+            self.bottomView.isCallConnected = true
             self.callView.frame = CGRect(x: 0, y: NavigationHeight+23, width: ScreenWidth, height: ScreenHeight-NavigationHeight-self.bottomView.frame.height-23-29)
         }
     }
@@ -185,10 +188,6 @@ open class CallMultiViewController: UIViewController {
                 consoleLogInfo("CallMultiViewController: Current user not found in items cache.", type: .error)
                 return
             }
-            if let call = CallKitManager.shared.callInfo,call.state != .answering {
-                self.bottomView.updateButtonSelectedStatus(selectedIndex: 3)
-                return
-            }
             CallKitManager.shared.setupLocalVideo()
             CallKitManager.shared.enableLocalVideo(true)
             item.videoMuted = false
@@ -196,10 +195,6 @@ open class CallMultiViewController: UIViewController {
         case .camera_off:
             guard let currentUserId = ChatClient.shared().currentUsername,let item = CallKitManager.shared.itemsCache[currentUserId],let canvas = CallKitManager.shared.canvasCache[currentUserId] else {
                 consoleLogInfo("CallMultiViewController: Current user not found in items cache.", type: .error)
-                return
-            }
-            if let call = CallKitManager.shared.callInfo,call.state != .answering {
-                self.bottomView.updateButtonSelectedStatus(selectedIndex: 3)
                 return
             }
             CallKitManager.shared.enableLocalVideo(false)

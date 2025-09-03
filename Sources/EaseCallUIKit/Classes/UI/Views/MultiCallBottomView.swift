@@ -35,6 +35,25 @@ public class MultiCallBottomView: UIView {
     
     public var didTapButton: ((CallButtonType) -> Void)?
     public var animationToExpand: (() -> Void)?
+    // 添加属性来控制按钮的启用状态
+    public var isCallConnected: Bool = false {
+        didSet {
+            updateButtonsInteractionState()
+        }
+    }
+    
+    // 添加需要在通话接通后才能使用的按钮索引
+    private let requiresConnectionButtonIndexes = [3] // Camera 按钮
+    
+    // 更新按钮交互状态
+    private func updateButtonsInteractionState() {
+        for (index, buttonView) in buttonViews.enumerated() {
+            if requiresConnectionButtonIndexes.contains(index) {
+                buttonView.isUserInteractionEnabled = isCallConnected
+                buttonView.alpha = isCallConnected ? 1.0 : 0.5 // 视觉提示
+            }
+        }
+    }
     
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -108,10 +127,17 @@ public class MultiCallBottomView: UIView {
             buttonView.configure(data: data)
             buttonView.tag = index
             buttonView.didTap = { [weak self] button in
-                guard let `self` = self else { return }
+                guard let self = self else { return }
+                
+                // 检查按钮是否需要通话接通
+                if self.requiresConnectionButtonIndexes.contains(button.tag) && !self.isCallConnected {
+                    // 提供视觉反馈但不执行操作
+                    self.shakeButton(button)
+                    return
+                }
+                
                 UIImpactFeedbackGenerator.impactOccurred(style: .light)
-                if let buttonData = button.data
-                    {
+                if let buttonData = button.data {
                     buttonData.isSelected.toggle()
                     buttonView.configure(data: buttonData)
                     if let buttonType = self.getActionType(for: buttonData, button: button) {
@@ -123,6 +149,15 @@ public class MultiCallBottomView: UIView {
             addSubview(buttonView)
             buttonViews.append(buttonView)
         }
+    }
+    
+    // 添加摇晃动画提示按钮不可用
+    private func shakeButton(_ button: UIView) {
+        let animation = CAKeyframeAnimation(keyPath: "transform.translation.x")
+        animation.timingFunction = CAMediaTimingFunction(name: .linear)
+        animation.duration = 0.4
+        animation.values = [-10, 10, -10, 10, -5, 5, -2, 2, 0]
+        button.layer.add(animation, forKey: "shake")
     }
     
     private func getActionType(for data: CallButtonData, button: CallButtonView) -> CallButtonType? {
