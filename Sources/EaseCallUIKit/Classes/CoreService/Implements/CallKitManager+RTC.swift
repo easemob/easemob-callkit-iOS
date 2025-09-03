@@ -464,7 +464,7 @@ extension CallKitManager: AgoraRtcEngineDelegate {
                             if self.itemsCache.values.first(where: { $0.uid == UInt32(truncating: uidKey) }) == nil {
                                 uidNotFound = true
                             }
-                            let videoState = infos.first(where: { $0.uid == uidKey.uintValue })?.state ?? .stopped
+                            let videoState = info.state
                             switch videoState {// Handle different states of remote video.Starting&unmute, stopped&mute
                             case .starting,.decoding:
                                 if uidNotFound,userIdNotFound {
@@ -556,7 +556,7 @@ extension CallKitManager: AgoraRtcEngineDelegate {
                         for info in infos {
                             let uidKey = NSNumber(value: info.uid)
                             let user = relations?[uidKey] ?? ""
-                            let mute = infos.first(where: { $0.uid == uidKey.uintValue })?.muted ?? false
+                            let mute = info.muted
                             if let streamView = self.canvasCache[user],let item = self.itemsCache[user] {
                                 item.uid = uidKey.uint32Value
                                 item.userId = user
