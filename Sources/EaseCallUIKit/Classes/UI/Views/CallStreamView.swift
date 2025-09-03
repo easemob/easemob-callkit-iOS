@@ -26,6 +26,9 @@ public class CallStreamView: UIImageView {
             userInfoView.displayMode = displayMode
             if self.item.isExpanded {
                 self.networkStatusView.isHidden = false
+                if self.item.waiting {
+                    self.networkStatusView.isHidden = true
+                }
             } else {
                 if self.superview?.isKind(of: UIScrollView.self) == true {
                     self.userInfoView.displayMode = .hidden

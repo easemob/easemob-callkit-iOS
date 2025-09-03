@@ -41,7 +41,7 @@ extension CallKitManager: ChatEventsListener {
             }
             let callerDevId = ext[kCallerDevId] as? String ?? ""
             if message.from.lowercased() == ChatClient.shared().currentUsername?.lowercased() ?? "" {
-                consoleLogInfo("Call info from current user, ignoring message id:\(message.messageId) ext:\(String(describing: message.ext))", type: .info)
+//                consoleLogInfo("Call info from current user, ignoring message id:\(message.messageId) ext:\(String(describing: message.ext))", type: .info)
                 return
             }
             let defaultCalleeId = ChatClient.shared().getDeviceConfig(nil).deviceUUID ?? ""
@@ -135,7 +135,18 @@ extension CallKitManager: ChatEventsListener {
                     func handleAlertAction() {
                         if ChatClient.shared().getDeviceConfig(nil).deviceUUID == callerDevId {//主叫回给被叫
                             if let call = self.callInfo {
-                                self.confirmRing(callId: callId, calleeId: message.from, calleeDeviceId: calleeDevId, is_valid: call.callId == callId && call.state == .dialing)
+                                var stateJudgement = false
+                                
+                                var userInvited = true
+                                if call.type == .groupCall {
+                                    userInvited = self.callInfo?.inviteUsers.contains(message.from) ?? false
+                                    if call.state == .answering || call.state == .dialing {
+                                        stateJudgement = true
+                                    }
+                                } else {
+                                    stateJudgement = call.state == .dialing
+                                }
+                                self.confirmRing(callId: callId, calleeId: message.from, calleeDeviceId: calleeDevId, is_valid: call.callId == callId && stateJudgement && userInvited)
                             } else {
                                 self.confirmRing(callId: callId, calleeId: message.from, calleeDeviceId: calleeDevId, is_valid: false)
                             }
@@ -245,6 +256,7 @@ extension CallKitManager: ChatEventsListener {
                         if let call = self.callInfo, deviceId == callerDevId, call.callId == callId {
                             self.stopInvitationSignalTimer(callId: callId)
                             self.stopConfirmBuildConnectionTimer(callId: callId)
+                            self.callStartTimerStop(callId: callId)
                             if result == kBusyResult {
                                 UIViewController.currentController?.showCallToast(toast: "The other party busy".call.localize)
                             }
@@ -266,6 +278,10 @@ extension CallKitManager: ChatEventsListener {
                                     self.canvasCache[message.from]?.removeFromSuperview()
                                     self.canvasCache.removeValue(forKey: message.from)
                                     multiCallVC?.callView.updateWithItems([message.from])
+                                } else {
+                                    if let index = self.callInfo?.inviteUsers.firstIndex(of: message.from) {
+                                        self.callInfo?.inviteUsers.remove(at: index)
+                                    }
                                 }
                             } else {
                                 if call.state == .dialing {
@@ -988,7 +1004,7 @@ extension CallKitManager: CallMessageService {
             
             // Update call info with message details
             self.callInfo?.inviteMessageId = result?.0?.messageId ?? ""
-            
+            self.callInfo?.inviteUsers = ids
             // Start timer
             let timerKey = callId + " users:" + ids.joined(separator: ",")
             self.callStartTimerStart(callId: timerKey)
@@ -1064,6 +1080,7 @@ extension CallKitManager: CallMessageService {
             
             // Update call info with message details
             self.callInfo?.inviteMessageId = result?.0?.messageId ?? ""
+            self.callInfo?.inviteUsers = ids
             
             // Start timer
             let timerKey = callId + " users:" + ids.joined(separator: ",")
@@ -1495,7 +1512,9 @@ extension CallKitManager: CallMessageService {
             consoleLogInfo("\(currentUser) joined channel: \(channel) with uid: \(uid) elapsed: \(elapsed): account \(ChatClient.shared().currentUsername ?? "")", type: .debug)
             if uid == self.currentUserRTCUID {
                 self.hadJoinedChannel = true
-                self.updateCallEndReason(.abnormalEnd,false)
+                DispatchQueue.global().asyncAfter(deadline: .now() + 2.4, execute: {
+                    self.updateCallEndReason(.abnormalEnd,false)
+                })
             }
             completion(true)
         }) ?? 0
