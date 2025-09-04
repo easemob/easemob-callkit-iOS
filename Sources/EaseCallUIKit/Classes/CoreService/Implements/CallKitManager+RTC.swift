@@ -676,7 +676,7 @@ extension CallKitManager: AgoraRtcEngineDelegate {
         var unknownInfoIds = [String]()
         for userId in userIds {
             if let profile = CallKitManager.shared.usersCache[userId] {
-                if profile.nickname.isEmpty || profile.avatarURL.isEmpty {
+                if profile.nickname.isEmpty {
                     unknownInfoIds.append(userId)
                 }
             } else {

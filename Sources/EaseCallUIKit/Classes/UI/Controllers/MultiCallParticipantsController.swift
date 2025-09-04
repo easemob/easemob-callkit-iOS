@@ -226,7 +226,7 @@ extension MultiCallParticipantsController: UITableViewDelegate,UITableViewDataSo
         }
         var unknownInfoIds = [String]()
         if let profile = self.participants[safely: indexPath.row] {
-            if profile.nickname.isEmpty || profile.avatarURL.isEmpty {
+            if profile.nickname.isEmpty {
                 unknownInfoIds.append(profile.id)
             }
         }
