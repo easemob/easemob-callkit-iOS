@@ -91,6 +91,17 @@ open class CallMultiViewController: UIViewController {
         self.callView.isHidden = !state
         // Do any additional setup after loading the view.
         self.setupNavigationState()
+        self.updateNavigationBar()
+        self.navigationBar.clickClosure = { [weak self] in
+            self?.navigationClick(type: $0, indexPath: $1)
+        }
+        self.bottomView.didTapButton = { [weak self] in
+            self?.bottomClick(type: $0)
+        }
+        CallKitManager.shared.enableLocalVideo(false)
+    }
+    
+    func updateNavigationBar() {
         if let groupId = CallKitManager.shared.callInfo?.groupId, !groupId.isEmpty {
             let groupName = CallKitManager.shared.callInfo?.groupName ?? groupId
             var avatarURL = CallKitManager.shared.callInfo?.groupAvatar ?? ""
@@ -106,13 +117,6 @@ open class CallMultiViewController: UIViewController {
             self.navigationBar.avatarURL = avatarURL
             self.navigationBar.title = showName
         }
-        self.navigationBar.clickClosure = { [weak self] in
-            self?.navigationClick(type: $0, indexPath: $1)
-        }
-        self.bottomView.didTapButton = { [weak self] in
-            self?.bottomClick(type: $0)
-        }
-        CallKitManager.shared.enableLocalVideo(false)
     }
     
     func updateBottomState() {

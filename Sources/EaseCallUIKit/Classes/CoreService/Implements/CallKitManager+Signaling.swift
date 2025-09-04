@@ -180,7 +180,6 @@ extension CallKitManager: ChatEventsListener {
                     }
                     
                     func handleCancelAction() {
-                        AudioPlayerManager.shared.stopAudio()
                         self.stopInvitationSignalTimer(callId: callId)
                         self.stopConfirmBuildConnectionTimer(callId: callId)
                         self.stopRingTimer(callId: callId)
@@ -241,7 +240,6 @@ extension CallKitManager: ChatEventsListener {
                                 } else {//其它设备处理
                                     consoleLogInfo("Current device:\(currentDeviceId) Call confirm on other device:\(calleeDevId) messageId:\(message.messageId) ext:\(String(describing: ext))", type: .error)
                                     self.updateCallEndReason(.handleOnOtherDevice)
-                                    AudioPlayerManager.shared.stopAudio()
                                 }
                             } else {
                                 self.stopInvitationSignalTimer(callId: callId)
@@ -292,7 +290,6 @@ extension CallKitManager: ChatEventsListener {
                                             (self.callVC as? Call1v1VideoViewController)?.addCallTimer()
                                         }
                                     } else {
-                                        AudioPlayerManager.shared.stopAudio()
                                         let endReason = getEndReason(result: result)
                                         consoleLogInfo("Remote user refuse/busy for callId: \(callId) with reason: \(endReason)", type: .info)
                                         self.updateCallEndReason(endReason)
@@ -598,6 +595,8 @@ extension CallKitManager: CallMessageService {
                     let profiles = await self.profileProvider?.fetchUserProfiles(profileIds: [currentUserId])
                     if let profile = profiles?.first {
                         self.currentUserInfo = profile
+                        self.usersCache[currentUserId] = profile
+                        self.updateSingleControllerUI(type: type)
                     } else {
                         consoleLogInfo("Failed to fetch user profile for ID: \(currentUserId)", type: .error)
                         self.handleBusinessError(CallError.CallBusiness(error: .param, message: "Failed to fetch user profile"))
@@ -610,6 +609,8 @@ extension CallKitManager: CallMessageService {
                     let profiles = await self.profileProvider?.fetchUserProfiles(profileIds: [userId])
                     if let profile = profiles?.first {
                         self.currentUserInfo = profile
+                        self.usersCache[userId] = profile
+                        self.updateSingleControllerUI(type: type)
                     } else {
                         consoleLogInfo("Failed to fetch user profile for ID: \(userId)", type: .error)
                         self.handleBusinessError(CallError.CallBusiness(error: .param, message: "Failed to fetch user profile"))
@@ -620,6 +621,8 @@ extension CallKitManager: CallMessageService {
                 self.profileProviderOC?.fetchProfiles(profileIds: [userId], completion: { profiles in
                     if let profile = profiles.first {
                         self.currentUserInfo = profile
+                        self.usersCache[userId] = profile
+                        self.updateSingleControllerUI(type: type)
                     } else {
                         consoleLogInfo("Failed to fetch user profile for ID: \(userId)", type: .error)
                         self.handleBusinessError(CallError.CallBusiness(error: .param, message: "Failed to fetch user profile"))
@@ -705,6 +708,28 @@ extension CallKitManager: CallMessageService {
                 
                 // Now send the signaling message (will join channel after success)
                 self.sendCallSignaling(userId: userId, type: type, callId: callId, channelName: channelName, extensionInfo: extensionInfo)
+            }
+        }
+    }
+    
+    private func updateSingleControllerUI(type: CallType) {
+        DispatchQueue.main.async {
+            if type == .singleAudio {
+                if let controller = UIViewController.currentController as? Call1v1AudioViewController {
+                    controller.updateNavigationBar()
+                } else {
+                    if let controller = self.callVC as? Call1v1AudioViewController {
+                        controller.updateNavigationBar()
+                    }
+                }
+            } else {
+                if let controller = UIViewController.currentController as? Call1v1VideoViewController {
+                    controller.updateNavigationBar()
+                } else {
+                    if let controller = self.callVC as? Call1v1VideoViewController {
+                        controller.updateNavigationBar()
+                    }
+                }
             }
         }
     }
@@ -1371,7 +1396,6 @@ extension CallKitManager: CallMessageService {
     public func hangup() {
         consoleLogInfo("Hangup called", type: .info)
         if let call = self.callInfo {
-            AudioPlayerManager.shared.stopAudio()
             switch call.state {
             case .answering:
                 self.updateCallEndReason(.hangup)
@@ -1719,12 +1743,10 @@ extension CallKitManager: TimerServiceListener {
                 consoleLogInfo("Callee invitation signal timeout, no response", type: .info)
                 self.updateCallEndReason(.noResponse)
                 self.stopInvitationSignalTimer(callId: call.callId)
-                AudioPlayerManager.shared.stopAudio()
             }
         case startConfirmBuildConnectionTimer://建立链接超时
             if seconds >= updateDuration {
                 self.stopConfirmBuildConnectionTimer(callId: call.callId)
-                AudioPlayerManager.shared.stopAudio()
                 consoleLogInfo("Callee confirm build connection timeout, no response", type: .info)
                 self.updateCallEndReason(.remoteNoResponse)
             }
