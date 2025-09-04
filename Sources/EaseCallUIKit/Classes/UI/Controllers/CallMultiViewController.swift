@@ -84,6 +84,7 @@ open class CallMultiViewController: UIViewController {
         self.view.addSubViews([self.background, self.navigationBar,self.bottomView,self.callView])
         if state {
             self.addCallTimer()
+            self.bottomView.isCallConnected = true
         } else {
             self.bottomView.isCallConnected = false
         }
