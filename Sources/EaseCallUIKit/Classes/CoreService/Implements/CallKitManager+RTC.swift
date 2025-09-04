@@ -644,7 +644,7 @@ extension CallKitManager: AgoraRtcEngineDelegate {
                 for speaker in speakers {
                     speakerInfos[speaker.uid] = speaker.volume
                 }
-                let uids = speakers.map { NSNumber(value: $0.uid) }
+                let uids = speakers.map { NSNumber(value: $0.uid != 0 ? UInt32($0.uid):self.currentUserRTCUID) }
                 ChatClient.shared().getUserId(byRTCUIds: uids) { [weak self] relations, error in
                     guard let `self` = self else { return }
                     if error == nil {
