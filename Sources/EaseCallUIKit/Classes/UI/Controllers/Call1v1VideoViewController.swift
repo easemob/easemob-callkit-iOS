@@ -126,6 +126,7 @@ open class Call1v1VideoViewController: UIViewController {
             }
         }
         self.bottomView.isCallConnected = true
+
         self.setupNavigationState()
         
         self.updateNavigationBar()
