@@ -57,8 +57,8 @@ class LiveCommunicationManager: NSObject {
         let config = ConversationManager.Configuration(
             ringtoneName: nil,
             iconTemplateImageData: UIImage(named: "AppIcon")?.pngData(),
-            maximumConversationGroups: 1,
-            maximumConversationsPerConversationGroup: 1,
+            maximumConversationGroups: CallKitManager.shared.config.maximumConversationGroups,
+            maximumConversationsPerConversationGroup: CallKitManager.shared.config.maximumConversationsPerConversationGroup,
             includesConversationInRecents: false,
             supportsVideo: true,
             supportedHandleTypes: [.generic]
@@ -81,6 +81,11 @@ class LiveCommunicationManager: NSObject {
                 consoleLogInfo("[LiveCommunicationManager] successfully reported new incoming call: \(callerName) uuid: \(uuid.uuidString) type: \(type.rawValue)", type: .debug)
                 CallKitManager.shared.callInfo?.state = .ringing
                 self.uuid = uuid
+                DispatchQueue.main.async {
+                    for listener in CallKitManager.shared.listeners.allObjects {
+                        listener.onReceivedCall?(callType: type, userId: CallKitManager.shared.callInfo?.callerId ?? "", extensionInfo: CallKitManager.shared.callInfo?.extensionInfo)
+                    }
+                }
             } catch {
                 consoleLogInfo("[LiveCommunicationManager] failed to report new incoming call: \(error.localizedDescription)", type: .error)
             }

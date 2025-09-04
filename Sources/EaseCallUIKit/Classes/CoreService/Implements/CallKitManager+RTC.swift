@@ -294,6 +294,16 @@ extension CallKitManager: AgoraRtcEngineDelegate {
                 call.state = .answering
             }
             if call.type == .groupCall {
+                DispatchQueue.main.async {
+                    if let currentVC = UIViewController.currentController as? CallMultiViewController {
+                        currentVC.updateBottomState()
+                    } else {
+                        if let currentVC = self.callVC as? CallMultiViewController {
+                            currentVC.updateBottomState()
+                        }
+                    }
+                }
+                
                 //Add the user to the RTC throttler
                 self.rtcThrottler.addUserJoin(uid: uid, elapsed: elapsed) { [weak self] infos in
                     guard let `self` = self else { return }
@@ -345,6 +355,8 @@ extension CallKitManager: AgoraRtcEngineDelegate {
                                 }
                             }
                             consoleLogInfo("rtcEngine didJoinedOfUid: setRemoteVideoStream  userId:\(userId) uidKey:\(uidKey) uidNotFound:\(uidNotFound) userIdNotFound:\(userIdNotFound)", type: .debug)
+                            let type = self.getStreamRenderQuality(with: UInt(self.itemsCache.count))
+                            engine.setRemoteVideoStream(uidKey.uintValue, type: type)
                         }
                         if let currentVC = UIViewController.currentController as? CallMultiViewController {
                             currentVC.callView.updateWithItems()
@@ -664,7 +676,7 @@ extension CallKitManager: AgoraRtcEngineDelegate {
         var unknownInfoIds = [String]()
         for userId in userIds {
             if let profile = CallKitManager.shared.usersCache[userId] {
-                if profile.nickname.isEmpty || profile.avatarURL.isEmpty {
+                if profile.nickname.isEmpty {
                     unknownInfoIds.append(userId)
                 }
             } else {

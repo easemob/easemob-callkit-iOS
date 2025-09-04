@@ -81,14 +81,27 @@ open class CallMultiViewController: UIViewController {
     open override func viewDidLoad() {
         super.viewDidLoad()
         let state = self.connected
+        self.view.addSubViews([self.background, self.navigationBar,self.bottomView,self.callView])
         if state {
             self.addCallTimer()
+        } else {
+            self.bottomView.isCallConnected = false
         }
-        self.view.addSubViews([self.background, self.navigationBar,self.bottomView,self.callView])
         self.bottomView.updateButtonSelectedStatus(selectedIndex: 3)
         self.callView.isHidden = !state
         // Do any additional setup after loading the view.
         self.setupNavigationState()
+        self.updateNavigationBar()
+        self.navigationBar.clickClosure = { [weak self] in
+            self?.navigationClick(type: $0, indexPath: $1)
+        }
+        self.bottomView.didTapButton = { [weak self] in
+            self?.bottomClick(type: $0)
+        }
+        CallKitManager.shared.enableLocalVideo(false)
+    }
+    
+    func updateNavigationBar() {
         if let groupId = CallKitManager.shared.callInfo?.groupId, !groupId.isEmpty {
             let groupName = CallKitManager.shared.callInfo?.groupName ?? groupId
             var avatarURL = CallKitManager.shared.callInfo?.groupAvatar ?? ""
@@ -104,19 +117,13 @@ open class CallMultiViewController: UIViewController {
             self.navigationBar.avatarURL = avatarURL
             self.navigationBar.title = showName
         }
-        self.navigationBar.clickClosure = { [weak self] in
-            self?.navigationClick(type: $0, indexPath: $1)
-        }
-        self.bottomView.didTapButton = { [weak self] in
-            self?.bottomClick(type: $0)
-        }
-        CallKitManager.shared.enableLocalVideo(false)
     }
     
     func updateBottomState() {
         if self.connected {
             self.callView.isHidden = !self.connected
             self.bottomView.animateToExpandedState()
+            self.bottomView.isCallConnected = true
             self.callView.frame = CGRect(x: 0, y: NavigationHeight+23, width: ScreenWidth, height: ScreenHeight-NavigationHeight-self.bottomView.frame.height-23-29)
         }
     }
@@ -185,10 +192,6 @@ open class CallMultiViewController: UIViewController {
                 consoleLogInfo("CallMultiViewController: Current user not found in items cache.", type: .error)
                 return
             }
-            if let call = CallKitManager.shared.callInfo,call.state != .answering {
-                self.bottomView.updateButtonSelectedStatus(selectedIndex: 3)
-                return
-            }
             CallKitManager.shared.setupLocalVideo()
             CallKitManager.shared.enableLocalVideo(true)
             item.videoMuted = false
@@ -196,10 +199,6 @@ open class CallMultiViewController: UIViewController {
         case .camera_off:
             guard let currentUserId = ChatClient.shared().currentUsername,let item = CallKitManager.shared.itemsCache[currentUserId],let canvas = CallKitManager.shared.canvasCache[currentUserId] else {
                 consoleLogInfo("CallMultiViewController: Current user not found in items cache.", type: .error)
-                return
-            }
-            if let call = CallKitManager.shared.callInfo,call.state != .answering {
-                self.bottomView.updateButtonSelectedStatus(selectedIndex: 3)
                 return
             }
             CallKitManager.shared.enableLocalVideo(false)
@@ -286,7 +285,7 @@ open class CallMultiViewController: UIViewController {
         let point = touch.location(in: self.view)
         
         // 检查是否点击在 callView 内
-        if self.callView.frame.contains(point) {
+        if self.callView.frame.contains(point),!self.callView.isHidden {
             // 将点转换为 callView 的坐标系
             let pointInCallView = touch.location(in: self.callView)
             

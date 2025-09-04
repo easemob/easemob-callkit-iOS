@@ -87,7 +87,7 @@ extension CallKitManager: ChatEventsListener {
                         handleConfirmCalleeAction()
                     case CALL_ANSWER://主叫收到被叫接受/拒绝/忙碌通话
                         handleAnswerCallAction()
-                    case CALL_END:
+                    case CALL_END://退出通话
                         handleEndCallAction()
                     default:
                         consoleLogInfo("Unknown action type: \(action) in message id:\(message.messageId)", type: .error)
@@ -180,7 +180,6 @@ extension CallKitManager: ChatEventsListener {
                     }
                     
                     func handleCancelAction() {
-                        AudioPlayerManager.shared.stopAudio()
                         self.stopInvitationSignalTimer(callId: callId)
                         self.stopConfirmBuildConnectionTimer(callId: callId)
                         self.stopRingTimer(callId: callId)
@@ -241,7 +240,6 @@ extension CallKitManager: ChatEventsListener {
                                 } else {//其它设备处理
                                     consoleLogInfo("Current device:\(currentDeviceId) Call confirm on other device:\(calleeDevId) messageId:\(message.messageId) ext:\(String(describing: ext))", type: .error)
                                     self.updateCallEndReason(.handleOnOtherDevice)
-                                    AudioPlayerManager.shared.stopAudio()
                                 }
                             } else {
                                 self.stopInvitationSignalTimer(callId: callId)
@@ -292,7 +290,6 @@ extension CallKitManager: ChatEventsListener {
                                             (self.callVC as? Call1v1VideoViewController)?.addCallTimer()
                                         }
                                     } else {
-                                        AudioPlayerManager.shared.stopAudio()
                                         let endReason = getEndReason(result: result)
                                         consoleLogInfo("Remote user refuse/busy for callId: \(callId) with reason: \(endReason)", type: .info)
                                         self.updateCallEndReason(endReason)
@@ -487,11 +484,13 @@ extension CallKitManager: ChatEventsListener {
     }
     
     func presentCalleeController(call: CallInfo) {
+        consoleLogInfo("Present callee controller for callId: \(call.callId)", type: .info)
         let currentVC = UIViewController.currentController
         if currentVC is CallMultiViewController || currentVC is Call1v1AudioViewController || currentVC is Call1v1VideoViewController {
             (currentVC as? Call1v1AudioViewController)?.updateBottomState()
             (currentVC as? Call1v1VideoViewController)?.updateBottomState()
             (currentVC as? CallMultiViewController)?.updateBottomState()
+            consoleLogInfo("Call page already presented for callId: \(call.callId)", type: .info)
             return
         }
         if call.state != .idle {
@@ -507,8 +506,17 @@ extension CallKitManager: ChatEventsListener {
                 break
             }
             let root = UIApplication.shared.call.keyWindow?.rootViewController
-            root?.present(vc, animated: true)
-            consoleLogInfo("Present callee page for callId: \(call.callId) root \(String(describing: root))", type: .info)
+//            if let tab = root as? UITabBarController, let selected = tab.selectedViewController {
+//
+//                selected.present(vc, animated: true, completion: {
+//                    consoleLogInfo("Present callee page for callId: \(call.callId) root \(String(describing: root))", type: .info)
+//                })
+//            } else {
+            UIViewController.currentController?.present(vc, animated: true, completion: {
+                    consoleLogInfo("Present callee page for callId: \(call.callId) root \(String(describing: root))", type: .info)
+                })
+//            }
+            
         }
     }
     
@@ -533,7 +541,9 @@ extension CallKitManager: ChatEventsListener {
             break
         }
         DispatchQueue.main.asyncAfter(wallDeadline: .now()+0.25) {
-            UIApplication.shared.call.keyWindow?.rootViewController?.present(vc, animated: true)
+            UIApplication.shared.call.keyWindow?.rootViewController?.present(vc, animated: true,completion: {
+                consoleLogInfo("Present caller page for callId: \(call.callId)", type: .info)
+            })
         }
     }
     
@@ -585,6 +595,8 @@ extension CallKitManager: CallMessageService {
                     let profiles = await self.profileProvider?.fetchUserProfiles(profileIds: [currentUserId])
                     if let profile = profiles?.first {
                         self.currentUserInfo = profile
+                        self.usersCache[currentUserId] = profile
+                        self.updateSingleControllerUI(type: type)
                     } else {
                         consoleLogInfo("Failed to fetch user profile for ID: \(currentUserId)", type: .error)
                         self.handleBusinessError(CallError.CallBusiness(error: .param, message: "Failed to fetch user profile"))
@@ -597,6 +609,8 @@ extension CallKitManager: CallMessageService {
                     let profiles = await self.profileProvider?.fetchUserProfiles(profileIds: [userId])
                     if let profile = profiles?.first {
                         self.currentUserInfo = profile
+                        self.usersCache[userId] = profile
+                        self.updateSingleControllerUI(type: type)
                     } else {
                         consoleLogInfo("Failed to fetch user profile for ID: \(userId)", type: .error)
                         self.handleBusinessError(CallError.CallBusiness(error: .param, message: "Failed to fetch user profile"))
@@ -607,6 +621,8 @@ extension CallKitManager: CallMessageService {
                 self.profileProviderOC?.fetchProfiles(profileIds: [userId], completion: { profiles in
                     if let profile = profiles.first {
                         self.currentUserInfo = profile
+                        self.usersCache[userId] = profile
+                        self.updateSingleControllerUI(type: type)
                     } else {
                         consoleLogInfo("Failed to fetch user profile for ID: \(userId)", type: .error)
                         self.handleBusinessError(CallError.CallBusiness(error: .param, message: "Failed to fetch user profile"))
@@ -692,6 +708,28 @@ extension CallKitManager: CallMessageService {
                 
                 // Now send the signaling message (will join channel after success)
                 self.sendCallSignaling(userId: userId, type: type, callId: callId, channelName: channelName, extensionInfo: extensionInfo)
+            }
+        }
+    }
+    
+    private func updateSingleControllerUI(type: CallType) {
+        DispatchQueue.main.async {
+            if type == .singleAudio {
+                if let controller = UIViewController.currentController as? Call1v1AudioViewController {
+                    controller.updateNavigationBar()
+                } else {
+                    if let controller = self.callVC as? Call1v1AudioViewController {
+                        controller.updateNavigationBar()
+                    }
+                }
+            } else {
+                if let controller = UIViewController.currentController as? Call1v1VideoViewController {
+                    controller.updateNavigationBar()
+                } else {
+                    if let controller = self.callVC as? Call1v1VideoViewController {
+                        controller.updateNavigationBar()
+                    }
+                }
             }
         }
     }
@@ -1358,7 +1396,6 @@ extension CallKitManager: CallMessageService {
     public func hangup() {
         consoleLogInfo("Hangup called", type: .info)
         if let call = self.callInfo {
-            AudioPlayerManager.shared.stopAudio()
             switch call.state {
             case .answering:
                 self.updateCallEndReason(.hangup)
@@ -1706,12 +1743,10 @@ extension CallKitManager: TimerServiceListener {
                 consoleLogInfo("Callee invitation signal timeout, no response", type: .info)
                 self.updateCallEndReason(.noResponse)
                 self.stopInvitationSignalTimer(callId: call.callId)
-                AudioPlayerManager.shared.stopAudio()
             }
         case startConfirmBuildConnectionTimer://建立链接超时
             if seconds >= updateDuration {
                 self.stopConfirmBuildConnectionTimer(callId: call.callId)
-                AudioPlayerManager.shared.stopAudio()
                 consoleLogInfo("Callee confirm build connection timeout, no response", type: .info)
                 self.updateCallEndReason(.remoteNoResponse)
             }

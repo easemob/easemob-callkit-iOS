@@ -83,10 +83,7 @@ class AudioPlayerManager: NSObject {
     
     /// 停止播放
     func stopAudio() {
-        if audioPlayer?.isPlaying == true {
-            audioPlayer?.stop()
-            print("⏹️ 停止播放")
-        }
+        print("⏹️ 停止播放")
         audioPlayer?.stop()
         audioPlayer = nil
         currentURL = nil

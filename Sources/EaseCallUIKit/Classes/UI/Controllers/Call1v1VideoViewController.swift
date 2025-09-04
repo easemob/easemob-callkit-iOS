@@ -127,14 +127,8 @@ open class Call1v1VideoViewController: UIViewController {
         }
         self.setupNavigationState()
         
-        var showUserId = (self.role == .caller ? CallKitManager.shared.callInfo?.calleeId : CallKitManager.shared.callInfo?.callerId) ?? ""
-        if showUserId.isEmpty {
-            showUserId = ChatClient.shared().chatManager?.getMessageWithMessageId(CallKitManager.shared.callInfo?.inviteMessageId ?? "")?.from ?? showUserId
-        }
-        let username = CallKitManager.shared.usersCache[showUserId]?.nickname ?? ""
-        let avatarURL = CallKitManager.shared.usersCache[showUserId]?.avatarURL
-        self.navigationBar.title = username.isEmpty ? showUserId:username
-        self.navigationBar.avatarURL = avatarURL
+        self.updateNavigationBar()
+        
         self.navigationBar.clickClosure = { [weak self] in
             self?.navigationClick(type: $0, indexPath: $1)
         }
@@ -155,6 +149,17 @@ open class Call1v1VideoViewController: UIViewController {
         if self.connected {
             self.bottomView.animateToExpandedState()
         }
+    }
+    
+    func updateNavigationBar() {
+        var showUserId = (self.role == .caller ? CallKitManager.shared.callInfo?.calleeId : CallKitManager.shared.callInfo?.callerId) ?? ""
+        if showUserId.isEmpty {
+            showUserId = ChatClient.shared().chatManager?.getMessageWithMessageId(CallKitManager.shared.callInfo?.inviteMessageId ?? "")?.from ?? showUserId
+        }
+        let username = CallKitManager.shared.usersCache[showUserId]?.nickname ?? ""
+        let avatarURL = CallKitManager.shared.usersCache[showUserId]?.avatarURL
+        self.navigationBar.title = username.isEmpty ? showUserId:username
+        self.navigationBar.avatarURL = avatarURL
     }
     
     private func setupNavigationState() {

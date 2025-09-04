@@ -44,8 +44,18 @@ public class Call1v1AudioViewController: UIViewController {
         super.viewDidLoad()
         self.view.addSubViews([self.background, self.navigationBar,self.bottomView])
         self.setupBottomsState()
-
+        self.updateNavigationBar()
         // Do any additional setup after loading the view.
+        
+        self.navigationBar.clickClosure = { [weak self] in
+            self?.navigationClick(type: $0, indexPath: $1)
+        }
+        self.bottomView.didTapButton = { [weak self] in
+            self?.bottomClick(type: $0)
+        }
+    }
+    
+    func updateNavigationBar() {
         var showUserId = (self.role == .caller ? CallKitManager.shared.callInfo?.calleeId : CallKitManager.shared.callInfo?.callerId) ?? ""
         if showUserId.isEmpty {
             showUserId = ChatClient.shared().chatManager?.getMessageWithMessageId(CallKitManager.shared.callInfo?.inviteMessageId ?? "")?.from ?? showUserId
@@ -54,12 +64,6 @@ public class Call1v1AudioViewController: UIViewController {
         let avatarURL = CallKitManager.shared.usersCache[showUserId]?.avatarURL
         self.navigationBar.title = username.isEmpty ? showUserId:username
         self.navigationBar.avatarURL = avatarURL
-        self.navigationBar.clickClosure = { [weak self] in
-            self?.navigationClick(type: $0, indexPath: $1)
-        }
-        self.bottomView.didTapButton = { [weak self] in
-            self?.bottomClick(type: $0)
-        }
     }
     
     public override func viewIsAppearing(_ animated: Bool) {
