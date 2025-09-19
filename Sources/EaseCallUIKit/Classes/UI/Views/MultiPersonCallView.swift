@@ -328,12 +328,12 @@ public class MultiPersonCallView: UIView {
         } else {
             for view in itemViews {
                 if totalCount > 6 {
-                    view.displayMode = .buttonsOnly
+                    view.displayMode = view.item.waiting ? .nameOnly:.buttonsOnly
                 } else {
                     if ScreenHeight/ScreenWidth > 1.8,totalCount <= 4 {
-                        view.displayMode = .all
+                        view.displayMode = view.item.waiting ? .nameOnly:.all
                     } else {
-                        view.displayMode = .buttonsOnly
+                        view.displayMode = view.item.waiting ? .nameOnly:.buttonsOnly
                     }
                 }
             }

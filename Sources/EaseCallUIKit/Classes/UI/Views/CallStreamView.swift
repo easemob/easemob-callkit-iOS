@@ -21,7 +21,7 @@ public class CallStreamView: UIImageView {
     private let loadingView = UIImageView().contentMode(.scaleAspectFit)
     public let userInfoView = UserInfoView()
     
-    var displayMode: UserInfoDisplayMode = .all {
+    var displayMode: UserInfoDisplayMode = .nameOnly {
         didSet {
             userInfoView.displayMode = displayMode
             if self.item.isExpanded {
@@ -215,7 +215,26 @@ public class CallStreamView: UIImageView {
     }
     
     func updateAudioVolume(_ volume: UInt) {
-        self.userInfoView.isSpeaking = volume > 10 // Adjust threshold as needed
+        if self.item.waiting {
+            return
+        }
+        // 设置说话状态
+        self.userInfoView.isSpeaking = volume > 0
+        
+        // 根据音量动态调整显示模式
+        if volume > 0 && !self.item.audioMuted {
+            // 有音量且未静音时，显示音频图标
+            if self.userInfoView.displayMode == .nameOnly {
+                self.userInfoView.displayMode = .all
+            }
+        } else if volume == 0 && !self.item.audioMuted {
+            // 无音量且未静音时，隐藏音频图标（仅显示昵称）
+            if self.userInfoView.displayMode == .all {
+                self.userInfoView.displayMode = .nameOnly
+            }
+        }
+        
+        // 清理覆盖视图
         coverView.isHidden = true
         coverView.removeFromSuperview()
     }
@@ -290,6 +309,15 @@ public class CallStreamItem: NSObject {
     
 }
 // MARK: - User Info Component
+// MARK: - Display Mode
+public enum UserInfoDisplayMode {
+    case all          // 显示昵称和按钮
+    case nameOnly     // 只显示昵称
+    case buttonsOnly  // 只显示按钮
+    case hidden       // 完全隐藏
+}
+
+// MARK: - User Info Component
 public class UserInfoView: UIView {
     
     private let nicknameLabel = UILabel()
@@ -300,7 +328,7 @@ public class UserInfoView: UIView {
     private var containerTrailingConstraint: NSLayoutConstraint?
     private var nicknameLabelWidthConstraint: NSLayoutConstraint?
     
-    var displayMode: UserInfoDisplayMode = .all {
+    var displayMode: UserInfoDisplayMode = .nameOnly {
         didSet {
             updateDisplayMode()
         }
@@ -318,13 +346,35 @@ public class UserInfoView: UIView {
         }
     }
     
-    var isSpeaking: Bool = false {
+    @MainActor var isSpeaking: Bool = false {
         didSet {
-            if isSpeaking,!isAudioMuted {
+            if isSpeaking && !isAudioMuted {
+                // 正在说话且未静音时显示说话图标
                 audioButton.setImage(UIImage(named: "speaking", in: .callBundle, with: nil), for: .normal)
+                audioButton.isHidden = false
+                
+                // 动态更新约束以显示音频按钮
+                containerStackView.spacing = 6
+                setNeedsUpdateConstraints()
+                
+            } else if !isSpeaking && !isAudioMuted {
+                // 不说话且未静音时清空图标
+                audioButton.setImage(nil, for: .normal)
+                audioButton.isHidden = true
+                
+                // 动态更新约束以隐藏音频按钮
+                containerStackView.spacing = 0
+                setNeedsUpdateConstraints()
+                
             } else {
+                // 静音状态保持原有逻辑
                 updateAudioButton()
             }
+            
+            // 触发布局更新
+            invalidateIntrinsicContentSize()
+            setNeedsLayout()
+            layoutIfNeeded()
         }
     }
     
@@ -405,7 +455,7 @@ public class UserInfoView: UIView {
         if isAudioMuted {
             audioButton.setImage(UIImage(systemName: "mic.slash.fill"), for: .normal)
         } else {
-            audioButton.setImage(UIImage(systemName: "mic.fill"), for: .normal)
+            audioButton.setImage(nil, for: .normal)
         }
     }
     
@@ -419,6 +469,16 @@ public class UserInfoView: UIView {
             
             // 恢复正常的约束和间距
             containerStackView.spacing = 6
+            nicknameLabelWidthConstraint?.constant = 80
+            
+        case .nameOnly:
+            // 只显示昵称，隐藏音频按钮
+            nicknameLabel.isHidden = false
+            audioButton.isHidden = true
+            self.isHidden = false
+            
+            // 移除间距，因为没有按钮
+            containerStackView.spacing = 0
             nicknameLabelWidthConstraint?.constant = 80
             
         case .buttonsOnly:
@@ -438,7 +498,6 @@ public class UserInfoView: UIView {
         // 触发布局更新
         setNeedsLayout()
         layoutIfNeeded()
-        
     }
     
     // 重写 intrinsicContentSize 以支持自动布局
@@ -460,13 +519,6 @@ public class UserInfoView: UIView {
     }
 }
 
-// MARK: - Display Mode
-public enum UserInfoDisplayMode {
-    case all          // 显示昵称和按钮
-    case buttonsOnly  // 只显示按钮
-    case hidden       // 完全隐藏
-}
-
 // MARK: - 便利方法
 extension UserInfoView {
     
@@ -484,6 +536,11 @@ extension UserInfoView {
             // 计算昵称标签的实际宽度
             let nicknameWidth = min(nicknameLabel.intrinsicContentSize.width, 80)
             return 6 + nicknameWidth + 6 + 16 + 6 // padding + nickname + spacing + button + padding
+            
+        case .nameOnly:
+            // 只有昵称，没有音频按钮
+            let nicknameWidth = min(nicknameLabel.intrinsicContentSize.width, 80)
+            return 6 + nicknameWidth + 6 // padding + nickname + padding
             
         case .buttonsOnly:
             return 6 + 16 + 6 // padding + button + padding
@@ -505,21 +562,3 @@ extension UserInfoView {
         })
     }
 }
-
-// MARK: - 调试辅助
-#if DEBUG
-extension UserInfoView {
-    
-    /// 添加边框以便调试
-    public func enableDebugMode() {
-        layer.borderWidth = 1
-        layer.borderColor = UIColor.red.cgColor
-        
-        nicknameLabel.layer.borderWidth = 0.5
-        nicknameLabel.layer.borderColor = UIColor.green.cgColor
-        
-        audioButton.layer.borderWidth = 0.5
-        audioButton.layer.borderColor = UIColor.blue.cgColor
-    }
-}
-#endif

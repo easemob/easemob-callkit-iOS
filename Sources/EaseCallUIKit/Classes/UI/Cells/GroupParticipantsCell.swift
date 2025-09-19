@@ -48,7 +48,11 @@ import UIKit
         self.nickName.text = nickName
         self.nickName.font = UIFont.callTheme.labelLarge
         self.avatar.image(with: profile.avatarURL, placeHolder: CallAppearance.avatarPlaceHolder)
-        self.checkbox.image = UIImage(named: profile.selected ? "select":"unselect", in: .callBundle, compatibleWith: nil)
+        if let user = CallKitManager.shared.itemsCache[profile.id] {
+            self.checkbox.image = UIImage(named: "already_seleted", in: .callBundle, compatibleWith: nil)
+        } else {
+            self.checkbox.image = UIImage(named: profile.selected ? "select":"unselect", in: .callBundle, compatibleWith: nil)
+        }
         self.separatorLine.backgroundColor = Theme.style == .dark ? UIColor.callTheme.neutralColor2:UIColor.callTheme.neutralColor9
     }
     

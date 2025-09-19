@@ -166,7 +166,7 @@ public let CallKitVersion = "1.0.0"
         }
         self.engine?.enableAudio()
         self.engine?.enable(inEarMonitoring: true)
-        self.engine?.enableAudioVolumeIndication(618, smooth: 10, reportVad: true)
+        self.engine?.enableAudioVolumeIndication(618, smooth: 5, reportVad: true)
         self.engine?.setDefaultAudioRouteToSpeakerphone(true)
         self.engine?.setVideoFrameDelegate(self)
         return nil
