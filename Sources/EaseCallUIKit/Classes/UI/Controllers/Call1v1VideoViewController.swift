@@ -674,6 +674,7 @@ extension Call1v1VideoViewController: AVPictureInPictureControllerDelegate {
             UIApplication.shared.call.keyWindow?.rootViewController?.present(existingVC, animated: true) {
                 // 将floatView恢复到existingVC
                 existingVC.ensureFloatViewVisible()
+                existingVC.floatViewClicked(dragView: existingVC.floatView)
                 completionHandler(true)
             }
         } else {
@@ -683,6 +684,7 @@ extension Call1v1VideoViewController: AVPictureInPictureControllerDelegate {
             UIApplication.shared.call.keyWindow?.rootViewController?.present(self, animated: true) {
                 // 恢复floatView
                 self.ensureFloatViewVisible()
+                self.floatViewClicked(dragView: self.floatView)
                 completionHandler(true)
             }
         }

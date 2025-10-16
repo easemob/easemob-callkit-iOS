@@ -638,24 +638,16 @@ extension CallKitManager: AgoraRtcEngineDelegate {
     }
     
     public func rtcEngine(_ engine: AgoraRtcEngineKit, reportAudioVolumeIndicationOfSpeakers speakers: [AgoraRtcAudioVolumeInfo], totalVolume: Int) {//On audio volume indication change of speakers
-        if let call = self.callInfo {
-            if call.type == .groupCall {// Only handle audio volume indication in multi call
-                var speakerInfos = [UInt:UInt]()
-                for speaker in speakers {
-                    speakerInfos[speaker.uid] = speaker.volume
-                }
-                let uids = speakers.map { NSNumber(value: $0.uid != 0 ? UInt32($0.uid):self.currentUserRTCUID) }
-                ChatClient.shared().getUserId(byRTCUIds: uids) { [weak self] relations, error in
-                    guard let `self` = self else { return }
-                    if error == nil {
-                        let relationships = relations ?? [:]
-                        for ship in relationships {
-                            if let streamView = self.canvasCache[ship.value],streamView.item.uid == UInt32(truncating: ship.key) {
-                                streamView.updateAudioVolume(speakerInfos[UInt(streamView.item.uid)] ?? 0)
+        DispatchQueue.main.async {
+            if let call = self.callInfo {
+                if call.type == .groupCall {// Only handle audio volume indication in multi call
+                    for speaker in speakers {
+                        if let item = self.itemsCache.values.first(where: { $0.uid == speaker.uid }) {
+                            let streamView = self.canvasCache[item.userId]
+                            if item.uid == speaker.uid {
+                                streamView?.updateAudioVolume(speaker.volume)
                             }
                         }
-                    } else {
-                        consoleLogInfo("Failed to get userId by RTC UIDs: \(error?.errorDescription ?? "Unknown error")", type: .error)
                     }
                 }
             }

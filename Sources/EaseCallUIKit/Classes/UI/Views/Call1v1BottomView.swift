@@ -371,7 +371,7 @@ public class Call1v1BottomView: UIView {
     // MARK: - Actions
     private func handleButtonTap(_ sender: CallButtonView) {
         // Haptic feedback
-        UIImpactFeedbackGenerator.impactOccurred(style: .light)
+        UIImpactFeedbackGenerator.impactOccurred(style: .medium)
         print("tag: \(sender.buttonTag)")
         
         guard let data = sender.data, let buttonType = self.getActionType(for: data, button: sender) else { return }

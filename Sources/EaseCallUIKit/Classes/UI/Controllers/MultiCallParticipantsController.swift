@@ -162,7 +162,6 @@ import UIKit
                         }))
                     }
                     self.participants.removeAll { $0.id == ChatClient.shared().currentUsername ?? "" }
-                    self.participants.removeAll { self.excludeUsers.contains($0.id) }
                     DispatchQueue.main.async {
                         self.participantsList.reloadData()
                     }
@@ -202,6 +201,9 @@ extension MultiCallParticipantsController: UITableViewDelegate,UITableViewDataSo
     
     @objc open func didSelectRowAt(indexPath: IndexPath) {
         if let profile = self.participants[safely: indexPath.row] {
+            if let user = CallKitManager.shared.itemsCache[profile.id] {
+                return
+            }
             profile.selected = !profile.selected
             self.participantsList.reloadData()
         }
