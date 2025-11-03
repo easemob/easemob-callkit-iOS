@@ -83,10 +83,6 @@ open class Call1v1VideoViewController: UIViewController {
         return drag
     }()
     
-    public lazy var micView: UIImageView = {
-        UIImageView(frame: CGRect(x: 18, y: self.bottomView.frame.minY - 14, width: 14, height: 14)).image(UIImage(named: "mic_off", in: .callBundle, with: nil)).isUserInteractionEnabled(false).tag(1002)
-    }()
-    
     public private(set) var role: CallRole = .caller
     
     /// Picture-in-Picture controller
@@ -193,9 +189,8 @@ open class Call1v1VideoViewController: UIViewController {
     
     // 新增：集中管理视图层级
     private func setupViews() {
-        // 确保视图层级正确
-        self.micView.isHidden = true
-        self.view.addSubViews([self.background, self.navigationBar, self.bottomView, self.micView,self.navigationBlur])
+
+        self.view.addSubViews([self.background, self.navigationBar, self.bottomView,self.navigationBlur])
         self.background.addSubViews([self.callView, self.floatView])
         self.navigationBlur.image = UIImage(named: "mask", in: .callBundle, with: nil)
         // 确保floatView在最上层
@@ -217,9 +212,7 @@ open class Call1v1VideoViewController: UIViewController {
         self.background.bringSubviewToFront(self.floatView)
         self.floatView.isUserInteractionEnabled = true
         self.callView.isUserInteractionEnabled = false
-        self.floatView.micView.isHidden = false
         self.callView.micView.isHidden = true
-        self.micView.isHidden = true
         self.floatView.updateAudioState(self.floatView.isAudioMuted)
         self.floatView.blurEffectView.isHidden = true
         self.callView.blurEffectView.isHidden = false
@@ -241,7 +234,6 @@ open class Call1v1VideoViewController: UIViewController {
         self.callView.isUserInteractionEnabled = true
         self.floatView.micView.isHidden = true
         self.callView.micView.isHidden = true
-        self.micView.isHidden = !self.floatView.isAudioMuted
         self.floatView.blurEffectView.isHidden = false
         self.callView.blurEffectView.isHidden = true
     }
@@ -490,13 +482,11 @@ open class Call1v1VideoViewController: UIViewController {
             UIView.animate(withDuration: 0.3) {
                 self.navigationBar.alpha = 1
                 self.bottomView.alpha = 1
-                self.micView.frame = CGRect(x: 18, y: self.bottomView.frame.minY - 14 , width: 14, height: 14)
             }
         } else {
             UIView.animate(withDuration: 0.3) {
                 self.navigationBar.alpha = 0
                 self.bottomView.alpha = 0
-                self.micView.frame = CGRect(x: 18, y: ScreenHeight - BottomBarHeight - 14 - 12, width: 14, height: 14)
             }
         }
     }
