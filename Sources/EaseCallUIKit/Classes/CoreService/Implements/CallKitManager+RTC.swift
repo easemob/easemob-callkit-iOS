@@ -56,9 +56,6 @@ extension CallKitManager: CallActionService {
     
     /// Set up local video capturing and rendering
     func setupLocalVideo() {
-        let cameraConfig = AgoraCameraCapturerConfiguration()
-        cameraConfig.cameraDirection = .front
-        self.engine?.setCameraCapturerConfiguration(cameraConfig)
         self.engine?.enableVideo()
         self.engine?.enableAudio()
         if let call = self.callInfo {

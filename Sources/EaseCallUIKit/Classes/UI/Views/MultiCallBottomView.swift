@@ -132,6 +132,7 @@ public class MultiCallBottomView: UIView {
     
     private func setupButtonViews() {
         // 创建所有按钮视图
+        buttonData.first?.isSelected = false
         for (index, data) in buttonData.enumerated() {
             let buttonView = CallButtonView(frame: CGRect(origin: .zero, size: CGSize(width: buttonWidth, height: buttonHeight)),iconTitleSpace: 4)
             if index == 4 {
@@ -162,6 +163,7 @@ public class MultiCallBottomView: UIView {
                 
                 UIImpactFeedbackGenerator.impactOccurred(style: .medium)
                 if let buttonData = button.data {
+                    print("bottomClick title:\(buttonData.title) isSelected:\(buttonData.isSelected) status:\(buttonData.status) tag:\(button.tag)")
                     buttonData.isSelected.toggle()
                     buttonView.configure(data: buttonData)
                     
@@ -171,6 +173,7 @@ public class MultiCallBottomView: UIView {
                     }
                     
                     if let buttonType = self.getActionType(for: buttonData, button: button) {
+                        print("bottomClick type:\(buttonType) title:\(buttonData.title) isSelected:\(buttonData.isSelected) status:\(buttonData.status)")
                         self.didTapButton?(buttonType)
                     }
                 }

@@ -265,6 +265,7 @@ open class Call1v1VideoViewController: UIViewController {
     }
     
     @objc open func bottomClick(type: CallButtonType) {
+        print("bottomClick type:\(type.rawValue)")
         switch type {
         case .mic_on: CallKitManager.shared.enableLocalAudio(true)
         case .mic_off: CallKitManager.shared.enableLocalAudio(false)
