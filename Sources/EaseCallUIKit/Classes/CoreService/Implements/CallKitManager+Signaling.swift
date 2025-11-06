@@ -1446,11 +1446,19 @@ extension CallKitManager: CallMessageService {
     public func accept() {
         AudioPlayerManager.shared.stopAudio()
         if let call = self.callInfo {
-            if call.type == .singleVideo {
-                self.setupLocalVideo()
-//                self.enableLocalVideo(true)
-            } else {
+            switch call.type {
+            case .singleAudio:
                 self.enableLocalVideo(false)
+            case .singleVideo:
+                self.setupLocalVideo()
+            case .groupCall:
+                if let vc = UIViewController.currentController as? CallMultiViewController {
+                    if vc.isCameraPreviewEnabled {
+                        self.setupLocalVideo()
+                    } else {
+                        self.enableLocalVideo(false)
+                    }
+                }
             }
             self.engine?.enableAudio()
             self.enableLocalAudio(true)

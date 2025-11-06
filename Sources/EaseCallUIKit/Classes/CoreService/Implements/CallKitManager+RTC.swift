@@ -56,9 +56,6 @@ extension CallKitManager: CallActionService {
     
     /// Set up local video capturing and rendering
     func setupLocalVideo() {
-        let cameraConfig = AgoraCameraCapturerConfiguration()
-        cameraConfig.cameraDirection = .front
-        self.engine?.setCameraCapturerConfiguration(cameraConfig)
         self.engine?.enableVideo()
         self.engine?.enableAudio()
         if let call = self.callInfo {
@@ -604,14 +601,11 @@ extension CallKitManager: AgoraRtcEngineDelegate {
                     controller.callView.micView.isHidden = true
                     if self.isVideoExchanged {// If video is exchanged, update mic view visibility
                         if muted {
-                            controller.micView.isHidden = false
                             controller.floatView.updateAudioState(!muted)
                         } else {
-                            controller.micView.isHidden = true
                             controller.floatView.updateAudioState(muted)
                         }
                     } else {
-                        controller.micView.isHidden = true
                         controller.floatView.updateAudioState(muted)
                     }
                 } else {// If current controller is not Call1v1VideoViewController
@@ -619,14 +613,11 @@ extension CallKitManager: AgoraRtcEngineDelegate {
                         controller.callView.micView.isHidden = true
                         if self.isVideoExchanged {// If video is exchanged, update mic view visibility and audio state
                             if muted {
-                                controller.micView.isHidden = false
                                 controller.floatView.updateAudioState(!muted)
                             } else {
-                                controller.micView.isHidden = true
                                 controller.floatView.updateAudioState(muted)
                             }
                         } else {// If video is not exchanged, hide mic view and update audio state
-                            controller.micView.isHidden = true
                             controller.floatView.updateAudioState(muted)
                         }
                     }
@@ -748,6 +739,25 @@ extension CallKitManager: AgoraRtcEngineDelegate {
 extension CallKitManager: AgoraVideoFrameDelegate {
     public func onCapture(_ videoFrame: AgoraOutputVideoFrame, sourceType: AgoraVideoSourceType) -> Bool {// This method is called when local video frame is captured.
         if let call = self.callInfo {
+            // 处理群组通话预览（仅前台且当前显示的页面）
+            if call.type == .groupCall {
+                // 只处理当前正在显示的 CallMultiViewController
+                if let controller = UIViewController.currentController as? CallMultiViewController {
+                    // 未连接状态且开启了摄像头预览
+                    if controller.isCameraPreviewEnabled, let previewView = controller.localPreviewView {
+                        if let pixelBuffer = videoFrame.pixelBuffer {
+                            previewView.renderVideoPixelBuffer(pixelBuffer: pixelBuffer, width: videoFrame.width, height: videoFrame.height)
+                        } else {
+                            previewView.renderFromVideoFrameData(videoData: videoFrame)
+                        }
+                        return true
+                    }
+                }
+                // 群组通话在后台或缩小时不处理预览，直接返回
+                return true
+            }
+
+            // 原有逻辑：处理1v1视频通话
             if call.type == .singleVideo {
                 if let controller = UIViewController.currentController as? Call1v1VideoViewController {
                     if let pixelBuffer = videoFrame.pixelBuffer {

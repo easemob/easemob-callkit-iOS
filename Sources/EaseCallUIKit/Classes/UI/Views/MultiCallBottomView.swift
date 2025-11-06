@@ -51,7 +51,7 @@ public class MultiCallBottomView: UIView {
     }
     
     // 添加需要在通话接通后才能使用的按钮索引
-    private let requiresConnectionButtonIndexes = [3] // Camera 按钮
+    private let requiresConnectionButtonIndexes: [Int] = [] // 不再限制任何按钮
     
     // 更新Flip按钮状态（基于Camera状态）
     private func updateFlipButtonState() {
@@ -132,6 +132,7 @@ public class MultiCallBottomView: UIView {
     
     private func setupButtonViews() {
         // 创建所有按钮视图
+        buttonData.first?.isSelected = false
         for (index, data) in buttonData.enumerated() {
             let buttonView = CallButtonView(frame: CGRect(origin: .zero, size: CGSize(width: buttonWidth, height: buttonHeight)),iconTitleSpace: 4)
             if index == 4 {
@@ -146,13 +147,13 @@ public class MultiCallBottomView: UIView {
             buttonView.tag = index
             buttonView.didTap = { [weak self] button in
                 guard let self = self else { return }
-                
+
                 // 检查Flip按钮是否因Camera关闭而不可用
                 if button.tag == 0 && !self.isCameraOn {
                     self.shakeButton(button)
                     return
                 }
-                
+
                 // 检查按钮是否需要通话接通
                 if self.requiresConnectionButtonIndexes.contains(button.tag) && !self.isCallConnected {
                     // 提供视觉反馈但不执行操作
@@ -162,6 +163,7 @@ public class MultiCallBottomView: UIView {
                 
                 UIImpactFeedbackGenerator.impactOccurred(style: .medium)
                 if let buttonData = button.data {
+                    print("bottomClick title:\(buttonData.title) isSelected:\(buttonData.isSelected) status:\(buttonData.status) tag:\(button.tag)")
                     buttonData.isSelected.toggle()
                     buttonView.configure(data: buttonData)
                     
@@ -171,6 +173,7 @@ public class MultiCallBottomView: UIView {
                     }
                     
                     if let buttonType = self.getActionType(for: buttonData, button: button) {
+                        print("bottomClick type:\(buttonType) title:\(buttonData.title) isSelected:\(buttonData.isSelected) status:\(buttonData.status)")
                         self.didTapButton?(buttonType)
                     }
                 }
@@ -399,25 +402,25 @@ public class MultiCallBottomView: UIView {
         return positions
     }
 
-    func updateButtonSelectedStatus(selectedIndex: Int) {
+    func updateButtonSelectedStatus(selectedIndex: Int, triggerCallback: Bool = true) {
         guard selectedIndex >= 0 && selectedIndex < buttonViews.count else {
             consoleLogInfo("MultiCallBottomView: Invalid index for updating button status.", type: .error)
             return
         }
-        
+
         // 更新按钮状态
         let buttonView = buttonViews[selectedIndex]
         if let data = buttonView.data {
             data.isSelected.toggle()
             buttonView.configure(data: data)
-            
+
             // 如果是Camera按钮，更新摄像头状态
             if selectedIndex == 3 {
                 isCameraOn = !data.isSelected
             }
-            
-            // 执行对应的操作
-            if let actionType = getActionType(for: data, button: buttonView) {
+
+            // 执行对应的操作（可选是否触发回调）
+            if triggerCallback, let actionType = getActionType(for: data, button: buttonView) {
                 didTapButton?(actionType)
             }
         }

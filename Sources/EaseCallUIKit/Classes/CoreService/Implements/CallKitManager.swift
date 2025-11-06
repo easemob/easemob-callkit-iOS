@@ -158,6 +158,10 @@ public let CallKitVersion = "1.0.0"
         configuration.dimensions = CGSize(width: 1280, height: 720)
         configuration.frameRate = .fps30
         self.engine?.setVideoEncoderConfiguration(configuration)
+        
+        let cameraConfig = AgoraCameraCapturerConfiguration()
+        cameraConfig.cameraDirection = .front
+        self.engine?.setCameraCapturerConfiguration(cameraConfig)
         for listener in self.listeners.allObjects {
             if let engine = self.engine {
                 listener.onRtcEngineCreated?(engine: engine)

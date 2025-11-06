@@ -62,7 +62,13 @@ open class CallMultiViewController: UIViewController {
     }
     
     public private(set) var role: CallRole = .caller
-    
+
+    // 本地摄像头预览视图（未接听状态下使用）
+    public var localPreviewView: PixelBufferRenderView?
+
+    // 跟踪摄像头状态
+    public var isCameraPreviewEnabled: Bool = false
+
     @objc public init(role: CallRole) {
         self.role = role
         super.init(nibName: nil, bundle: nil)
@@ -88,7 +94,8 @@ open class CallMultiViewController: UIViewController {
         } else {
             self.bottomView.isCallConnected = false
         }
-        self.bottomView.updateButtonSelectedStatus(selectedIndex: 3)
+        // 初始化时不触发回调，只更新按钮状态
+        self.bottomView.updateButtonSelectedStatus(selectedIndex: 3, triggerCallback: false)
         self.callView.isHidden = !state
         // Do any additional setup after loading the view.
         self.setupNavigationState()
@@ -99,7 +106,6 @@ open class CallMultiViewController: UIViewController {
         self.bottomView.didTapButton = { [weak self] in
             self?.bottomClick(type: $0)
         }
-        CallKitManager.shared.enableLocalVideo(false)
     }
     
     func updateNavigationBar() {
@@ -122,6 +128,11 @@ open class CallMultiViewController: UIViewController {
     
     func updateBottomState() {
         if self.connected {
+            // 连接成功后移除预览视图
+            self.removeLocalPreview()
+            self.isCameraPreviewEnabled = false
+
+            // 原有逻辑
             self.callView.isHidden = !self.connected
             self.bottomView.animateToExpandedState()
             self.bottomView.isCallConnected = true
@@ -168,7 +179,6 @@ open class CallMultiViewController: UIViewController {
     }
     
     @objc open func bottomClick(type: CallButtonType) {
-        
         switch type {
         case .mic_on:
             guard let currentUserId = ChatClient.shared().currentUsername,let item = CallKitManager.shared.itemsCache[currentUserId],let canvas = CallKitManager.shared.canvasCache[currentUserId] else {
@@ -189,22 +199,39 @@ open class CallMultiViewController: UIViewController {
         case .flip_back: CallKitManager.shared.switchCamera()
         case .flip_front: CallKitManager.shared.switchCamera()
         case .camera_on:
-            guard let currentUserId = ChatClient.shared().currentUsername,let item = CallKitManager.shared.itemsCache[currentUserId],let canvas = CallKitManager.shared.canvasCache[currentUserId] else {
-                consoleLogInfo("CallMultiViewController: Current user not found in items cache.", type: .error)
-                return
+            if !self.connected {
+                // 未连接状态：显示全屏预览
+                self.setupLocalPreview()
+                CallKitManager.shared.setupLocalVideo()
+                CallKitManager.shared.enableLocalVideo(true)
+                self.isCameraPreviewEnabled = true
+            } else {
+                // 已连接状态：正常处理（保持现有逻辑）
+                guard let currentUserId = ChatClient.shared().currentUsername,let item = CallKitManager.shared.itemsCache[currentUserId],let canvas = CallKitManager.shared.canvasCache[currentUserId] else {
+                    consoleLogInfo("CallMultiViewController: Current user not found in items cache.", type: .error)
+                    return
+                }
+                CallKitManager.shared.setupLocalVideo()
+                CallKitManager.shared.enableLocalVideo(true)
+                item.videoMuted = false
+                canvas.updateItem(item)
             }
-            CallKitManager.shared.setupLocalVideo()
-            CallKitManager.shared.enableLocalVideo(true)
-            item.videoMuted = false
-            canvas.updateItem(item)
         case .camera_off:
-            guard let currentUserId = ChatClient.shared().currentUsername,let item = CallKitManager.shared.itemsCache[currentUserId],let canvas = CallKitManager.shared.canvasCache[currentUserId] else {
-                consoleLogInfo("CallMultiViewController: Current user not found in items cache.", type: .error)
-                return
+            if !self.connected {
+                // 未连接状态：移除预览
+                self.removeLocalPreview()
+                CallKitManager.shared.enableLocalVideo(false)
+                self.isCameraPreviewEnabled = false
+            } else {
+                // 已连接状态：正常处理（保持现有逻辑）
+                guard let currentUserId = ChatClient.shared().currentUsername,let item = CallKitManager.shared.itemsCache[currentUserId],let canvas = CallKitManager.shared.canvasCache[currentUserId] else {
+                    consoleLogInfo("CallMultiViewController: Current user not found in items cache.", type: .error)
+                    return
+                }
+                CallKitManager.shared.enableLocalVideo(false)
+                item.videoMuted = true
+                canvas.updateItem(item)
             }
-            CallKitManager.shared.enableLocalVideo(false)
-            item.videoMuted = true
-            canvas.updateItem(item)
         case .speaker_on:
             CallKitManager.shared.turnSpeakerOn(on: true)
         case .speaker_off:
@@ -214,6 +241,13 @@ open class CallMultiViewController: UIViewController {
             self.dismiss(animated: true, completion: nil)
             CallKitManager.shared.hangup()
         case .accept:
+            // 保存摄像头开启状态（在移除预览前检查）
+            let wasCameraOn = self.isCameraPreviewEnabled
+
+            // 接受通话前先移除预览视图
+            self.removeLocalPreview()
+            self.isCameraPreviewEnabled = false
+
             if let call = CallKitManager.shared.callInfo {
                 GlobalTimerManager.shared.registerListener(self, timerIdentify: "call-\(call.channelName)-answering-timer")
                 GlobalTimerManager.shared.registerListener(CallKitManager.shared, timerIdentify: "call-\(call.channelName)-answering-timer")
@@ -228,6 +262,32 @@ open class CallMultiViewController: UIViewController {
                 CallKitManager.shared.accept()
             }
             self.callView.isHidden = false
+
+            // 如果接听前摄像头是开启的，需要同步状态到 MultiPersonCallView
+            if wasCameraOn {
+                consoleLogInfo("CallMultiViewController: Camera was on before accept, restoring state...", type: .debug)
+
+                // accept() 方法会调用 enableLocalVideo(false)，需要立即覆盖
+                CallKitManager.shared.setupLocalVideo()
+                CallKitManager.shared.enableLocalVideo(true)
+
+                // 延迟更新，确保 canvas 已创建并同步状态
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                    guard let self = self else { return }
+                    if let currentUserId = ChatClient.shared().currentUsername {
+                        if let item = CallKitManager.shared.itemsCache[currentUserId],
+                           let canvas = CallKitManager.shared.canvasCache[currentUserId] {
+                            item.videoMuted = false
+                            canvas.updateItem(item)
+                            // 触发 MultiPersonCallView 更新
+                            self.callView.updateWithItems()
+                            consoleLogInfo("CallMultiViewController: Camera state synced - userId=\(currentUserId), videoMuted=false", type: .debug)
+                        } else {
+                            consoleLogInfo("CallMultiViewController: Failed to sync camera state - item or canvas not found for userId=\(currentUserId)", type: .error)
+                        }
+                    }
+                }
+            }
         case .end:
             if let call = CallKitManager.shared.callInfo {
                 GlobalTimerManager.shared.removeListener(self, timerIdentify: "call-\(call.channelName)-answering-timer")
@@ -272,6 +332,9 @@ open class CallMultiViewController: UIViewController {
     }
     
     open override func dismiss(animated flag: Bool, completion: (() -> Void)? = nil) {
+        // 页面关闭时清理预览
+        self.removeLocalPreview()
+        self.isCameraPreviewEnabled = false
         super.dismiss(animated: flag, completion: completion)
     }
     
@@ -352,6 +415,28 @@ open class CallMultiViewController: UIViewController {
                 self.navigationBar.title = group.groupName ?? groupId
             }
         }
+    }
+
+    // 设置本地摄像头预览（全屏）
+    private func setupLocalPreview() {
+        guard localPreviewView == nil else { return }
+
+        let previewView = PixelBufferRenderView(frame: self.view.bounds)
+        previewView.backgroundColor = .clear
+        previewView.userId = ChatClient.shared().currentUsername ?? ""
+        previewView.dragEnable = false
+        previewView.tag = 9999 // 特殊标记
+
+        // 插入到背景和 navigationBar 之间
+        self.view.insertSubview(previewView, aboveSubview: self.background)
+
+        self.localPreviewView = previewView
+    }
+
+    // 移除本地摄像头预览
+    private func removeLocalPreview() {
+        localPreviewView?.removeFromSuperview()
+        localPreviewView = nil
     }
 }
 
