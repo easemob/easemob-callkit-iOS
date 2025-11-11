@@ -76,7 +76,7 @@ public let CallKitVersion = "1.0.0"
     public internal(set) var popup: CallPopupView?
     
     /// Application ID for Agora SDK
-    public private(set) var appID: String = ""
+    public var appID: String = ""
     
     /// The throttler for RTC callbacks
     let rtcThrottler = RTCCallbackThrottler()
@@ -147,7 +147,9 @@ public let CallKitVersion = "1.0.0"
         if self.engine != nil {
             return nil
         }
-        self.appID = ChatClient.shared().options.appId ?? ""
+        if self.appID.isEmpty {
+            self.appID = ChatClient.shared().options.appId ?? ""
+        }
         if self.appID.isEmpty {
             return ChatError(description: "App ID is not set.", code: .invalidAppkey)
         } else {
