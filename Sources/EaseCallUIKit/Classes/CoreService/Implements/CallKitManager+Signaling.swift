@@ -1055,6 +1055,10 @@ extension CallKitManager: CallMessageService {
                         // Handle join channel failure
                         self.callStartTimerStop(callId: timerKey)
                         self.hangup()
+                    } else {
+                        if let controller = UIViewController.currentController as? CallMultiViewController {
+                            self.enableLocalVideo(controller.isCameraPreviewEnabled)
+                        }
                     }
                 }
             }
@@ -1455,6 +1459,7 @@ extension CallKitManager: CallMessageService {
                 if let vc = UIViewController.currentController as? CallMultiViewController {
                     if vc.isCameraPreviewEnabled {
                         self.setupLocalVideo()
+                        self.enableLocalVideo(true)
                     } else {
                         self.enableLocalVideo(false)
                     }
@@ -1595,7 +1600,9 @@ extension CallKitManager: CallMessageService {
             case .groupCall:
                 self.setupLocalVideo()
                 self.engine?.enableVideo()
-                self.enableLocalVideo(false)
+                if let controller = UIViewController.currentController as? CallMultiViewController {
+                    self.enableLocalVideo(controller.isCameraPreviewEnabled)
+                }
             default:
                 break
             }
