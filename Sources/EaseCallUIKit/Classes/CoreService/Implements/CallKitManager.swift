@@ -11,7 +11,7 @@ import AVKit
 import AVFAudio
 import PushKit
 
-public let CallKitVersion = "1.0.0"
+public let CallKitVersion = "4.18.1"
 
 @objcMembers public class CallKitManager: NSObject {
     /// Cache for user profiles
@@ -145,6 +145,11 @@ public let CallKitVersion = "1.0.0"
     
     @objc func setupEngine() -> ChatError? {
         if self.engine != nil {
+            for listener in self.listeners.allObjects {
+                if let engine = self.engine {
+                    listener.onRtcEngineCreated?(engine: engine)
+                }
+            }
             return nil
         }
         if self.appID.isEmpty {
@@ -168,7 +173,6 @@ public let CallKitVersion = "1.0.0"
             if let engine = self.engine {
                 listener.onRtcEngineCreated?(engine: engine)
             }
-            
         }
         self.engine?.enableAudio()
         self.engine?.enable(inEarMonitoring: true)

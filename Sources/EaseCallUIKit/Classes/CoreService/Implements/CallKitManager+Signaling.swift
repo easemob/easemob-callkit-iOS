@@ -1526,7 +1526,7 @@ extension CallKitManager: CallMessageService {
 //                completion(false)
 //            }
         } else {
-            if self.token.isEmpty {
+            if self.token.isEmpty,!self.config.disableRTCTokenValidation {
                 // Fetch the token from the ChatClient
                 ChatClient.shared().getRTCToken(withChannel: nil) { [weak self] uid, token, expiration, error in
                     if let error = error {
@@ -1556,8 +1556,10 @@ extension CallKitManager: CallMessageService {
         config.clientRoleType = .broadcaster
         config.channelProfile = .liveBroadcasting
         let currentUser = ChatClient.shared().currentUsername ?? ""
-        consoleLogInfo("\(currentUser) joining channel: \(channelName) with uid: \(uid) token:\(String(describing: self.token))", type: .debug)
-        let result = self.engine?.joinChannel(byToken: self.token, channelId: channelName, uid: UInt(uid), mediaOptions: config, joinSuccess: { [weak self] channel, uid, elapsed in
+        consoleLogInfo("\(currentUser) joining channel: \(channelName) with uid: \(uid) token:\(String(describing: self.token)) self.config.disableRTCTokenValidation:\(self.config.disableRTCTokenValidation)", type: .debug)
+        let joinToken = self.config.disableRTCTokenValidation ? nil:self.token
+        consoleLogInfo("joinToken is nil:\(joinToken == nil)", type: .debug)
+        let result = self.engine?.joinChannel(byToken: joinToken, channelId: channelName, uid: UInt(uid), mediaOptions: config, joinSuccess: { [weak self] channel, uid, elapsed in
             guard let `self` = self else { return  }
             consoleLogInfo("\(currentUser) joined channel: \(channel) with uid: \(uid) elapsed: \(elapsed): account \(ChatClient.shared().currentUsername ?? "")", type: .debug)
             if uid == self.currentUserRTCUID {
