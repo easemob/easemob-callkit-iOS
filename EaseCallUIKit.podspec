@@ -8,7 +8,7 @@
 
 Pod::Spec.new do |s|
   s.name             = 'EaseCallUIKit'
-  s.version          = '4.18.0'
+  s.version          = '4.18.1'
   s.summary          = 'A short description of EaseCallUIKit.'
 
 # This description is used to generate tags and improve search results.
@@ -43,5 +43,5 @@ TODO: Add long description of the pod here.
   s.frameworks = 'UIKit', 'Foundation', 'Combine', 'AudioToolbox', 'AVFoundation','AVKit', 'CoreMedia', 'CoreVideo', 'CoreGraphics'
   
   s.dependency 'HyphenateChat'
-  s.dependency 'AgoraRtcEngine_iOS/RtcBasic', '4.1.0'
+  s.dependency 'AgoraRtcEngine_iOS/RtcBasic', '>=4.6.0'
 end
