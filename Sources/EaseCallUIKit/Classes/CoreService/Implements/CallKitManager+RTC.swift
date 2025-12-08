@@ -267,14 +267,7 @@ extension CallKitManager: AgoraRtcEngineDelegate {
     func getStreamRenderQuality(with count: UInt) -> AgoraVideoStreamType {
         var type = AgoraVideoStreamType.low
         switch count {
-        case 1...2: type = .high
-        case 3...4: type = .layer1
-        case 5...6: type = .layer2
-        case 7...8: type = .layer3
-        case 9...10: type = .layer4
-        case 11...12: type = .layer5
-        case 13...14: type = .layer6
-        case 15...: type = .low
+        case 1...4: type = .high
         default:
             break
         }

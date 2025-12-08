@@ -1157,9 +1157,16 @@ extension ViewController: CallUserProfileProvider {
 </details>
 
 ### 5.2 RTC私有化部署
+```Swift
+    //设置appid，需要联系商务以及产品经理配合使用（需要后台改映射关系）
+    CallKitManager.shared.appID = <#app id#>
+    //CallKit初始化方法的参数config中新增参数，关闭RTC token验证，默认为false，改为true则不验证token，需要联系商务以及产品经理配合使用（需要后台改映射关系）
+    config.disableRTCTokenValidation = true
+```
 
 ```Swift
-//添加CallKitListener监听后实现下面方法，填写自己的ip地址以及域名
+    CallKitManager.shared.addListener(self)//初始化CallKit后添加CallKitListener监听后实现下面方法，填写自己的ip地址以及域名
+    
     func onRtcEngineCreated(engine: AgoraRtcEngineKit?) {
         let config = AgoraLocalAccessPointConfiguration()
         config.ipList = ["123.456.789.0"]

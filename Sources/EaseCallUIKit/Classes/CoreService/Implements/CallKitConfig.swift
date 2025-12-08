@@ -23,4 +23,7 @@ import Foundation
     
     /// ``LiveCommunicationKit`` supports multiple conversation groups, and each conversation group supports multiple conversations.
     public var maximumConversationsPerConversationGroup: Int = 1
+    
+    /// Disable RTC token validation
+    public var disableRTCTokenValidation: Bool = false
 }
