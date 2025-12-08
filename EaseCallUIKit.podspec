@@ -43,5 +43,5 @@ TODO: Add long description of the pod here.
   s.frameworks = 'UIKit', 'Foundation', 'Combine', 'AudioToolbox', 'AVFoundation','AVKit', 'CoreMedia', 'CoreVideo', 'CoreGraphics'
   
   s.dependency 'HyphenateChat'
-  s.dependency 'AgoraRtcEngine_iOS/RtcBasic', '~> 4.6.0'
+  s.dependency 'AgoraRtcEngine_iOS/RtcBasic', '4.1.0'
 end

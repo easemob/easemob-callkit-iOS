@@ -85,8 +85,7 @@ class AudioPlayerManager: NSObject {
     func stopAudio() {
         print("⏹️ 停止播放")
         audioPlayer?.stop()
-        audioPlayer = nil
-        currentURL = nil
+        
     }
     
     /// 暂停播放
@@ -138,6 +137,12 @@ class AudioPlayerManager: NSObject {
         } catch {
             print("❌ 设置音频会话失败: \(error.localizedDescription)")
         }
+    }
+    
+    func tearDown() {
+        stopAudio()
+        audioPlayer = nil
+        currentURL = nil
     }
 }
 

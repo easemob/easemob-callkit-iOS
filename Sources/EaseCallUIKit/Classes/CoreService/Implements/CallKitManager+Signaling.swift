@@ -1623,7 +1623,9 @@ extension CallKitManager: CallMessageService {
             DispatchQueue.main.async {
                 self.callVC?.dismiss(animated: false)
                 self.callVC = nil
-                AudioPlayerManager.shared.stopAudio()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    AudioPlayerManager.shared.stopAudio()
+                }
                 UIApplication.shared.isIdleTimerDisabled = false
                 if let currentVC = UIViewController.currentController, (currentVC is Call1v1AudioViewController || currentVC is Call1v1VideoViewController ) {
                     currentVC.dismiss(animated: false)
