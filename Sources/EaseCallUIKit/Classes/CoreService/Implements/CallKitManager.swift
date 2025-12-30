@@ -121,8 +121,6 @@ public let CallKitVersion = "4.18.1"
         }
         _ = AudioPlayerManager.shared
         consoleLogInfo("CallKitManager setup completed", type: .info)
-        self.checkCameraPermission()
-        self.checkMicrophonePermission()
         if #available(iOS 17.4, *),self.config.enableVOIP {
             LiveCommunicationManager.shared.setupPushKit()
         }
@@ -183,7 +181,7 @@ public let CallKitVersion = "4.18.1"
     }
 
     /// Checks and requests camera permission.
-    func checkCameraPermission() {
+    public func checkCameraPermission() {
         let status = AVCaptureDevice.authorizationStatus(for: .video)
         switch status {
         case .notDetermined:
@@ -192,6 +190,9 @@ public let CallKitVersion = "4.18.1"
                     if granted {
                         consoleLogInfo("The camera permission is granted.", type: .info)
                     } else {
+                        DispatchQueue.main.async {
+                            UIViewController.currentController?.showCallToast(toast: "检测到用户拒绝授予摄像头权限，请前往设置开启摄像头权限",duration: 3.0,delay: 0.5)
+                        }
                         consoleLogInfo("The camera permission is denied, please enable it in settings.", type: .error)
                     }
                 }
@@ -202,13 +203,16 @@ public let CallKitVersion = "4.18.1"
             // permission denied or restricted
             consoleLogInfo("The camera permission is denied or restricted.", type: .error)
             // 可引导用户去设置中开启：Settings -> 应用名称 -> 摄像头
+            DispatchQueue.main.async {
+                UIViewController.currentController?.showCallToast(toast: "检测到摄像头权限未开启，请前往设置开启摄像头权限",duration: 3.0,delay: 0.5)
+            }
         @unknown default:
             consoleLogInfo("Unknown camera permission status", type: .error)
         }
     }
     
     /// Checks and requests microphone permission.
-    func checkMicrophonePermission() {
+    public func checkMicrophonePermission() {
         let status = AVCaptureDevice.authorizationStatus(for: .audio)
         switch status {
         case .notDetermined:
@@ -218,6 +222,9 @@ public let CallKitVersion = "4.18.1"
                     if granted {
                         consoleLogInfo("The microphone permission is granted.", type: .info)
                     } else {
+                        DispatchQueue.main.async {
+                            UIViewController.currentController?.showCallToast(toast: "检测到用户拒绝授予麦克风权限，请前往设置开启麦克风权限",duration: 3.0,delay: 0.5)
+                        }
                         consoleLogInfo("The microphone permission is denied, please enable it in settings.", type: .error)
                     }
                 }
@@ -227,6 +234,9 @@ public let CallKitVersion = "4.18.1"
         case .denied, .restricted:
             consoleLogInfo("The microphone permission is denied or restricted, please enable it in settings.", type: .error)
             // 引导用户去设置中开启：Settings -> 应用名称 -> 麦克风
+            DispatchQueue.main.async {
+                UIViewController.currentController?.showCallToast(toast: "检测到麦克风权限未开启，请前往设置开启麦克风权限",duration: 3.0,delay: 0.5)
+            }
         @unknown default:
             consoleLogInfo("Unknown microphone permission status", type: .error)
         }

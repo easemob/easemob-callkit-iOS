@@ -1568,6 +1568,14 @@ extension CallKitManager: CallMessageService {
                     self.updateCallEndReason(.abnormalEnd,false)
                 })
             }
+            if let call = self.callInfo {
+                if call.type == .singleVideo || call.type == .groupCall {
+                    self.checkCameraPermission()
+                    self.checkMicrophonePermission()
+                } else {
+                    self.checkMicrophonePermission()
+                }
+            }
             completion(true)
         }) ?? 0
         if result != 0 {
