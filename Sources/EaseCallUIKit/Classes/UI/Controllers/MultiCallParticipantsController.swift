@@ -53,7 +53,7 @@ import UIKit
 
     open override func viewDidLoad() {
         super.viewDidLoad()
-        self.navigation.leftItem.setImage(UIImage(named: "back", in: .callBundle, with: nil), for: .normal)
+        self.navigation.leftItem.setImage(UIImage(callNamed: "back"), for: .normal)
         self.navigation.title = "invite_page_title".call.localize
         self.navigation.rightItem.isEnabled = false
         self.view.addSubViews([self.participantsList,self.navigation])

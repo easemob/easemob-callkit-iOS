@@ -24,23 +24,20 @@ public extension Bundle {
         if CallAppearance.resourceBundle != nil {
             return CallAppearance.resourceBundle!
         } else {
-            if CallResourceBundle != nil {
-                return CallResourceBundle!
-            }
+
 #if COCOAPODS
-        CallResourceBundle = Bundle(for: CallAppearance.self)
+            return Bundle(for: CallAppearance.self)
                 .url(forResource: "EaseCallUIKit.bundle/CallResource", withExtension: "bundle")
-                .flatMap { Bundle(url: $0) }
+                .flatMap { Bundle(url: $0) }!
 #elseif SWIFT_PACKAGE
-        CallResourceBundle = Bundle.module
+            return Bundle.module
 #elseif STATIC_LIBRARY
-        CallResourceBundle = Bundle.main
+            return Bundle.main
                 .url(forResource: "EaseCallUIKit.bundle/CallResource", withExtension: "bundle")
                 .flatMap(Bundle.init(url:))!
 #else
-        CallResourceBundle = Bundle(for: CallAppearance.self)
+        return Bundle(for: CallAppearance.self)
 #endif
-            return CallResourceBundle!
         }
     }
 }

@@ -57,7 +57,7 @@ public class FloatingAudioView: DragFloatView {
         vibrancyEffectView.translatesAutoresizingMaskIntoConstraints = false
         
         // Phone icon setup
-        phoneIconImageView.image = UIImage(named: "phone_pick", in: .callBundle, with: nil)?.withTintColor(UIColor.callTheme.secondaryColor5, renderingMode: .alwaysOriginal)
+        phoneIconImageView.image = UIImage(callNamed: "phone_pick")?.withTintColor(UIColor.callTheme.secondaryColor5, renderingMode: .alwaysOriginal)
         phoneIconImageView.backgroundColor = .clear
         phoneIconImageView.contentMode = .scaleAspectFit
         phoneIconImageView.translatesAutoresizingMaskIntoConstraints = false

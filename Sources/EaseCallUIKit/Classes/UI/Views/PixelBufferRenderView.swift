@@ -89,7 +89,7 @@ public class PixelBufferRenderView: DragFloatView {
     
     func updateAudioState(_ mute: Bool) {
         isAudioMuted = mute
-        micView.image = mute ? UIImage(named: "mic_off", in: .callBundle, with: nil) : UIImage(named: "mic_on", in: .callBundle, with: nil)
+        micView.image = mute ? UIImage(callNamed: "mic_off") : UIImage(callNamed: "mic_on")
         self.micView.isHidden = !mute
         if !micView.isHidden {
             bringSubviewToFront(micView)

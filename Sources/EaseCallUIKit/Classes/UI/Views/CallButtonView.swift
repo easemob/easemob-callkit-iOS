@@ -128,12 +128,12 @@
         self.data = data
         if allowSelection {
             containerView.backgroundColor = data.isSelected ? UIColor.callTheme.barrageLightColor5:UIColor.callTheme.barrageDarkColor9
-            imageView.image = UIImage(named: data.isSelected ? data.selectedImageName:data.imageName, in: .callBundle, with: nil)
+            imageView.image = UIImage(callNamed: data.isSelected ? data.selectedImageName:data.imageName)
             nameLabel.text = data.title
             statusLabel.text = data.isSelected ? data.selectedStatus : data.status
         } else {
             containerView.backgroundColor = data.color
-            imageView.image = UIImage(named: data.imageName, in: .callBundle, with: nil)
+            imageView.image = UIImage(callNamed: data.imageName)
             nameLabel.text = data.title
             statusLabel.text = data.status
         }

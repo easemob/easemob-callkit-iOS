@@ -225,11 +225,11 @@
 			);
 			inputPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-EaseCallUIKit_Example/Pods-EaseCallUIKit_Example-resources.sh",
-				"${PODS_ROOT}/../../Sources/EaseCallUIKit/Classes/Resources/CallResource.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/EaseCallUIKit/EaseCallUIKit.bundle",
 			);
 			name = "[CP] Copy Pods Resources";
 			outputPaths = (
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/CallResource.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/EaseCallUIKit.bundle",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;

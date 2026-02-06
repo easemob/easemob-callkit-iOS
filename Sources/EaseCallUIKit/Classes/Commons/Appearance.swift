@@ -36,11 +36,11 @@ import Foundation
     public static var avatarRadius: EaseCallUIKit.CornerRadius = .extraSmall
     
     /// The placeholder image of the avatar image view of ``MessageCell``.
-    public static var avatarPlaceHolder: UIImage? = UIImage(named: "default_avatar", in: .callBundle, with: nil)
+    public static var avatarPlaceHolder: UIImage? = UIImage(callNamed: "default_avatar")
     
     /// The bundle that contains the resources of EaseCallUIKit.
     public static var resourceBundle: Bundle? = nil
     
     /// The background image of the call interface.
-    public static var backgroundImage : UIImage? = UIImage(named: "bg", in: .callBundle, with: nil)
+    public static var backgroundImage : UIImage? = UIImage(callNamed: "bg")
 }
