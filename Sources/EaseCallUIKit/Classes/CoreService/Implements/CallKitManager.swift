@@ -150,6 +150,7 @@ public let CallKitVersion = "4.18.1"
             }
             return nil
         }
+        self.engine?.setParameters("{\"che.audio.mix_with_others\":false}")
         if self.appID.isEmpty {
             self.appID = ChatClient.shared().options.appId ?? ""
         }
@@ -161,7 +162,7 @@ public let CallKitVersion = "4.18.1"
         let configuration = AgoraVideoEncoderConfiguration()
         configuration.orientationMode = .fixedPortrait
         configuration.dimensions = CGSize(width: 1280, height: 720)
-        configuration.frameRate = .fps30
+        configuration.frameRate = 30
         self.engine?.setVideoEncoderConfiguration(configuration)
         
         let cameraConfig = AgoraCameraCapturerConfiguration()

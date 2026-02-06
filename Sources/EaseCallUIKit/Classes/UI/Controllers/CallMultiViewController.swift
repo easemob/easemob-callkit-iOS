@@ -26,7 +26,7 @@ open class CallMultiViewController: UIViewController {
     }()
     
     @objc func createNavigationBar() -> CallNavigationBar {
-        CallNavigationBar(showLeftItem: true,textAlignment: .left, rightImages: [UIImage(named: "person_add", in: .callBundle, with: nil)!]).backgroundColor(.clear)
+        CallNavigationBar(showLeftItem: true,textAlignment: .left, rightImages: [UIImage(callNamed: "person_add")!]).backgroundColor(.clear)
     }
     
     public lazy var callView: MultiPersonCallView = {

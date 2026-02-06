@@ -192,7 +192,7 @@ open class Call1v1VideoViewController: UIViewController {
 
         self.view.addSubViews([self.background, self.navigationBar, self.bottomView,self.navigationBlur])
         self.background.addSubViews([self.callView, self.floatView])
-        self.navigationBlur.image = UIImage(named: "mask", in: .callBundle, with: nil)
+        self.navigationBlur.image = UIImage(callNamed: "mask")
         // 确保floatView在最上层
         self.background.bringSubviewToFront(self.floatView)
     }

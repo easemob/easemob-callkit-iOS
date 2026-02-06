@@ -46,7 +46,7 @@ public class RingAlert: UIView {
         let button = UIButton(type: .custom)
         button.imageView?.contentMode = .scaleAspectFit
         button.backgroundColor = UIColor.callTheme.errorColor6
-        button.setImage(UIImage(named: "phone_hang_mini", in: .callBundle, with: nil), for: .normal)
+        button.setImage(UIImage(callNamed: "phone_hang_mini"), for: .normal)
         button.layer.cornerRadius = 18
         button.translatesAutoresizingMaskIntoConstraints = false
         button.addTarget(self, action: #selector(declineCall), for: .touchUpInside)
@@ -57,7 +57,7 @@ public class RingAlert: UIView {
         let button = UIButton(type: .custom)
         button.backgroundColor = UIColor.callTheme.secondaryColor4
         button.imageView?.contentMode = .scaleAspectFit
-        button.setImage(UIImage(named: "phone_pick_mini", in: .callBundle, with: nil), for: .normal)
+        button.setImage(UIImage(callNamed: "phone_pick_mini"), for: .normal)
         button.layer.cornerRadius = 18
         button.translatesAutoresizingMaskIntoConstraints = false
         button.addTarget(self, action: #selector(acceptCall), for: .touchUpInside)

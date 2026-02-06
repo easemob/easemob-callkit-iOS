@@ -78,7 +78,7 @@ public class CallStreamView: UIImageView {
         
         // Setup network status view
         networkStatusView.translatesAutoresizingMaskIntoConstraints = false
-        networkStatusView.image = UIImage(named: "network_0", in: .callBundle, with: nil)
+        networkStatusView.image = UIImage(callNamed: "network_0")
         networkStatusView.contentMode = .scaleAspectFit
         networkStatusView.backgroundColor = UIColor.callTheme.barrageLightColor5
         networkStatusView.layer.cornerRadius = 4
@@ -93,7 +93,7 @@ public class CallStreamView: UIImageView {
         
         loadingView.backgroundColor = UIColor.clear
         loadingView.translatesAutoresizingMaskIntoConstraints = false
-        loadingView.image = UIImage(named: "wait_indicator", in: .callBundle, with: nil)
+        loadingView.image = UIImage(callNamed: "wait_indicator")
         coverView.addSubview(loadingView)
         // Setup user info view
         userInfoView.translatesAutoresizingMaskIntoConstraints = false
@@ -248,13 +248,13 @@ public class CallStreamView: UIImageView {
         coverView.removeFromSuperview()
         switch status {
         case .good:
-            networkStatusView.image = UIImage(named: "network_0", in: .callBundle, with: nil)
+            networkStatusView.image = UIImage(callNamed: "network_0")
         case .poor:
-            networkStatusView.image = UIImage(named: "network_1", in: .callBundle, with: nil)
+            networkStatusView.image = UIImage(callNamed: "network_1")
         case .bad:
-            networkStatusView.image = UIImage(named: "network_2", in: .callBundle, with: nil)
+            networkStatusView.image = UIImage(callNamed: "network_2")
         case .unknown:
-            networkStatusView.image = UIImage(named: "network_3", in: .callBundle, with: nil)
+            networkStatusView.image = UIImage(callNamed: "network_3")
         }
         self.bringSubviewToFront(self.networkStatusView)
 //        self.networkStatusView.isHidden = false
@@ -350,7 +350,7 @@ public class UserInfoView: UIView {
         didSet {
             if isSpeaking && !isAudioMuted {
                 // 正在说话且未静音时显示说话图标
-                audioButton.setImage(UIImage(named: "speaking", in: .callBundle, with: nil), for: .normal)
+                audioButton.setImage(UIImage(callNamed: "speaking"), for: .normal)
                 audioButton.isHidden = false
                 
                 // 动态更新约束以显示音频按钮
