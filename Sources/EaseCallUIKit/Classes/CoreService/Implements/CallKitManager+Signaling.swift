@@ -486,7 +486,7 @@ extension CallKitManager: ChatEventsListener {
     func presentCalleeController(call: CallInfo) {
         consoleLogInfo("Present callee controller for callId: \(call.callId)", type: .info)
         let currentVC = UIViewController.currentController
-        if currentVC is CallMultiViewController || currentVC is Call1v1AudioViewController || currentVC is Call1v1VideoViewController {
+        if currentVC is CallMultiViewController || currentVC is Call1v1AudioViewController || currentVC is Call1v1VideoViewController  || self.callVC is CallMultiViewController || self.callVC is Call1v1AudioViewController || self.callVC is Call1v1VideoViewController{
             (currentVC as? Call1v1AudioViewController)?.updateBottomState()
             (currentVC as? Call1v1VideoViewController)?.updateBottomState()
             (currentVC as? CallMultiViewController)?.updateBottomState()
@@ -522,7 +522,7 @@ extension CallKitManager: ChatEventsListener {
     
     private func presentCallerPage(call: CallInfo) {
         let currentVC = UIViewController.currentController
-        if currentVC is CallMultiViewController || currentVC is Call1v1AudioViewController || currentVC is Call1v1VideoViewController {
+        if currentVC is CallMultiViewController || currentVC is Call1v1AudioViewController || currentVC is Call1v1VideoViewController || self.callVC is CallMultiViewController || self.callVC is Call1v1AudioViewController || self.callVC is Call1v1VideoViewController{
             (currentVC as? Call1v1AudioViewController)?.updateBottomState()
             (currentVC as? Call1v1VideoViewController)?.updateBottomState()
             (currentVC as? CallMultiViewController)?.updateBottomState()
@@ -1632,8 +1632,8 @@ extension CallKitManager: CallMessageService {
     func quitCall() {
         if self.callInfo != nil {
             self.hadJoinedChannel = false
-            AudioPlayerManager.shared.playAudio(from: "busy")
             DispatchQueue.main.async {
+                AudioPlayerManager.shared.playAudio(from: "busy")
                 self.callVC?.dismiss(animated: false)
                 self.callVC = nil
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
