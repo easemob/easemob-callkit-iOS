@@ -1265,7 +1265,6 @@ extension CallKitManager: CallMessageService {
                 }
             }
             let message = ChatMessage(conversationID: conversationId, body: ChatCMDMessageBody(action: kCall), ext: [kCallId:callId,kMsgType: kMsgTypeValue,kAction:CALL_END])
-            message.deliverOnlineOnly = true
             if self.callInfo?.type ?? .singleAudio  == .groupCall {
                 message.chatType = .groupChat
                 if to.contains(",") {
@@ -1679,6 +1678,7 @@ extension CallKitManager: CallMessageService {
             DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
                 AudioPlayerManager.shared.stopAudio()
             }
+            self.callInfo = nil
         }
     }
     
