@@ -317,7 +317,12 @@ extension LiveCommunicationManager: ConversationManagerDelegate
         consoleLogInfo("[LiveCommunicationManager] perform endAction:",type: .debug)
         _ = hangupCurrentCallIfNeeded(source: "endAction")
         action.fulfill()
-        ChatClient.shared().applicationDidEnterBackground(UIApplication.shared)
+        DispatchQueue.main.asyncAfter(wallDeadline: .now()+2) {
+            if UIApplication.shared.applicationState == .background || UIApplication.shared.applicationState == .inactive {
+                
+                ChatClient.shared().applicationDidEnterBackground(UIApplication.shared)
+            }
+        }
     }
     
     func conversationManager(_ manager: ConversationManager, timedOutPerforming action: ConversationAction) {
