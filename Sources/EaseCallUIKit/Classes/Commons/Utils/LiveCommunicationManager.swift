@@ -318,10 +318,8 @@ extension LiveCommunicationManager: ConversationManagerDelegate
         _ = hangupCurrentCallIfNeeded(source: "endAction")
         action.fulfill()
         DispatchQueue.main.asyncAfter(wallDeadline: .now()+2) {
-            if UIApplication.shared.applicationState == .background || UIApplication.shared.applicationState == .inactive {
-                
-                ChatClient.shared().applicationDidEnterBackground(UIApplication.shared)
-            }
+            consoleLogInfo("[LiveCommunicationManager] endAction delay execute applicationDidEnterBackground",type: .debug)
+            ChatClient.shared().applicationDidEnterBackground(UIApplication.shared)
         }
     }
     
