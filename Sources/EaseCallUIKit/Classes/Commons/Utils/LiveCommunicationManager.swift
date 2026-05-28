@@ -317,7 +317,7 @@ extension LiveCommunicationManager: ConversationManagerDelegate
         consoleLogInfo("[LiveCommunicationManager] perform endAction:",type: .debug)
         _ = hangupCurrentCallIfNeeded(source: "endAction")
         action.fulfill()
-        DispatchQueue.main.asyncAfter(wallDeadline: .now()+2) {
+        DispatchQueue.main.asyncAfter(wallDeadline: .now()+1.5) {
             consoleLogInfo("[LiveCommunicationManager] endAction delay execute applicationDidEnterBackground",type: .debug)
             ChatClient.shared().applicationDidEnterBackground(UIApplication.shared)
         }
