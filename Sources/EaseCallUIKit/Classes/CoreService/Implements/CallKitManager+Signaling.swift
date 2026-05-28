@@ -517,7 +517,7 @@ extension CallKitManager: ChatEventsListener {
                     break
                 }
             }
-        case .background:
+        case .background,.inactive:
             if #available(iOS 17.4, *),self.config.enableVOIP {
                 LiveCommunicationManager.shared.createConversationManager()
                 var uuid = UUID(uuidString: call.callId)
@@ -1719,7 +1719,13 @@ extension CallKitManager: CallMessageService {
             self.isVideoExchanged = false
             let result = self.engine?.leaveChannel()
             consoleLogInfo("quitCall leaveChannel result: \(String(describing: result))", type: .debug)
+            if let code = result,code != 0 {
+                for listener in self.listeners.allObjects {
+                    listener.didOccurError?(error: CallError(CallError.RTC(code: AgoraErrorCode(rawValue: Int(code))!, message: "quitCall leaveChannel failed"), module: .rtc))
+                }
+            }
             self.engine?.stopPreview()
+            self.engine?.stopAudioRecording()
             self.callInfo?.callId = ""
             self.callInfo?.callerId = ""
             self.callInfo?.callerDeviceId = ""

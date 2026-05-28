@@ -317,6 +317,7 @@ extension LiveCommunicationManager: ConversationManagerDelegate
         consoleLogInfo("[LiveCommunicationManager] perform endAction:",type: .debug)
         _ = hangupCurrentCallIfNeeded(source: "endAction")
         action.fulfill()
+        ChatClient.shared().applicationDidEnterBackground(UIApplication.shared)
     }
     
     func conversationManager(_ manager: ConversationManager, timedOutPerforming action: ConversationAction) {
