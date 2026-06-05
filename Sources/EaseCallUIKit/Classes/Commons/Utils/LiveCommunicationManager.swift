@@ -30,6 +30,8 @@ class LiveCommunicationManager: NSObject {
     
     private var uuid: UUID?
     
+    private var handledEndCallId: String?
+    
     var currentUserMute: Bool = false // 当前用户是否静音
     
     // 私有化初始化方法，确保单例
@@ -93,8 +95,12 @@ class LiveCommunicationManager: NSObject {
     }
      
     func endCall(){
+        if let callId = CallKitManager.shared.callInfo?.callId, !callId.isEmpty {
+            self.handledEndCallId = callId
+        }
         self.manager?.invalidate()
         self.manager = nil
+        self.uuid = nil
         DispatchQueue.main.async {
             if UIApplication.shared.applicationState == .background {
                 ChatClient.shared().applicationDidEnterBackground(UIApplication.shared)
@@ -173,6 +179,7 @@ extension LiveCommunicationManager: PKPushRegistryDelegate {
         if let group = payload.dictionaryPayload["g"] as? String {
             groupId = group
         }
+        self.handledEndCallId = nil
         CallKitManager.shared.callInfo = CallInfo(callId: callId, callerId: callerID, callerDeviceId: callerDeviceId, channelName: channelName, type: callType)
         CallKitManager.shared.callInfo?.calleeDeviceId = ChatClient.shared().getDeviceConfig(nil).deviceUUID ?? ""
         CallKitManager.shared.callInfo?.groupId = groupId
@@ -292,16 +299,34 @@ extension LiveCommunicationManager: ConversationManagerDelegate
         }
     }
     
+    private func hangupCurrentCallIfNeeded(source: String) -> Bool {
+        guard let call = CallKitManager.shared.callInfo, !call.callId.isEmpty else {
+            consoleLogInfo("[LiveCommunicationManager] skip \(source) because call info is empty", type: .debug)
+            return false
+        }
+        if handledEndCallId == call.callId {
+            consoleLogInfo("[LiveCommunicationManager] skip duplicate \(source) for callId: \(call.callId)", type: .debug)
+            return false
+        }
+        handledEndCallId = call.callId
+        CallKitManager.shared.hangup()
+        return true
+    }
+    
     private func endAction(action: EndConversationAction) {
         consoleLogInfo("[LiveCommunicationManager] perform endAction:",type: .debug)
-        CallKitManager.shared.hangup()
+        _ = hangupCurrentCallIfNeeded(source: "endAction")
         action.fulfill()
+        DispatchQueue.main.asyncAfter(wallDeadline: .now()+1.5) {
+            consoleLogInfo("[LiveCommunicationManager] endAction delay execute applicationDidEnterBackground",type: .debug)
+            ChatClient.shared().applicationDidEnterBackground(UIApplication.shared)
+        }
     }
     
     func conversationManager(_ manager: ConversationManager, timedOutPerforming action: ConversationAction) {
         // 会话超时
         consoleLogInfo("[LiveCommunicationManager] perform timedOutPerforming:\(action)",type: .debug)
-        CallKitManager.shared.hangup()
+        _ = hangupCurrentCallIfNeeded(source: "timedOutPerforming")
     }
     
     func conversationManager(_ manager: ConversationManager, didActivate audioSession: AVAudioSession) {
@@ -312,7 +337,6 @@ extension LiveCommunicationManager: ConversationManagerDelegate
     func conversationManager(_ manager: ConversationManager, didDeactivate audioSession: AVAudioSession) {
         //会话失效了
         consoleLogInfo("[LiveCommunicationManager] perform didDeactivate:",type: .debug)
-        CallKitManager.shared.hangup()
+        _ = hangupCurrentCallIfNeeded(source: "didDeactivate")
     }
 }
-

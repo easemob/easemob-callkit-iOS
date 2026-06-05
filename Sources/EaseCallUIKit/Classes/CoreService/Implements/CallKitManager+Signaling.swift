@@ -10,6 +10,63 @@ import AgoraRtcKit
 
 extension CallKitManager: ChatEventsListener {
     
+    private struct CallEndReasonSnapshot: Sendable {
+        let info: CallInfo
+        let inviteMessageId: String
+        let duration: UInt
+        let isCurrentCall: Bool
+    }
+    
+    private func makeCallInfoSnapshot(_ info: CallInfo) -> CallInfo {
+        let snapshot = CallInfo(
+            callId: info.callId,
+            callerId: info.callerId,
+            callerDeviceId: info.callerDeviceId,
+            channelName: info.channelName,
+            type: info.type,
+            startMessageId: info.inviteMessageId,
+            extensionInfo: info.extensionInfo
+        )
+        snapshot.calleeId = info.calleeId
+        snapshot.calleeDeviceId = info.calleeDeviceId
+        snapshot.groupId = info.groupId
+        snapshot.groupName = info.groupName
+        snapshot.groupAvatar = info.groupAvatar
+        snapshot.state = info.state
+        snapshot.duration = info.duration
+        snapshot.inviteMessageId = info.inviteMessageId
+        snapshot.inviteUsers = info.inviteUsers
+        return snapshot
+    }
+    
+    private func makeCallEndReasonSnapshot(_ callInfo: CallInfo?) -> CallEndReasonSnapshot? {
+        if let currentInfo = self.callInfo, !currentInfo.callId.isEmpty {
+            let snapshot = makeCallInfoSnapshot(currentInfo)
+            return CallEndReasonSnapshot(
+                info: snapshot,
+                inviteMessageId: snapshot.inviteMessageId,
+                duration: snapshot.duration,
+                isCurrentCall: true
+            )
+        }
+        if let info = callInfo, !info.callId.isEmpty {
+            let snapshot = makeCallInfoSnapshot(info)
+            return CallEndReasonSnapshot(
+                info: snapshot,
+                inviteMessageId: snapshot.inviteMessageId,
+                duration: snapshot.duration,
+                isCurrentCall: false
+            )
+        }
+        return nil
+    }
+    
+    private func notifyCallEndReason(_ reason: CallEndReason, info: CallInfo) {
+        for listener in self.listeners.allObjects {
+            listener.didUpdateCallEndReason?(reason: reason, info: info)
+        }
+    }
+    
     public func messagesDidReceive(_ aMessages: [ChatMessage]) {
         for message in aMessages {
             if message.chatType == .chat || message.chatType == .groupChat {
@@ -128,7 +185,7 @@ extension CallKitManager: ChatEventsListener {
                             }
                             self.calleeAnswerCaller(callId: callId, callerId: message.from, callerDeviceId: callerDevId)
                             self.startInvitationSignalTimer(callId: callId)
-                            self.updateCallEndReason(.remoteCancel)
+                            self.updateCallEndReason(.remoteCancel, false, info)
                         }
                     }
                     
@@ -374,17 +431,25 @@ extension CallKitManager: ChatEventsListener {
     ///   - callInfo: If provided, this CallInfo will be used for the callback instead of self.callInfo.
     func updateCallEndReason(_ reason: CallEndReason, _ immediateCallback: Bool = true, _ callInfo: CallInfo? = nil) {
         consoleLogInfo("Update call end reason to: \(reason.rawValue)", type: .info)
-        var info: CallInfo?
-        if self.callInfo != nil,!(self.callInfo?.callId.isEmpty ?? false) {
-            info = self.callInfo
-        } else {
-            info = callInfo
+        guard let snapshot = makeCallEndReasonSnapshot(callInfo) else {
+            consoleLogInfo("Skip updating call end reason because call info is empty", type: .error)
+            return
         }
-        if let message = ChatClient.shared().chatManager?.getMessageWithMessageId(info?.inviteMessageId ?? "") {
+        
+        if immediateCallback {
+            if snapshot.isCurrentCall {
+                self.quitCall()
+            } else {
+                self.receivedCalls.removeValue(forKey: snapshot.info.callId)
+            }
+        }
+        
+        if let message = ChatClient.shared().chatManager?.getMessageWithMessageId(snapshot.inviteMessageId) {
             let ext = message.ext ?? [:]
             var newExt = ext
             newExt[kCallEndReason] = reason.rawValue
-            if let duration = self.callInfo?.duration {
+            if snapshot.duration > 0 {
+                let duration = snapshot.duration
                 newExt[kCallDuration] = duration
             }
             message.ext = newExt
@@ -394,19 +459,12 @@ extension CallKitManager: ChatEventsListener {
                     consoleLogInfo("Failed to update call reason:\(reason.rawValue): \(String(describing: error.errorDescription))", type: .error)
                 } else {
                     if immediateCallback {
-                        if let callbackInfo = info {
-                            for listener in self.listeners.allObjects {
-                                listener.didUpdateCallEndReason?(reason: reason, info: callbackInfo)
-                            }
-                            if !(self.callInfo?.callId.isEmpty ?? false) {
-                                self.quitCall()
-                            } else {
-                                self.receivedCalls.removeValue(forKey: callbackInfo.callId)
-                            }
-                        }
+                        self.notifyCallEndReason(reason, info: snapshot.info)
                     }
                 }
             }
+        } else {
+            consoleLogInfo("Failed to find invite message for callId:\(snapshot.info.callId) messageId:\(snapshot.inviteMessageId)", type: .error)
         }
     }
     private func showReceivedCallAlert(call: CallInfo) {
@@ -421,6 +479,7 @@ extension CallKitManager: ChatEventsListener {
         if call.state != .ringing {
             return
         }
+        consoleLogInfo("Show received call alert for callId: \(call.callId) in state: \(call.state) from user: \(String(describing: user?.id)) applicationState:\(UIApplication.shared.applicationState.rawValue)", type: .info)
         switch UIApplication.shared.applicationState {
         case .active:
             if #available(iOS 17.4, *),self.config.enableVOIP,LiveCommunicationManager.shared.manager != nil {
@@ -458,7 +517,7 @@ extension CallKitManager: ChatEventsListener {
                     break
                 }
             }
-        case .background:
+        case .background,.inactive:
             if #available(iOS 17.4, *),self.config.enableVOIP {
                 LiveCommunicationManager.shared.createConversationManager()
                 var uuid = UUID(uuidString: call.callId)
@@ -1405,8 +1464,8 @@ extension CallKitManager: CallMessageService {
         if let call = self.callInfo {
             switch call.state {
             case .answering:
-                self.updateCallEndReason(.hangup)
                 self.terminateCall()
+                self.updateCallEndReason(.hangup)
                 call.state = .idle
                 GlobalTimerManager.shared.invalidate()
             case .dialing:
@@ -1660,7 +1719,13 @@ extension CallKitManager: CallMessageService {
             self.isVideoExchanged = false
             let result = self.engine?.leaveChannel()
             consoleLogInfo("quitCall leaveChannel result: \(String(describing: result))", type: .debug)
+            if let code = result,code != 0 {
+                for listener in self.listeners.allObjects {
+                    listener.didOccurError?(error: CallError(CallError.RTC(code: AgoraErrorCode(rawValue: Int(code))!, message: "quitCall leaveChannel failed"), module: .rtc))
+                }
+            }
             self.engine?.stopPreview()
+            self.engine?.stopAudioRecording()
             self.callInfo?.callId = ""
             self.callInfo?.callerId = ""
             self.callInfo?.callerDeviceId = ""
