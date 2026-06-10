@@ -1740,9 +1740,6 @@ extension CallKitManager: CallMessageService {
             self.callInfo?.extensionInfo = nil
             self.callInfo?.state = .idle
             self.callInfo?.duration = 0
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                AudioPlayerManager.shared.stopAudio()
-            }
             self.callInfo = nil
         }
     }
