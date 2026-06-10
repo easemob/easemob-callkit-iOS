@@ -8,7 +8,7 @@
 
 Pod::Spec.new do |s|
   s.name             = 'EaseCallUIKit'
-  s.version          = '4.22.0'
+  s.version          = '4.23.0'
   s.summary          = 'A short description of EaseCallUIKit.'
 
 # This description is used to generate tags and improve search results.
