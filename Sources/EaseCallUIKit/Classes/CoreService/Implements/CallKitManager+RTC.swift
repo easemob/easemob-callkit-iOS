@@ -247,7 +247,12 @@ extension CallKitManager: AgoraRtcEngineDelegate {
                     if credential.token == token {
                         consoleLogInfo("RTC pre-refresh returned the current token; it remains usable until expiration.", type: .info)
                     }
-                    _ = engine.renewToken(credential.token)
+                    // 仅在 token 非空时续期，避免 Agora SDK 错误
+                    if !credential.token.isEmpty {
+                        _ = engine.renewToken(credential.token)
+                    } else {
+                        consoleLogInfo("RTC token is empty (disableRTCTokenValidation mode); skipping renewal.", type: .info)
+                    }
                 } catch {
                     consoleLogInfo("RTC token pre-refresh failed: \(error.localizedDescription)", type: .error)
                 }
@@ -261,8 +266,13 @@ extension CallKitManager: AgoraRtcEngineDelegate {
                 guard let self = self else { return }
                 do {
                     let credential = try await self.credentialForUse(reason: .rtcExpired)
-                    let result = engine.renewToken(credential.token)
-                    consoleLogInfo("Renewed expired RTC credential for channel: \(channelName) uid: \(credential.uid) userId: \(userId) result: \(result)", type: .info)
+                    // 仅在 token 非空时续期，避免 Agora SDK 错误
+                    if !credential.token.isEmpty {
+                        let result = engine.renewToken(credential.token)
+                        consoleLogInfo("Renewed expired RTC credential for channel: \(channelName) uid: \(credential.uid) userId: \(userId) result: \(result)", type: .info)
+                    } else {
+                        consoleLogInfo("RTC token is empty (disableRTCTokenValidation mode); cannot renew.", type: .warning)
+                    }
                 } catch {
                     consoleLogInfo("Unable to renew expired RTC credential: \(error.localizedDescription)", type: .error)
                 }

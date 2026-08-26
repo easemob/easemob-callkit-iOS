@@ -1611,7 +1611,9 @@ extension CallKitManager: CallMessageService {
         guard let engine = self.engine else {
             consoleLogInfo("Cannot join RTC channel because the RTC engine is not initialized.", type: .error)
             self.handleBusinessError(CallError.CallBusiness(error: .state, message: "RTC engine is not initialized."))
-            completion(false)
+            DispatchQueue.main.async {
+                completion(false)
+            }
             return
         }
         engine.enableInstantMediaRendering()
@@ -1623,14 +1625,18 @@ extension CallKitManager: CallMessageService {
                     let message = "CallTokenProvider returned RTC UID 0; joining the RTC channel is not allowed."
                     consoleLogInfo(message, type: .error)
                     self.handleBusinessError(CallError.CallBusiness(error: .param, message: message))
-                    completion(false)
+                    DispatchQueue.main.async {
+                        completion(false)
+                    }
                     return
                 }
                 if self.hadJoinedChannel {
                     let leaveResult = self.engine?.leaveChannel()
                     if leaveResult != 0 {
                         consoleLogInfo("leaveChannel result: \(String(describing: leaveResult)) channelName:\(channelName)", type: .error)
-                        completion(false)
+                        DispatchQueue.main.async {
+                            completion(false)
+                        }
                         return
                     }
                 }
@@ -1643,7 +1649,9 @@ extension CallKitManager: CallMessageService {
                     self.handleBusinessError(CallError.CallBusiness(error: .param, message: message))
                 }
                 consoleLogInfo("Failed to prepare RTC credential for channel \(channelName): \(error.localizedDescription)", type: .error)
-                completion(false)
+                DispatchQueue.main.async {
+                    completion(false)
+                }
             }
         }
     }
@@ -1651,7 +1659,9 @@ extension CallKitManager: CallMessageService {
     private func joinWithToken(credential: RTCCredentialRecord, channelName: String, completion: @escaping ((Bool) -> Void)) {
         guard let engine = self.engine else {
             consoleLogInfo("Cannot join RTC channel because the RTC engine is not initialized.", type: .error)
-            completion(false)
+            DispatchQueue.main.async {
+                completion(false)
+            }
             return
         }
         let config = AgoraRtcChannelMediaOptions()
@@ -1686,11 +1696,16 @@ extension CallKitManager: CallMessageService {
                     self.checkMicrophonePermission()
                 }
             }
-            completion(true)
+            // 确保 completion 在主线程执行，避免 UIKit 操作在后台线程
+            DispatchQueue.main.async {
+                completion(true)
+            }
         })
         if result != 0 {
             if abs(result) == 17 {
-                completion(true)
+                DispatchQueue.main.async {
+                    completion(true)
+                }
                 return
             }
             self.quitCall()
@@ -1700,7 +1715,9 @@ extension CallKitManager: CallMessageService {
                 self.notifyCallError(CallError(CallError.RTC(code: code, message: "RTC error occurred with code: \(result)"), module: .rtc))
             }
             
-            completion(false)
+            DispatchQueue.main.async {
+                completion(false)
+            }
         } else {
             consoleLogInfo("\(currentUser) joined channel: \(channelName) result: \(result)", type: .debug)
         }

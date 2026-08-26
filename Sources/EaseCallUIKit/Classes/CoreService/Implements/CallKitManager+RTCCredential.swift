@@ -207,7 +207,10 @@ extension CallKitManager {
                 let credential = try await self.credentialForUse(reason: reason)
                 self.scheduleRTCCredentialRefresh(for: credential)
                 if self.hadJoinedChannel && (reason == .scheduled || reason == .foreground) {
-                    _ = self.engine?.renewToken(credential.token)
+                    // 仅在 token 非空时续期，避免 Agora SDK 错误
+                    if !credential.token.isEmpty {
+                        _ = self.engine?.renewToken(credential.token)
+                    }
                 }
             } catch {
                 consoleLogInfo("RTC credential refresh failed: \(error.localizedDescription)", type: .error)
