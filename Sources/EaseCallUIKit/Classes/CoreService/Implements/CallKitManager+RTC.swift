@@ -8,8 +8,55 @@
 import Foundation
 import AgoraRtcKit
 
+private extension CallKitManager {
+    func performRTCUIUpdate(_ update: @escaping () -> Void) {
+        if Thread.isMainThread {
+            update()
+        } else {
+            DispatchQueue.main.async(execute: update)
+        }
+    }
+
+    /// RTC UID 未能解析出 IM userId 时，用稳定的占位 key 代替空字符串。
+    /// 空字符串会让多个解析失败的用户共用同一个 itemsCache/canvasCache key，导致群聊画面互相覆盖。
+    func streamCacheKey(uid: UInt, resolvedUserId: String) -> String {
+        resolvedUserId.isEmpty ? "uid-\(uid)" : resolvedUserId
+    }
+
+    /// 占位条目迁移：真实 userId 到达时，让它接管此前 "uid-N" 占位 key 下的 item/view，
+    /// 否则同一个人会在群聊里出现两个格子。必须在主线程调用。
+    func promotePlaceholderIfNeeded(uid: UInt, realUserId: String) {
+        guard !realUserId.isEmpty else { return }
+        let placeholder = "uid-\(uid)"
+        guard placeholder != realUserId,
+              itemsCache[realUserId] == nil,
+              let item = itemsCache.removeValue(forKey: placeholder) else { return }
+        item.userId = realUserId
+        itemsCache[realUserId] = item
+        if let view = canvasCache.removeValue(forKey: placeholder) {
+            canvasCache[realUserId] = view
+            view.updateUserInfo(newItem: item)
+        }
+        consoleLogInfo("promotePlaceholderIfNeeded: \(placeholder) -> \(realUserId)", type: .debug)
+    }
+}
 
 extension CallKitManager: CallActionService {
+
+    func syncLocalRTCUID(_ uid: UInt32) {
+        performRTCUIUpdate {
+            guard let currentUserID = ChatClient.shared().currentUsername, !currentUserID.isEmpty else { return }
+            self.itemsCache[currentUserID]?.uid = uid
+            self.canvasCache[currentUserID]?.item.uid = uid
+            guard self.callInfo?.type == .groupCall,
+                  let streamView = self.canvasCache[currentUserID] else { return }
+            let canvas = AgoraRtcVideoCanvas()
+            canvas.renderMode = .hidden
+            canvas.uid = UInt(uid)
+            canvas.view = streamView.canvasView
+            self.engine?.setupLocalVideo(canvas)
+        }
+    }
     
     /// Switch the camera direction
     func switchCamera() {
@@ -28,15 +75,15 @@ extension CallKitManager: CallActionService {
     /// - Parameter enable: true to enable local audio, false to disable
     func enableLocalAudio(_ enable: Bool) {
         if #available(iOS 17.4, *),self.config.enableVOIP {
-            if LiveCommunicationManager.shared.manager != nil {
-                if UIApplication.shared.applicationState == .active {
-                    LiveCommunicationManager.shared.currentUserMute = !enable
-                    LiveCommunicationManager.shared.performAction(type: .mute)
-                } else {
-                    if let controller = UIViewController.currentController as? Call1v1AudioViewController {
-                        controller.bottomView.updateMuteState(isMuted: !enable)
+            performRTCUIUpdate {
+                if LiveCommunicationManager.shared.manager != nil {
+                    if UIApplication.shared.applicationState == .active {
+                        LiveCommunicationManager.shared.currentUserMute = !enable
+                        LiveCommunicationManager.shared.performAction(type: .mute)
                     } else {
-                        if let controller = self.callVC as? Call1v1AudioViewController {
+                        if let controller = UIViewController.currentController as? Call1v1AudioViewController {
+                            controller.bottomView.updateMuteState(isMuted: !enable)
+                        } else if let controller = self.callVC as? Call1v1AudioViewController {
                             controller.bottomView.updateMuteState(isMuted: !enable)
                         }
                     }
@@ -51,15 +98,15 @@ extension CallKitManager: CallActionService {
     /// - Parameter enable: true to enable local video, false to disable
     func enableLocalVideo(_ enable: Bool) {
         let result = self.engine?.muteLocalVideoStream(!enable)
-        consoleLogInfo("muteLocalVideoStream result: \(String(describing: result)) previewResult:\("String(describing: previewResult)")", type: .debug)
+        consoleLogInfo("muteLocalVideoStream result: \(String(describing: result))", type: .debug)
     }
     
     /// Set up local video capturing and rendering
     func setupLocalVideo() {
         self.engine?.enableVideo()
         self.engine?.enableAudio()
-        if let call = self.callInfo {
-            if call.type == .groupCall {
+        if let call = self.callInfo, call.type == .groupCall {
+            performRTCUIUpdate {
                 let canvas = AgoraRtcVideoCanvas()
                 canvas.renderMode = .hidden
                 let currentUserId = ChatClient.shared().currentUsername ?? ""
@@ -76,9 +123,11 @@ extension CallKitManager: CallActionService {
                     canvas.view = self.canvasCache[currentUserId]?.canvasView
                 }
                 self.engine?.setupLocalVideo(canvas)
+                self.engine?.startPreview()
             }
+        } else {
+            self.engine?.startPreview()
         }
-        self.engine?.startPreview()
     }
     
     /// Set up remote video view for a user
@@ -90,12 +139,12 @@ extension CallKitManager: CallActionService {
             consoleLogInfo("setupRemoteVideoView failed, engine is nil", type: .error)
             return
         }
-        
-        let canvas = AgoraRtcVideoCanvas()
-        canvas.uid = uid
-        canvas.renderMode = .hidden
-        if let call = self.callInfo {
-            if call.type == .groupCall {
+
+        performRTCUIUpdate {
+            let canvas = AgoraRtcVideoCanvas()
+            canvas.uid = uid
+            canvas.renderMode = .hidden
+            if let call = self.callInfo, call.type == .groupCall {
                 if let streamView = self.canvasCache[userId] {
                     streamView.item.uid = UInt32(uid)
                     canvas.uid = UInt(streamView.item.uid)
@@ -121,8 +170,10 @@ extension CallKitManager: AgoraRtcEngineDelegate {
     
     public func rtcEngine(_ engine: AgoraRtcEngineKit, didOccurError errorCode: AgoraErrorCode) {
         consoleLogInfo("rtcEngine didOccurError: \(errorCode.rawValue)", type: .error)
-        for listener in self.listeners.allObjects {
-            listener.didOccurError?(error: CallError(CallError.RTC(code: errorCode, message: "RTC error occurred with code: \(errorCode.rawValue)"), module: .rtc))
+        performRTCUIUpdate {
+            for listener in self.listeners.allObjects {
+                listener.didOccurError?(error: CallError(CallError.RTC(code: errorCode, message: "RTC error occurred with code: \(errorCode.rawValue)"), module: .rtc))
+            }
         }
         switch errorCode {
         case .invalidToken:
@@ -137,20 +188,20 @@ extension CallKitManager: AgoraRtcEngineDelegate {
         if txQuality == .unknown {//If the quality is unknown, we skip the update
             return
         }
-        let uids = [NSNumber(value: uid != 0 ? UInt32(uid):self.currentUserRTCUID)]
+        let targetUID: UInt = uid != 0 ? uid : UInt(self.currentUserRTCUID)
+        let uids = [NSNumber(value: targetUID)]
         // Get userId by RTC uid
-        ChatClient.shared().getUserId(byRTCUIds: uids) { [weak self] relations, error in
+        self.resolveRTCUserIDs(uids) { [weak self] relations, error in
             guard let `self` = self else { return }
-            var userId = relations?.values.first ?? ""
-            if userId.isEmpty || error != nil {
-                userId = "uid-\(uid)"
-            }
+            // 解析失败（含 error）时用稳定占位 key，避免空字符串在群聊里互相覆盖
+            let resolvedUserId = error == nil ? (relations?.values.first ?? "") : ""
+            let userId = self.streamCacheKey(uid: targetUID, resolvedUserId: resolvedUserId)
             if let call = self.callInfo {
                 if call.type == .groupCall {
-                    if let streamView = self.canvasCache[userId],let item = self.itemsCache[userId] {
-                        item.networkStatus = mirrorNetworkQuality(txQuality)
-                        streamView.item = item
-                        DispatchQueue.main.async {// Update network UI on the main thread
+                    self.performRTCUIUpdate {
+                        if let streamView = self.canvasCache[userId],let item = self.itemsCache[userId] {
+                            item.networkStatus = self.mirrorNetworkQuality(txQuality)
+                            streamView.item = item
                             streamView.updateNetworkStatus(item.networkStatus)
                         }
                     }
@@ -189,75 +240,39 @@ extension CallKitManager: AgoraRtcEngineDelegate {
     public func rtcEngine(_ engine: AgoraRtcEngineKit, tokenPrivilegeWillExpire token: String) {// This method is called when the token will expire
         if let channelName = self.callInfo?.channelName,let userId = ChatClient.shared().currentUsername {
             consoleLogInfo("rtcEngine tokenPrivilegeWillExpire for channel: \(channelName) userId: \(userId)", type: .debug)
-            if self.tokenProvider != nil {
-//                self.tokenProvider?.fetchCallToken{ [weak self] uid, token, expire in
-//                    if let token = token, !token.isEmpty {
-//                        self?.token = token
-//                        self?.tokenExpired = expire
-//                        self?.currentUserRTCUID = uid
-//                        let result = engine.renewToken(token)
-//                        consoleLogInfo("rtcEngine renewToken: \(token) result: \(String(describing: result))", type: .debug)
-//                    } else {
-//                        consoleLogInfo("rtcEngine renewToken failed to fetch new token", type: .error)
-//                    }
-//                }
-            } else {
-                self.getRTCTokenFromIMSDK(true)
+            Task { [weak self] in
+                guard let self = self else { return }
+                do {
+                    let credential = try await self.credentialForUse(reason: .rtcWillExpire)
+                    if credential.token == token {
+                        consoleLogInfo("RTC pre-refresh returned the current token; it remains usable until expiration.", type: .info)
+                    }
+                    _ = engine.renewToken(credential.token)
+                } catch {
+                    consoleLogInfo("RTC token pre-refresh failed: \(error.localizedDescription)", type: .error)
+                }
             }
         }
-        
-        
     }
     
     public func rtcEngineRequestToken(_ engine: AgoraRtcEngineKit) {// This method is called when the token was expired
         if let channelName = self.callInfo?.channelName,let userId = ChatClient.shared().currentUsername {
-            if self.tokenProvider != nil {
-//                self.tokenProvider?.fetchCallToken{ [weak self] uid ,token, expire in
-//                    if let token = token, !token.isEmpty {
-//                        self?.token = token
-//                        self?.joinChannel(channelName: channelName) { success in
-//                            consoleLogInfo("rtcEngine renewToken: \(token) result: \(success)", type: .debug)
-//                        }
-//                    } else {
-//                        consoleLogInfo("rtcEngine renewToken failed to fetch new token", type: .error)
-//                    }
-//                }
-            } else {
-                // Fetch the call token from the IM SDK
-                ChatClient.shared().getRTCToken(withChannel: nil) { [weak self] uid, token, expiration, error in
-                    guard let `self` = self else { return }
-                    if let error = error {
-                        self.token = ""
-                        self.handleError(error)
-                        consoleLogInfo("Failed to fetch call token: \(String(describing: error.errorDescription))", type: .error)
-                    } else {
-                        let rtcToken = token ?? ""
-                        self.token = rtcToken
-                        self.currentUserRTCUID = UInt32(uid)
-                        let options: AgoraRtcChannelMediaOptions = AgoraRtcChannelMediaOptions()
-                        options.autoSubscribeAudio = true
-                        options.autoSubscribeVideo = true
-                        options.publishCameraTrack = true
-                        options.publishMicrophoneTrack = true
-                        options.clientRoleType = .broadcaster
-                        options.channelProfile = .liveBroadcasting
-                        options.token = rtcToken
-                        // Update the channel with the new token
-                        let result = self.engine?.updateChannelEx(with: options, connection: AgoraRtcConnection(channelId: channelName, localUid: Int(uid)))
-                        consoleLogInfo("Call token fetched successfully when token expired: \(String(describing: token)) updateChannelEx result: \(String(describing: result)) channelName: \(channelName) uid: \(uid) userId: \(userId)", type: .info)
-                        if result == 0 {
-                            self.callInfo?.state = .answering
-                            self.joinedThenPresentCallVC()
-                            if uid == self.currentUserRTCUID {
-                                self.hadJoinedChannel = true
-                                self.updateCallEndReason(.abnormalEnd,false)
-                            }
-                        }
-//                        self.joinChannel(channelName: <#T##String#>, completion: <#T##((Bool) -> Void)##((Bool) -> Void)##(Bool) -> Void#>)
-                    }
+            Task { [weak self] in
+                guard let self = self else { return }
+                do {
+                    let credential = try await self.credentialForUse(reason: .rtcExpired)
+                    let result = engine.renewToken(credential.token)
+                    consoleLogInfo("Renewed expired RTC credential for channel: \(channelName) uid: \(credential.uid) userId: \(userId) result: \(result)", type: .info)
+                } catch {
+                    consoleLogInfo("Unable to renew expired RTC credential: \(error.localizedDescription)", type: .error)
                 }
             }
-            
+        }
+    }
+
+    public func rtcEngine(_ engine: AgoraRtcEngineKit, connectionChangedTo state: AgoraConnectionState, reason: AgoraConnectionChangedReason) {
+        if reason == .reasonTokenExpired {
+            rtcEngineRequestToken(engine)
         }
     }
     
@@ -299,63 +314,69 @@ extension CallKitManager: AgoraRtcEngineDelegate {
                     guard let `self` = self else { return }
                     let ids = infos.map { NSNumber(value: $0.uid ) }
                     // Get userId by RTC uid
-                    ChatClient.shared().getUserId(byRTCUIds: ids) { [weak self] relations, error in
+                    self.resolveRTCUserIDs(ids) { [weak self] relations, error in
                         guard let `self` = self else { return }
                         if let error = error {
+                            // 只上报错误，不中断 UI 更新：否则解析失败的用户根本不会显示出来
                             consoleLogInfo("Failed to get userId by RTC UIDs: \(error.errorDescription ?? "Unknown error")", type: .error)
-                            return
+                            for listener in self.listeners.allObjects {
+                                listener.didOccurError?(error: CallError(CallError.IM(error: error), module: .im))
+                            }
                         }
-                        for info in infos {
-                            let uidKey = NSNumber(value: info.uid)
-                            let userId = relations?[uidKey] ?? ""
-                            //Find and remove any existing timers related to this user
-                            CallKitManager.shared.stopRingTimer(callId: call.callId)
-                            CallKitManager.shared.stopConfirmBuildConnectionTimer(callId: call.callId)
-                            CallKitManager.shared.stopInvitationSignalTimer(callId: call.callId)
-                            // Update existing CallStreamItem and CallStreamView for the remote user
-                            var userIdNotFound = false
-                            var uidNotFound = false
-                            if let streamView = self.canvasCache[userId],let item = self.itemsCache[userId]  {
-                                item.uid = UInt32(truncating: uidKey)
-                                item.waiting = false
-                                streamView.updateUserInfo(newItem: item)
-                                consoleLogInfo("rtcEngine didJoinedOfUid: setRemoteVideoStream userId:\(userId) uidKey:\(uidKey) uidNotFound:\(uidNotFound) userIdNotFound:\(userIdNotFound)", type: .debug)
-                            } else {
-                                userIdNotFound = true
-                            }
-                            
-                            if let first = self.itemsCache.values.first(where: { $0.uid == UInt32(truncating: uidKey) })  {
-                                first.uid = UInt32(truncating: uidKey)
-                                first.waiting = false
-                                canvasCache[first.userId]?.updateUserInfo(newItem: first)
-                                consoleLogInfo("rtcEngine didJoinedOfUid: setRemoteVideoStream userId:\(userId) uidKey:\(uidKey) uidNotFound:\(uidNotFound) userIdNotFound:\(userIdNotFound)", type: .debug)
-                            } else {
-                                uidNotFound = true
-                            }
-                            
-                            if uidNotFound,userIdNotFound {
-                                let item = CallStreamItem(userId: userId, index: 1, isExpanded: false)
-                                item.waiting = false
-                                item.uid = UInt32(truncating: uidKey)
-                                self.itemsCache[userId] = item
-                                let view = CallStreamView(item: item)
-                                self.canvasCache[userId] = view
-                                for listener in self.listeners.allObjects {
-                                    listener.remoteUserDidJoined?(userId: userId, channelName: call.channelName, type: call.type)
+                        self.performRTCUIUpdate {
+                            for info in infos {
+                                let uidKey = NSNumber(value: info.uid)
+                                let resolvedUserId = relations?[uidKey] ?? ""
+                                // 真实 userId 到达时接管此前的 "uid-N" 占位条目，避免同一个人出现两个格子
+                                self.promotePlaceholderIfNeeded(uid: info.uid, realUserId: resolvedUserId)
+                                let userId = self.streamCacheKey(uid: info.uid, resolvedUserId: resolvedUserId)
+                                //Find and remove any existing timers related to this user
+                                CallKitManager.shared.stopRingTimer(callId: call.callId)
+                                CallKitManager.shared.stopConfirmBuildConnectionTimer(callId: call.callId)
+                                CallKitManager.shared.stopInvitationSignalTimer(callId: call.callId)
+                                // Update existing CallStreamItem and CallStreamView for the remote user
+                                var userIdNotFound = false
+                                var uidNotFound = false
+                                if let streamView = self.canvasCache[userId],let item = self.itemsCache[userId]  {
+                                    item.uid = UInt32(truncating: uidKey)
+                                    item.waiting = false
+                                    streamView.updateUserInfo(newItem: item)
+                                    consoleLogInfo("rtcEngine didJoinedOfUid: setRemoteVideoStream userId:\(userId) uidKey:\(uidKey) uidNotFound:\(uidNotFound) userIdNotFound:\(userIdNotFound)", type: .debug)
+                                } else {
+                                    userIdNotFound = true
                                 }
+
+                                if let first = self.itemsCache.values.first(where: { $0.uid == UInt32(truncating: uidKey) })  {
+                                    first.uid = UInt32(truncating: uidKey)
+                                    first.waiting = false
+                                    self.canvasCache[first.userId]?.updateUserInfo(newItem: first)
+                                    consoleLogInfo("rtcEngine didJoinedOfUid: setRemoteVideoStream userId:\(userId) uidKey:\(uidKey) uidNotFound:\(uidNotFound) userIdNotFound:\(userIdNotFound)", type: .debug)
+                                } else {
+                                    uidNotFound = true
+                                }
+
+                                if uidNotFound,userIdNotFound {
+                                    let item = CallStreamItem(userId: userId, index: 1, isExpanded: false)
+                                    item.waiting = false
+                                    item.uid = UInt32(truncating: uidKey)
+                                    self.itemsCache[userId] = item
+                                    let view = CallStreamView(item: item)
+                                    self.canvasCache[userId] = view
+                                    for listener in self.listeners.allObjects {
+                                        listener.remoteUserDidJoined?(userId: userId, channelName: call.channelName, type: call.type)
+                                    }
+                                }
+                                consoleLogInfo("rtcEngine didJoinedOfUid: setRemoteVideoStream  userId:\(userId) uidKey:\(uidKey) uidNotFound:\(uidNotFound) userIdNotFound:\(userIdNotFound)", type: .debug)
+                                let type = self.getStreamRenderQuality(with: UInt(self.itemsCache.count))
+                                engine.setRemoteVideoStream(uidKey.uintValue, type: type)
                             }
-                            consoleLogInfo("rtcEngine didJoinedOfUid: setRemoteVideoStream  userId:\(userId) uidKey:\(uidKey) uidNotFound:\(uidNotFound) userIdNotFound:\(userIdNotFound)", type: .debug)
-                            let type = self.getStreamRenderQuality(with: UInt(self.itemsCache.count))
-                            engine.setRemoteVideoStream(uidKey.uintValue, type: type)
-                        }
-                        if let currentVC = UIViewController.currentController as? CallMultiViewController {
-                            currentVC.callView.updateWithItems()
-                        } else {
-                            if let controller = self.callVC as? CallMultiViewController {
+                            if let currentVC = UIViewController.currentController as? CallMultiViewController {
+                                currentVC.callView.updateWithItems()
+                            } else if let controller = self.callVC as? CallMultiViewController {
                                 controller.callView.updateWithItems()
                             }
+                            self.providerFetchUsersInfo(relations?.values.map { $0 } ?? [])
                         }
-                        self.providerFetchUsersInfo(relations?.values.map { $0 } ?? [])
                     }
                 }
                 
@@ -442,78 +463,83 @@ extension CallKitManager: AgoraRtcEngineDelegate {
                 self.rtcThrottler.addVideoState(uid: uid, state: state, reason: reason, elapsed: elapsed) { [weak self] infos in
                     guard let `self` = self else { return }
                     let rtcUids = infos.map { NSNumber(value: $0.uid ) }
-                    ChatClient.shared().getUserId(byRTCUIds: rtcUids) { [weak self] relations, error in
+                    self.resolveRTCUserIDs(rtcUids) { [weak self] relations, error in
                         guard let `self` = self else { return }
                         if let error = error {
-                            for listener in self.listeners.allObjects {
-                                listener.didOccurError?(error: CallError(CallError.IM(error: error), module: .im))
+                            // 只上报错误，不中断 UI 更新：否则解析失败的用户根本不会显示出来
+                            self.performRTCUIUpdate {
+                                for listener in self.listeners.allObjects {
+                                    listener.didOccurError?(error: CallError(CallError.IM(error: error), module: .im))
+                                }
                             }
                             consoleLogInfo("Failed to get userId by RTC UIDs: \(error.errorDescription ?? "Unknown error")", type: .error)
-                            return
                         }
-                        for info in infos {
-                            let uidKey = NSNumber(value: info.uid)
-                            let userId = relations?[uidKey] ?? ""
-                            var userIdNotFound = false
-                            if let streamView = self.canvasCache[userId],let item = self.itemsCache[userId]  {
-                                item.uid = UInt32(truncating: uidKey)
-                                item.waiting = false
-                                streamView.updateUserInfo(newItem: item)
-                            } else {
-                                userIdNotFound = true
-                            }
-                            var uidNotFound = false
-                            if self.itemsCache.values.first(where: { $0.uid == UInt32(truncating: uidKey) }) == nil {
-                                uidNotFound = true
-                            }
-                            let videoState = info.state
-                            switch videoState {// Handle different states of remote video.Starting&unmute, stopped&mute
-                            case .starting,.decoding:
-                                if uidNotFound,userIdNotFound {
-                                    let item = CallStreamItem(userId: userId, index: self.itemsCache.count+1, isExpanded: false)
-                                    item.waiting = false
+                        self.performRTCUIUpdate {
+                            for info in infos {
+                                let uidKey = NSNumber(value: info.uid)
+                                let resolvedUserId = relations?[uidKey] ?? ""
+                                // 真实 userId 到达时接管此前的 "uid-N" 占位条目，避免同一个人出现两个格子
+                                self.promotePlaceholderIfNeeded(uid: info.uid, realUserId: resolvedUserId)
+                                let userId = self.streamCacheKey(uid: info.uid, resolvedUserId: resolvedUserId)
+                                var userIdNotFound = false
+                                if let streamView = self.canvasCache[userId],let item = self.itemsCache[userId]  {
                                     item.uid = UInt32(truncating: uidKey)
-                                    self.itemsCache[userId] = item
-                                    let view = CallStreamView(item: item)
-                                    self.canvasCache[userId] = view
-                                    if let currentVC = UIViewController.currentController as? CallMultiViewController {
-                                        currentVC.callView.updateWithItems()
-                                    } else {
-                                        if let controller = self.callVC as? CallMultiViewController {
+                                    item.waiting = false
+                                    streamView.updateUserInfo(newItem: item)
+                                } else {
+                                    userIdNotFound = true
+                                }
+                                var uidNotFound = false
+                                if self.itemsCache.values.first(where: { $0.uid == UInt32(truncating: uidKey) }) == nil {
+                                    uidNotFound = true
+                                }
+                                let videoState = info.state
+                                switch videoState {// Handle different states of remote video.Starting&unmute, stopped&mute
+                                case .starting,.decoding:
+                                    if uidNotFound,userIdNotFound {
+                                        let item = CallStreamItem(userId: userId, index: self.itemsCache.count+1, isExpanded: false)
+                                        item.waiting = false
+                                        item.uid = UInt32(truncating: uidKey)
+                                        self.itemsCache[userId] = item
+                                        let view = CallStreamView(item: item)
+                                        self.canvasCache[userId] = view
+                                        if let currentVC = UIViewController.currentController as? CallMultiViewController {
+                                            currentVC.callView.updateWithItems()
+                                        } else if let controller = self.callVC as? CallMultiViewController {
                                             controller.callView.updateWithItems()
                                         }
                                     }
-                                }
-                                if let streamView = self.canvasCache[userId],let item = self.itemsCache[userId] {
-                                    item.videoMuted = false
-                                    item.uid = UInt32(truncating: uidKey)
-                                    streamView.updateItem(item)
-                                    self.setupRemoteVideoView(userId: userId, uid: uidKey.uintValue)
-                                }
-                                consoleLogInfo("remoteVideoStateChangedOfUid: \(uidKey.uintValue) userId:\(userId) state: starting", type: .debug)
-                                
-                            case .stopped:
-                                let videoReason = info.reason
-                                if let streamView = self.canvasCache[userId],let item = self.itemsCache[userId] {
-                                    if videoReason == .remoteMuted {// Remote video muted
-                                        item.videoMuted = true
+                                    if let streamView = self.canvasCache[userId],let item = self.itemsCache[userId] {
+                                        item.videoMuted = false
+                                        item.uid = UInt32(truncating: uidKey)
+                                        streamView.updateItem(item)
+                                        self.setupRemoteVideoView(userId: userId, uid: uidKey.uintValue)
                                     }
-                                    item.uid = UInt32(truncating: uidKey)
-                                    streamView.updateItem(item)
+                                    consoleLogInfo("remoteVideoStateChangedOfUid: \(uidKey.uintValue) userId:\(userId) state: starting", type: .debug)
+
+                                case .stopped:
+                                    let videoReason = info.reason
+                                    if let streamView = self.canvasCache[userId],let item = self.itemsCache[userId] {
+                                        if videoReason == .remoteMuted {// Remote video muted
+                                            item.videoMuted = true
+                                        }
+                                        item.uid = UInt32(truncating: uidKey)
+                                        streamView.updateItem(item)
+                                    }
+                                    consoleLogInfo("remoteVideoStateChangedOfUid: \(uid) userId:\(userId) state: stop", type: .debug)
+                                default:
+                                    break
                                 }
-                                consoleLogInfo("remoteVideoStateChangedOfUid: \(uid) userId:\(userId) state: stop", type: .debug)
-                            default:
-                                break
                             }
                         }
                     }
                 }
             }
             if call.type == .singleVideo {
-                switch state {
-                case .starting,.decoding:
-                    if reason == .remoteUnmuted {//Remote video unmuted
-                        if call.type == .singleVideo {
+                self.performRTCUIUpdate {
+                    switch state {
+                    case .starting,.decoding:
+                        if reason == .remoteUnmuted {//Remote video unmuted
                             if let controller = UIViewController.currentController as? Call1v1VideoViewController {
                                 if !controller.firstRemoteVideoAppeared {
                                     controller.floatViewClicked(dragView: controller.floatView)
@@ -526,21 +552,19 @@ extension CallKitManager: AgoraRtcEngineDelegate {
                                 }
                             }
                         }
-                    }
-                    consoleLogInfo("remoteVideoStateChangedOfUid: \(uid) state: starting", type: .debug)
-                case .stopped:
-                    if reason == .remoteMuted {// Remote video muted
-                        if let controller = UIViewController.currentController as? Call1v1VideoViewController {
-                            controller.floatView.updateVideoState(true)
-                        } else {
-                            if let controller = self.callVC as? Call1v1VideoViewController {
+                        consoleLogInfo("remoteVideoStateChangedOfUid: \(uid) state: starting", type: .debug)
+                    case .stopped:
+                        if reason == .remoteMuted {// Remote video muted
+                            if let controller = UIViewController.currentController as? Call1v1VideoViewController {
+                                controller.floatView.updateVideoState(true)
+                            } else if let controller = self.callVC as? Call1v1VideoViewController {
                                 controller.floatView.updateVideoState(true)
                             }
                         }
+                        consoleLogInfo("remoteVideoStateChangedOfUid: \(uid) state: stop", type: .debug)
+                    default:
+                        break
                     }
-                    consoleLogInfo("remoteVideoStateChangedOfUid: \(uid) state: stop", type: .debug)
-                default:
-                    break
                 }
             }
         }
@@ -553,56 +577,61 @@ extension CallKitManager: AgoraRtcEngineDelegate {
             if call.type == .groupCall {//Update audio state in multi call
                 self.rtcThrottler.addAudioMute(uid: uid, muted: muted) { [weak self] infos in
                     guard let `self` = self else { return }
-                    ChatClient.shared().getUserId(byRTCUIds: infos.map { NSNumber(value: $0.uid ) }) { [weak self] relations, error in
+                    self.resolveRTCUserIDs(infos.map { NSNumber(value: $0.uid ) }) { [weak self] relations, error in
                         guard let `self` = self else { return }
-                        for info in infos {
-                            let uidKey = NSNumber(value: info.uid)
-                            let user = relations?[uidKey] ?? ""
-                            let mute = info.muted
-                            if let streamView = self.canvasCache[user],let item = self.itemsCache[user] {
-                                item.uid = uidKey.uint32Value
-                                item.userId = user
-                                item.audioMuted = mute
-                                streamView.updateItem(item)
-                            } else {
-                                let item = CallStreamItem(userId: user, index: self.itemsCache.count + 1, isExpanded: false)
-                                item.audioMuted = mute
-                                item.uid = uidKey.uint32Value
-                                self.itemsCache[user] = item
-                                let view = CallStreamView(item: item)
-                                self.canvasCache[user] = view
-                                for listener in self.listeners.allObjects {
-                                    listener.remoteUserDidJoined?(userId: user, channelName: call.channelName, type: call.type)
-                                }
-                                if let currentVC = UIViewController.currentController as? CallMultiViewController {
-                                    currentVC.callView.updateWithItems()
+                        if let error = error {
+                            consoleLogInfo("Failed to get userId by RTC UIDs: \(error.errorDescription ?? "Unknown error")", type: .error)
+                        }
+                        self.performRTCUIUpdate {
+                            for info in infos {
+                                let uidKey = NSNumber(value: info.uid)
+                                let resolvedUserId = relations?[uidKey] ?? ""
+                                // 真实 userId 到达时接管此前的 "uid-N" 占位条目，避免同一个人出现两个格子
+                                self.promotePlaceholderIfNeeded(uid: info.uid, realUserId: resolvedUserId)
+                                let user = self.streamCacheKey(uid: info.uid, resolvedUserId: resolvedUserId)
+                                let mute = info.muted
+                                if let streamView = self.canvasCache[user],let item = self.itemsCache[user] {
+                                    item.uid = uidKey.uint32Value
+                                    item.userId = user
+                                    item.audioMuted = mute
+                                    streamView.updateItem(item)
                                 } else {
-                                    if let controller = self.callVC as? CallMultiViewController {
+                                    let item = CallStreamItem(userId: user, index: self.itemsCache.count + 1, isExpanded: false)
+                                    item.audioMuted = mute
+                                    item.uid = uidKey.uint32Value
+                                    self.itemsCache[user] = item
+                                    let view = CallStreamView(item: item)
+                                    self.canvasCache[user] = view
+                                    for listener in self.listeners.allObjects {
+                                        listener.remoteUserDidJoined?(userId: user, channelName: call.channelName, type: call.type)
+                                    }
+                                    if let currentVC = UIViewController.currentController as? CallMultiViewController {
+                                        currentVC.callView.updateWithItems()
+                                    } else if let controller = self.callVC as? CallMultiViewController {
                                         controller.callView.updateWithItems()
                                     }
                                 }
+                                consoleLogInfo("rtcEngine didAudioMuted: \(muted) byUid: \(uidKey) userId:\(user)", type: .debug)
                             }
-                            consoleLogInfo("rtcEngine didAudioMuted: \(muted) byUid: \(uidKey) userId:\(user)", type: .debug)
                         }
-                        
                     }
                 }
                 
             }
             if call.type == .singleVideo {//Update audio state in single video call
-                if let controller = UIViewController.currentController as? Call1v1VideoViewController {// If current controller is Call1v1VideoViewController
-                    controller.callView.micView.isHidden = true
-                    if self.isVideoExchanged {// If video is exchanged, update mic view visibility
-                        if muted {
-                            controller.floatView.updateAudioState(!muted)
+                self.performRTCUIUpdate {
+                    if let controller = UIViewController.currentController as? Call1v1VideoViewController {// If current controller is Call1v1VideoViewController
+                        controller.callView.micView.isHidden = true
+                        if self.isVideoExchanged {// If video is exchanged, update mic view visibility
+                            if muted {
+                                controller.floatView.updateAudioState(!muted)
+                            } else {
+                                controller.floatView.updateAudioState(muted)
+                            }
                         } else {
                             controller.floatView.updateAudioState(muted)
                         }
-                    } else {
-                        controller.floatView.updateAudioState(muted)
-                    }
-                } else {// If current controller is not Call1v1VideoViewController
-                    if let controller = self.callVC as? Call1v1VideoViewController {
+                    } else if let controller = self.callVC as? Call1v1VideoViewController {// If current controller is not Call1v1VideoViewController
                         controller.callView.micView.isHidden = true
                         if self.isVideoExchanged {// If video is exchanged, update mic view visibility and audio state
                             if muted {
@@ -734,16 +763,13 @@ extension CallKitManager: AgoraVideoFrameDelegate {
         if let call = self.callInfo {
             // 处理群组通话预览（仅前台且当前显示的页面）
             if call.type == .groupCall {
-                // 只处理当前正在显示的 CallMultiViewController
-                if let controller = UIViewController.currentController as? CallMultiViewController {
-                    // 未连接状态且开启了摄像头预览
-                    if controller.isCameraPreviewEnabled, let previewView = controller.localPreviewView {
-                        if let pixelBuffer = videoFrame.pixelBuffer {
-                            previewView.renderVideoPixelBuffer(pixelBuffer: pixelBuffer, width: videoFrame.width, height: videoFrame.height)
-                        } else {
-                            previewView.renderFromVideoFrameData(videoData: videoFrame)
-                        }
-                        return true
+                if let controller = UIViewController.currentController as? CallMultiViewController,
+                   controller.isCameraPreviewEnabled,
+                   let previewView = controller.localPreviewView {
+                    if let pixelBuffer = videoFrame.pixelBuffer {
+                        previewView.renderVideoPixelBuffer(pixelBuffer: pixelBuffer, width: videoFrame.width, height: videoFrame.height)
+                    } else {
+                        previewView.renderFromVideoFrameData(videoData: videoFrame)
                     }
                 }
                 // 群组通话在后台或缩小时不处理预览，直接返回
@@ -751,63 +777,48 @@ extension CallKitManager: AgoraVideoFrameDelegate {
             }
 
             // 原有逻辑：处理1v1视频通话
-            if call.type == .singleVideo {
-                if let controller = UIViewController.currentController as? Call1v1VideoViewController {
-                    if let pixelBuffer = videoFrame.pixelBuffer {
-                        controller.callView.renderVideoPixelBuffer(pixelBuffer: pixelBuffer, width: videoFrame.width, height: videoFrame.height)
-                    } else {
-                        controller.callView.renderFromVideoFrameData(videoData: videoFrame)
-                    }
+            if call.type == .singleVideo,
+               let callView = (UIViewController.currentController as? Call1v1VideoViewController)?.callView {
+                if let pixelBuffer = videoFrame.pixelBuffer {
+                    callView.renderVideoPixelBuffer(pixelBuffer: pixelBuffer, width: videoFrame.width, height: videoFrame.height)
+                } else {
+                    callView.renderFromVideoFrameData(videoData: videoFrame)
                 }
             }
         }
         return true
     }
-    
+
     public func onRenderVideoFrame(_ videoFrame: AgoraOutputVideoFrame, uid: UInt, channelId: String) -> Bool {// This method is called when remote video frame is rendered.
         DispatchQueue.main.async {
             UIApplication.shared.isIdleTimerDisabled = true
         }
-        if let call = self.callInfo {
-            if call.type == .singleVideo {
-                if let controller = UIViewController.currentController as? Call1v1VideoViewController{
-                    if let pixelBuffer = videoFrame.pixelBuffer {
-                        DispatchQueue.main.async {
-                            controller.floatView.updateVideoState(false)
-                        }
-                        controller.floatView.renderVideoPixelBuffer(pixelBuffer: pixelBuffer, width: videoFrame.width, height: videoFrame.height)
-                    } else {
-                        DispatchQueue.main.async {
-                            controller.floatView.updateVideoState(false)
-                        }
-                        controller.floatView.renderFromVideoFrameData(videoData: videoFrame)
+        if let call = self.callInfo, call.type == .singleVideo {
+            let controller = (UIViewController.currentController as? Call1v1VideoViewController)
+                ?? (self.callVC as? Call1v1VideoViewController)
+            if let floatView = controller?.floatView {
+                // 只在状态需要翻转时派发一次，避免每帧都往主队列投递重复的 UI 更新
+                if floatView.isVideoMuted {
+                    DispatchQueue.main.async {
+                        floatView.updateVideoState(false)
                     }
+                }
+                if let pixelBuffer = videoFrame.pixelBuffer {
+                    floatView.renderVideoPixelBuffer(pixelBuffer: pixelBuffer, width: videoFrame.width, height: videoFrame.height)
                 } else {
-                    if let controller = self.callVC as? Call1v1VideoViewController {
-                        if let pixelBuffer = videoFrame.pixelBuffer {
-                            DispatchQueue.main.async {
-                                controller.floatView.updateVideoState(false)
-                            }
-                            controller.floatView.renderVideoPixelBuffer(pixelBuffer: pixelBuffer, width: videoFrame.width, height: videoFrame.height)
-                        } else {
-                            DispatchQueue.main.async {
-                                controller.floatView.updateVideoState(false)
-                            }
-                            controller.floatView.renderFromVideoFrameData(videoData: videoFrame)
-                        }
-                    }
+                    floatView.renderFromVideoFrameData(videoData: videoFrame)
                 }
             }
         }
         return true
     }
-    
+
     public func exchangeVideoFrame() -> Bool {
         // 防止重复操作
         guard UIViewController.currentController is Call1v1VideoViewController else {
             return false
         }
-        
+
         // 切换状态
         isVideoExchanged.toggle()
         return true
