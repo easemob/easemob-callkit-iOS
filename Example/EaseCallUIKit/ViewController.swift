@@ -21,6 +21,7 @@ class ViewController: UIViewController {
     @IBOutlet weak var loginButton: UIButton!
     @IBOutlet weak var callTypeSegment: UISegmentedControl!
     @IBOutlet weak var logButton: UIButton!
+    @IBOutlet weak var tokenProviderButton: UIButton!
 
     
     override func viewDidLoad() {
@@ -30,6 +31,15 @@ class ViewController: UIViewController {
         self.callTypeSegment.selectedSegmentTintColor = .systemBlue
         CallKitManager.shared.profileProvider = self
         CallKitManager.shared.addListener(self)
+    }
+
+    /// 跳转到 CallTokenProvider 新用法示例页。
+    /// 该页会用你自己的声网 AppId 初始化 CallKit，并由业务服务器提供 RTC Token 与 uid↔userId 映射。
+    @IBAction func tokenProviderAction(_ sender: Any) {
+        let controller = TokenProviderViewController()
+        let navigation = UINavigationController(rootViewController: controller)
+        navigation.modalPresentationStyle = .fullScreen
+        present(navigation, animated: true)
     }
     
     override func viewDidAppear(_ animated: Bool) {

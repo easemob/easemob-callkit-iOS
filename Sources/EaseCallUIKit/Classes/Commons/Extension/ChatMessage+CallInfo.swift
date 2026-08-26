@@ -17,7 +17,8 @@ public extension ChatMessage {
                 consoleLogInfo("Invalid call info in message id:\(messageId) : \(String(describing: ext))", type: .error)
                 return nil
             }
-            let defaultCalleeId = ChatClient.shared().getDeviceConfig(nil).deviceUUID ?? ""
+            var error: ChatError?
+            let defaultCalleeId = ChatClient.shared().getDeviceConfig(&error)?.deviceUUID ?? ""
             let calleeDevId = ext[kCalleeDevId] as? String ?? defaultCalleeId
             let callTypeRawValue = ext[kCallType] as? UInt ?? 0
             let callType = CallType(rawValue: callTypeRawValue) ?? .singleAudio

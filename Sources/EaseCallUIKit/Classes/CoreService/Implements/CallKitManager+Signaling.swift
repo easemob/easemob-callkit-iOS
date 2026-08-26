@@ -62,8 +62,32 @@ extension CallKitManager: ChatEventsListener {
     }
     
     private func notifyCallEndReason(_ reason: CallEndReason, info: CallInfo) {
-        for listener in self.listeners.allObjects {
-            listener.didUpdateCallEndReason?(reason: reason, info: info)
+        if Thread.isMainThread {
+            for listener in self.listeners.allObjects {
+                listener.didUpdateCallEndReason?(reason: reason, info: info)
+            }
+        } else {
+            DispatchQueue.main.async { [weak self] in
+                guard let `self` = self else { return }
+                for listener in self.listeners.allObjects {
+                    listener.didUpdateCallEndReason?(reason: reason, info: info)
+                }
+            }
+        }
+    }
+
+    private func notifyCallError(_ error: CallError) {
+        if Thread.isMainThread {
+            for listener in self.listeners.allObjects {
+                listener.didOccurError?(error: error)
+            }
+        } else {
+            DispatchQueue.main.async { [weak self] in
+                guard let `self` = self else { return }
+                for listener in self.listeners.allObjects {
+                    listener.didOccurError?(error: error)
+                }
+            }
         }
     }
     
@@ -101,7 +125,7 @@ extension CallKitManager: ChatEventsListener {
 //                consoleLogInfo("Call info from current user, ignoring message id:\(message.messageId) ext:\(String(describing: message.ext))", type: .info)
                 return
             }
-            let defaultCalleeId = ChatClient.shared().getDeviceConfig(nil).deviceUUID ?? ""
+            let defaultCalleeId = ChatClient.shared().getDeviceConfig(nil)?.deviceUUID ?? ""
             let calleeDevId = ext[kCalleeDevId] as? String ?? defaultCalleeId
             let callTypeRawValue = ext[kCallType] as? UInt ?? 0
             let callType = CallType(rawValue: callTypeRawValue) ?? .singleAudio
@@ -115,12 +139,25 @@ extension CallKitManager: ChatEventsListener {
             let groupName = groupExtension["groupName"] as? String ?? ""
             let groupAvatar = groupExtension["groupAvatar"] as? String ?? ""
             
-            if let userJson = ext[kUserInfo] as? [String: Any] {//解析携带的用户信息
-                let profile = CallUserProfile()
-                profile.setValuesForKeys(userJson)
-                if profile.id.isEmpty {
-                    profile.id = message.from
+            if message.senderInfo == nil {
+                if let userJson = ext[kUserInfo] as? [String: Any] {//解析携带的用户信息
+                    let profile = CallUserProfile()
+                    profile.setValuesForKeys(userJson)
+                    if profile.id.isEmpty {
+                        profile.id = message.from
+                    }
+                    if CallKitManager.shared.usersCache[profile.id] == nil {
+                        CallKitManager.shared.usersCache[profile.id] = profile
+                    } else {
+                        CallKitManager.shared.usersCache[profile.id]?.nickname = profile.nickname
+                        CallKitManager.shared.usersCache[profile.id]?.avatarURL = profile.avatarURL
+                    }
                 }
+            } else {
+                let profile = CallUserProfile()
+                profile.id = message.senderInfo?.userId ?? message.from
+                profile.nickname = message.senderInfo?.nickname ?? ""
+                profile.avatarURL = message.senderInfo?.avatarUrl ?? ""
                 if CallKitManager.shared.usersCache[profile.id] == nil {
                     CallKitManager.shared.usersCache[profile.id] = profile
                 } else {
@@ -178,7 +215,7 @@ extension CallKitManager: ChatEventsListener {
                             }
                             if let calleeId = ChatClient.shared().currentUsername {
                                 self.callInfo?.calleeId = calleeId
-                                self.callInfo?.calleeDeviceId = ChatClient.shared().getDeviceConfig(nil).deviceUUID ?? ""
+                                self.callInfo?.calleeDeviceId = ChatClient.shared().getDeviceConfig(nil)?.deviceUUID ?? ""
                             }
                             for listener in self.listeners.allObjects {
                                 listener.onReceivedCall?(callType: callType, userId: message.from, extensionInfo: callExtension)
@@ -190,7 +227,7 @@ extension CallKitManager: ChatEventsListener {
                     }
                     
                     func handleAlertAction() {
-                        if ChatClient.shared().getDeviceConfig(nil).deviceUUID == callerDevId {//主叫回给被叫
+                        if ChatClient.shared().getDeviceConfig(nil)?.deviceUUID == callerDevId {//主叫回给被叫
                             if let call = self.callInfo {
                                 var stateJudgement = false
                                 
@@ -212,7 +249,7 @@ extension CallKitManager: ChatEventsListener {
                     
                     func handleConfirmRingAction() {
                         self.stopInvitationSignalTimer(callId: callId)
-                        if let currentDeviceId = ChatClient.shared().getDeviceConfig(nil).deviceUUID, currentDeviceId == calleeDevId {
+                        if let currentDeviceId = ChatClient.shared().getDeviceConfig(nil)?.deviceUUID, currentDeviceId == calleeDevId {
                             for info in self.receivedCalls.values {
                                 self.stopInvitationSignalTimer(callId: info.callId)
                             }
@@ -221,7 +258,7 @@ extension CallKitManager: ChatEventsListener {
                                 consoleLogInfo("parseCallInfo: Call already in progress with different callId: \(call.callId) for callId: \(callId)", type: .error)
                                 return
                             }
-                            if calleeDevId == ChatClient.shared().getDeviceConfig(nil).deviceUUID {
+                            if calleeDevId == ChatClient.shared().getDeviceConfig(nil)?.deviceUUID {
                                 if let call = self.receivedCalls[callId] {
                                     if isValid {
                                         self.callInfo = call
@@ -232,7 +269,7 @@ extension CallKitManager: ChatEventsListener {
                                 }
                             }
                         } else {
-                            consoleLogInfo("Current device:\(ChatClient.shared().getDeviceConfig(nil).deviceUUID ?? "") Call confirm on other device:\(calleeDevId) messageId:\(message.messageId) ext:\(String(describing: ext))", type: .error)
+                            consoleLogInfo("Current device:\(ChatClient.shared().getDeviceConfig(nil)?.deviceUUID ?? "") Call confirm on other device:\(calleeDevId) messageId:\(message.messageId) ext:\(String(describing: ext))", type: .error)
                         }
                     }
                     
@@ -260,7 +297,7 @@ extension CallKitManager: ChatEventsListener {
                                 self.stopRingTimer(callId: callId)
                                 self.stopInvitationSignalTimer(callId: callId)
                                 self.stopConfirmBuildConnectionTimer(callId: callId)
-                                let currentDeviceId = ChatClient.shared().getDeviceConfig(nil).deviceUUID ?? ""
+                                let currentDeviceId = ChatClient.shared().getDeviceConfig(nil)?.deviceUUID ?? ""
                                 if currentDeviceId == calleeDevId {//确认自己被叫
                                     switch result {
                                     case kAcceptResult:
@@ -307,7 +344,7 @@ extension CallKitManager: ChatEventsListener {
                     }
                     
                     func handleAnswerCallAction() {
-                        let deviceId = ChatClient.shared().getDeviceConfig(nil).deviceUUID ?? ""
+                        let deviceId = ChatClient.shared().getDeviceConfig(nil)?.deviceUUID ?? ""
                         if let call = self.callInfo, deviceId == callerDevId, call.callId == callId {
                             self.stopInvitationSignalTimer(callId: callId)
                             self.stopConfirmBuildConnectionTimer(callId: callId)
@@ -621,15 +658,11 @@ extension CallKitManager: ChatEventsListener {
         if error.code != .userPermissionDenied {
             self.hangup()
         }
-        for listener in self.listeners.allObjects {
-            listener.didOccurError?(error: CallError(CallError.IM(error: error), module: .im))
-        }
+        self.notifyCallError(CallError(CallError.IM(error: error), module: .im))
     }
     
     func handleBusinessError(_ error: CallError.CallBusiness) {
-        for listener in self.listeners.allObjects {
-            listener.didOccurError?(error: CallError(error, module: .business))
-        }
+        self.notifyCallError(CallError(error, module: .business))
     }
 }
 
@@ -733,7 +766,7 @@ extension CallKitManager: CallMessageService {
         self.callInfo = CallInfo(
             callId: callId,
             callerId: ChatClient.shared().currentUsername ?? "",
-            callerDeviceId: ChatClient.shared().getDeviceConfig(nil).deviceUUID ?? "",
+            callerDeviceId: ChatClient.shared().getDeviceConfig(nil)?.deviceUUID ?? "",
             channelName: channelName,
             type: type,
             startMessageId: "", // Will be updated after sending message
@@ -767,7 +800,7 @@ extension CallKitManager: CallMessageService {
                 // Play dialing sound
                 AudioPlayerManager.shared.playAudio(from: "dialing")
                 
-                self.engine?.setParameters("{\"che.audio mix_with_others\": false}")
+                self.engine?.setParameters("{\"che.audio.mix_with_others\": false}")
                 // Now send the signaling message (will join channel after success)
                 self.sendCallSignaling(userId: userId, type: type, callId: callId, channelName: channelName, extensionInfo: extensionInfo)
             }
@@ -803,7 +836,7 @@ extension CallKitManager: CallMessageService {
             kAction: CALL_INVITE,
             kCallId: callId,
             kCallType: type.rawValue,
-            kCallerDevId: ChatClient.shared().getDeviceConfig(nil).deviceUUID ?? "",
+            kCallerDevId: ChatClient.shared().getDeviceConfig(nil)?.deviceUUID ?? "",
             kChannelName: channelName,
             kTs: Int(Date().timeIntervalSince1970 * 1000),
             kCallDuration: 0,
@@ -816,7 +849,7 @@ extension CallKitManager: CallMessageService {
         }
         
         let json = CallKitManager.shared.currentUserInfo?.toJsonObject() ?? [:]
-        if !json.isEmpty {
+        if !json.isEmpty,self.compatibilityModeForUserInfo {
             ext.merge(json) { _, new in new }
         }
         
@@ -916,7 +949,7 @@ extension CallKitManager: CallMessageService {
                         return
                     }
                     
-                    self.engine?.setParameters("{\"che.audio mix_with_others\": false}")
+                    self.engine?.setParameters("{\"che.audio.mix_with_others\": false}")
                     // Start group call with selected participants
                     self.startGroupCallWithParticipants(
                         ids: ids,
@@ -974,7 +1007,7 @@ extension CallKitManager: CallMessageService {
             self.callInfo = CallInfo(
                 callId: callId,
                 callerId: ChatClient.shared().currentUsername ?? "",
-                callerDeviceId: ChatClient.shared().getDeviceConfig(nil).deviceUUID ?? "",
+                callerDeviceId: ChatClient.shared().getDeviceConfig(nil)?.deviceUUID ?? "",
                 channelName: channelName,
                 type: .groupCall,
                 startMessageId: "", // Will be updated after sending message
@@ -987,7 +1020,7 @@ extension CallKitManager: CallMessageService {
             self.callInfo?.state = .dialing
         } else {
             self.callInfo?.callerId = ChatClient.shared().currentUsername ?? ""
-            self.callInfo?.callerDeviceId = ChatClient.shared().getDeviceConfig(nil).deviceUUID ?? ""
+            self.callInfo?.callerDeviceId = ChatClient.shared().getDeviceConfig(nil)?.deviceUUID ?? ""
         }
         self.callInfo?.type = CallType.groupCall
         // Setup items cache for participants
@@ -1063,7 +1096,7 @@ extension CallKitManager: CallMessageService {
             kAction: CALL_INVITE,
             kCallId: callId,
             kCallType: CallType.groupCall.rawValue,
-            kCallerDevId: ChatClient.shared().getDeviceConfig(nil).deviceUUID ?? "",
+            kCallerDevId: ChatClient.shared().getDeviceConfig(nil)?.deviceUUID ?? "",
             kChannelName: channelName,
             kTs: Int(Date().timeIntervalSince1970 * 1000),
             kExt: extensionInfo ?? [:],
@@ -1076,7 +1109,7 @@ extension CallKitManager: CallMessageService {
         ]
         
         let json = CallKitManager.shared.currentUserInfo?.toJsonObject() ?? [:]
-        if !json.isEmpty {
+        if !json.isEmpty,self.compatibilityModeForUserInfo {
             ext.merge(json) { _, new in new }
         }
         
@@ -1113,14 +1146,16 @@ extension CallKitManager: CallMessageService {
             // Join channel after successful signaling (only if not already in call)
             if !isAlreadyInCall {
                 self.joinChannel(channelName: channelName) { [weak self] success in
-                    guard let `self` = self else { return }
-                    if !success {
-                        // Handle join channel failure
-                        self.callStartTimerStop(callId: timerKey)
-                        self.hangup()
-                    } else {
-                        if let controller = UIViewController.currentController as? CallMultiViewController {
-                            self.enableLocalVideo(controller.isCameraPreviewEnabled)
+                    DispatchQueue.main.async {
+                        guard let `self` = self else { return }
+                        if !success {
+                            // Handle join channel failure
+                            self.callStartTimerStop(callId: timerKey)
+                            self.hangup()
+                        } else {
+                            if let controller = UIViewController.currentController as? CallMultiViewController {
+                                self.enableLocalVideo(controller.isCameraPreviewEnabled)
+                            }
                         }
                     }
                 }
@@ -1142,7 +1177,7 @@ extension CallKitManager: CallMessageService {
             kAction: CALL_INVITE,
             kCallId: callId,
             kCallType: CallType.groupCall.rawValue,
-            kCallerDevId: ChatClient.shared().getDeviceConfig(nil).deviceUUID ?? "",
+            kCallerDevId: ChatClient.shared().getDeviceConfig(nil)?.deviceUUID ?? "",
             kChannelName: channelName,
             kTs: Int(Date().timeIntervalSince1970 * 1000),
             kExt: extensionInfo ?? [:],
@@ -1155,7 +1190,7 @@ extension CallKitManager: CallMessageService {
         ]
         
         let json = CallKitManager.shared.currentUserInfo?.toJsonObject() ?? [:]
-        if !json.isEmpty {
+        if !json.isEmpty,self.compatibilityModeForUserInfo {
             ext.merge(json) { _, new in new }
         }
         
@@ -1210,10 +1245,10 @@ extension CallKitManager: CallMessageService {
             kAction: CALL_ALERT,
             kCallId: callId,
             kCallerDevId: callerDeviceId,
-            kCalleeDevId: ChatClient.shared().getDeviceConfig(nil).deviceUUID ?? "",
+            kCalleeDevId: ChatClient.shared().getDeviceConfig(nil)?.deviceUUID ?? "",
             kTs: Int(Date().timeIntervalSince1970 * 1000) // Timestamp in milliseconds
         ]
-        if !json.isEmpty {
+        if !json.isEmpty,self.compatibilityModeForUserInfo {
             ext.merge(json) { _, new in
                 new
             }
@@ -1248,10 +1283,10 @@ extension CallKitManager: CallMessageService {
             kMsgType: kMsgTypeValue,
             kAction: CALL_CANCEL,
             kCallId: callId,
-            kCallerDevId: ChatClient.shared().getDeviceConfig(nil).deviceUUID ?? "",
+            kCallerDevId: ChatClient.shared().getDeviceConfig(nil)?.deviceUUID ?? "",
             kTs: Int(Date().timeIntervalSince1970 * 1000) // Timestamp in milliseconds
         ]
-        if !json.isEmpty {
+        if !json.isEmpty,self.compatibilityModeForUserInfo {
             ext.merge(json) { _, new in
                 new
             }
@@ -1274,9 +1309,7 @@ extension CallKitManager: CallMessageService {
         Task {
             let result = await ChatClient.shared().chatManager?.send(message, progress: nil)
             if let error = result?.1 {
-                for listener in self.listeners.allObjects {
-                    listener.didOccurError?(error: CallError(CallError.IM(error: error), module: .im))
-                }
+                self.notifyCallError(CallError(CallError.IM(error: error), module: .im))
                 consoleLogInfo("Failed to send cancel call message: \(String(describing: error.errorDescription))", type: .error)
             }
         }
@@ -1323,7 +1356,14 @@ extension CallKitManager: CallMessageService {
                     conversationId = call.groupId ?? ""
                 }
             }
-            let message = ChatMessage(conversationID: conversationId, body: ChatCMDMessageBody(action: kCall), ext: [kCallId:callId,kMsgType: kMsgTypeValue,kAction:CALL_END])
+            let json = CallKitManager.shared.currentUserInfo?.toJsonObject() ?? [:]
+            var ext:[String:Any] = [kCallId:callId,kMsgType: kMsgTypeValue,kAction:CALL_END]
+            if !json.isEmpty,self.compatibilityModeForUserInfo {
+                ext.merge(json) { _, new in
+                    new
+                }
+            }
+            let message = ChatMessage(conversationID: conversationId, body: ChatCMDMessageBody(action: kCall), ext: ext)
             if self.callInfo?.type ?? .singleAudio  == .groupCall {
                 message.chatType = .groupChat
                 if to.contains(",") {
@@ -1359,11 +1399,11 @@ extension CallKitManager: CallMessageService {
             kAction: CALL_CONFIRM_RING,
             kCallId: callId,
             kCalleeDevId: calleeDeviceId,
-            kCallerDevId: ChatClient.shared().getDeviceConfig(nil).deviceUUID ?? "",
+            kCallerDevId: ChatClient.shared().getDeviceConfig(nil)?.deviceUUID ?? "",
             kTs: Int(Date().timeIntervalSince1970 * 1000), // Timestamp in milliseconds
             kCallStatus: is_valid ? 1 : 0
         ]
-        if !json.isEmpty {
+        if !json.isEmpty,self.compatibilityModeForUserInfo {
             ext.merge(json) { _, new in
                 new
             }
@@ -1397,11 +1437,11 @@ extension CallKitManager: CallMessageService {
             kAction: CALL_CONFIRM_CALLEE,
             kCallId: callId,
             kCalleeDevId: calleeDeviceId,
-            kCallerDevId: ChatClient.shared().getDeviceConfig(nil).deviceUUID ?? "",
+            kCallerDevId: ChatClient.shared().getDeviceConfig(nil)?.deviceUUID ?? "",
             kCallResult: result,
             kTs: Int(Date().timeIntervalSince1970 * 1000) // Timestamp in milliseconds
         ]
-        if !json.isEmpty {
+        if !json.isEmpty,self.compatibilityModeForUserInfo {
             ext.merge(json) { _, new in
                 new
             }
@@ -1435,12 +1475,12 @@ extension CallKitManager: CallMessageService {
             kMsgType: kMsgTypeValue,
             kAction: CALL_ANSWER,
             kCallId: callId,
-            kCalleeDevId: ChatClient.shared().getDeviceConfig(nil).deviceUUID ?? "",
+            kCalleeDevId: ChatClient.shared().getDeviceConfig(nil)?.deviceUUID ?? "",
             kCallerDevId: callerDeviceId,
             kCallResult: result,
             kTs: Date().timeIntervalSince1970 * 1000, // Timestamp in milliseconds
         ]
-        if !json.isEmpty {
+        if !json.isEmpty,self.compatibilityModeForUserInfo {
             ext.merge(json) { _, new in
                 new
             }
@@ -1510,8 +1550,14 @@ extension CallKitManager: CallMessageService {
     }
     
     public func accept() {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in
+                self?.accept()
+            }
+            return
+        }
         AudioPlayerManager.shared.stopAudio()
-        self.engine?.setParameters("{\"che.audio mix_with_others\": false}")
+        self.engine?.setParameters("{\"che.audio.mix_with_others\": false}")
         if let call = self.callInfo {
             switch call.type {
             case .singleAudio:
@@ -1562,55 +1608,62 @@ extension CallKitManager: CallMessageService {
     }
     
     func joinChannel(channelName: String, completion: @escaping ((Bool) -> Void)) {
-        self.engine?.enableInstantMediaRendering()
-        if let call = self.callInfo,self.hadJoinedChannel {
-            let leaveResult = self.engine?.leaveChannel()
-            if leaveResult != 0 {
-                consoleLogInfo("leaveChannel result: \(String(describing: leaveResult)) channelName:\(channelName)", type: .error)
-                self.quitCall()
+        guard let engine = self.engine else {
+            consoleLogInfo("Cannot join RTC channel because the RTC engine is not initialized.", type: .error)
+            self.handleBusinessError(CallError.CallBusiness(error: .state, message: "RTC engine is not initialized."))
+            DispatchQueue.main.async {
+                completion(false)
             }
+            return
         }
-        
-        if self.tokenProvider != nil {
-//            if let currentUserId = ChatClient.shared().currentUsername,!currentUserId.isEmpty {
-//                self.tokenProvider?.fetchCallToken { [weak self] uid ,token, expiration  in
-//                    guard let `self` = self else { return }
-//                    if let token = token,!token.isEmpty {
-//                        self.token = token
-//                        self.tokenExpired = Int64(expiration)
-//                        self.joinWithToken(token: self.token, channelName: channelName, uid: uid, completion: completion)
-//                    } else {
-//                        completion(false)
-//                        consoleLogInfo("Failed to fetch call token: \(expiration)", type: .error)
-//                    }
-//                }
-//            } else {
-//                consoleLogInfo("Current user ID is empty, cannot fetch call token", type: .error)
-//                completion(false)
-//            }
-        } else {
-            if self.token.isEmpty,!self.config.disableRTCTokenValidation {
-                // Fetch the token from the ChatClient
-                ChatClient.shared().getRTCToken(withChannel: nil) { [weak self] uid, token, expiration, error in
-                    if let error = error {
-                        self?.handleError(error)
-                        consoleLogInfo("Failed to fetch call token: \(String(describing: error.errorDescription))", type: .error)
-                    } else {
-                        let rtcToken = token ?? ""
-                        self?.token = rtcToken
-                        self?.currentUserRTCUID = UInt32(uid)
-                        self?.joinWithToken(channelName: channelName, uid: UInt32(uid), completion: completion)
-                        consoleLogInfo("Call token fetched successfully: \(String(describing: token))", type: .info)
+        engine.enableInstantMediaRendering()
+        Task { [weak self] in
+            guard let self = self else { return }
+            do {
+                let credential = try await self.credentialForUse(reason: .join)
+                guard self.tokenProvider == nil || credential.uid > 0 else {
+                    let message = "CallTokenProvider returned RTC UID 0; joining the RTC channel is not allowed."
+                    consoleLogInfo(message, type: .error)
+                    self.handleBusinessError(CallError.CallBusiness(error: .param, message: message))
+                    DispatchQueue.main.async {
+                        completion(false)
+                    }
+                    return
+                }
+                if self.hadJoinedChannel {
+                    let leaveResult = self.engine?.leaveChannel()
+                    if leaveResult != 0 {
+                        consoleLogInfo("leaveChannel result: \(String(describing: leaveResult)) channelName:\(channelName)", type: .error)
+                        DispatchQueue.main.async {
+                            completion(false)
+                        }
+                        return
                     }
                 }
-            } else {
-                self.joinWithToken(channelName: channelName, uid: currentUserRTCUID, completion: completion)
+                self.joinWithToken(credential: credential, channelName: channelName, completion: completion)
+            } catch {
+                if self.tokenProvider != nil,
+                   let failure = error as? RTCCredentialFailure,
+                   case .invalidUID = failure {
+                    let message = "CallTokenProvider returned RTC UID 0; joining the RTC channel is not allowed."
+                    self.handleBusinessError(CallError.CallBusiness(error: .param, message: message))
+                }
+                consoleLogInfo("Failed to prepare RTC credential for channel \(channelName): \(error.localizedDescription)", type: .error)
+                DispatchQueue.main.async {
+                    completion(false)
+                }
             }
         }
     }
     
-    private func joinWithToken(channelName: String, uid: UInt32, completion: @escaping ((Bool) -> Void)) {
-        
+    private func joinWithToken(credential: RTCCredentialRecord, channelName: String, completion: @escaping ((Bool) -> Void)) {
+        guard let engine = self.engine else {
+            consoleLogInfo("Cannot join RTC channel because the RTC engine is not initialized.", type: .error)
+            DispatchQueue.main.async {
+                completion(false)
+            }
+            return
+        }
         let config = AgoraRtcChannelMediaOptions()
         config.autoSubscribeAudio = true
         config.autoSubscribeVideo = true
@@ -1619,13 +1672,17 @@ extension CallKitManager: CallMessageService {
         config.clientRoleType = .broadcaster
         config.channelProfile = .liveBroadcasting
         let currentUser = ChatClient.shared().currentUsername ?? ""
-        consoleLogInfo("\(currentUser) joining channel: \(channelName) with uid: \(uid) token:\(String(describing: self.token)) self.config.disableRTCTokenValidation:\(self.config.disableRTCTokenValidation)", type: .debug)
-        let joinToken = self.config.disableRTCTokenValidation ? nil:self.token
+        let uid = credential.uid
+        self.syncLocalRTCUID(uid)
+        consoleLogInfo("\(currentUser) joining channel: \(channelName) with uid: \(uid) self.config.disableRTCTokenValidation:\(self.config.disableRTCTokenValidation)", type: .debug)
+        let joinToken = self.config.disableRTCTokenValidation || credential.token.isEmpty ? nil : credential.token
         consoleLogInfo("joinToken is nil:\(joinToken == nil)", type: .debug)
-        let result = self.engine?.joinChannel(byToken: joinToken, channelId: channelName, uid: UInt(uid), mediaOptions: config, joinSuccess: { [weak self] channel, uid, elapsed in
+        let result = engine.joinChannel(byToken: joinToken, channelId: channelName, uid: UInt(uid), mediaOptions: config, joinSuccess: { [weak self] channel, joinedUid, elapsed in
             guard let `self` = self else { return  }
-            consoleLogInfo("\(currentUser) joined channel: \(channel) with uid: \(uid) elapsed: \(elapsed): account \(ChatClient.shared().currentUsername ?? "")", type: .debug)
-            if uid == self.currentUserRTCUID {
+            consoleLogInfo("\(currentUser) joined channel: \(channel) with uid: \(joinedUid) elapsed: \(elapsed): account \(ChatClient.shared().currentUsername ?? "")", type: .debug)
+            // 与本次入会所用凭证的 uid 比对。currentUserRTCUID 是从凭证缓存实时计算的动态值，
+            // 入会期间若发生凭证刷新会导致比对失败，进而使 hadJoinedChannel 永不置 true。
+            if joinedUid == UInt(credential.uid) {
                 self.hadJoinedChannel = true
                 DispatchQueue.global().asyncAfter(deadline: .now() + 2.4, execute: {
                     self.updateCallEndReason(.abnormalEnd,false)
@@ -1639,29 +1696,40 @@ extension CallKitManager: CallMessageService {
                     self.checkMicrophonePermission()
                 }
             }
-            completion(true)
-        }) ?? 0
+            // 确保 completion 在主线程执行，避免 UIKit 操作在后台线程
+            DispatchQueue.main.async {
+                completion(true)
+            }
+        })
         if result != 0 {
             if abs(result) == 17 {
-                completion(true)
+                DispatchQueue.main.async {
+                    completion(true)
+                }
                 return
             }
             self.quitCall()
-            consoleLogInfo("\(currentUser) failed to join channel: \(channelName) error code: \(result) token:\(String(describing: self.token))", type: .error)
+            consoleLogInfo("\(currentUser) failed to join channel: \(channelName) error code: \(result)", type: .error)
             GlobalTimerManager.shared.invalidate()
             if let code = AgoraErrorCode(rawValue: Int(abs(result))) {
-                for listener in self.listeners.allObjects {
-                    listener.didOccurError?(error: CallError(CallError.RTC(code: code, message: "RTC error occurred with code: \(result)"), module: .rtc))
-                }
+                self.notifyCallError(CallError(CallError.RTC(code: code, message: "RTC error occurred with code: \(result)"), module: .rtc))
             }
             
-            completion(false)
+            DispatchQueue.main.async {
+                completion(false)
+            }
         } else {
-            consoleLogInfo("\(currentUser) joined channel: \(channelName) result: \(result) token:\(String(describing: self.token))", type: .debug)
+            consoleLogInfo("\(currentUser) joined channel: \(channelName) result: \(result)", type: .debug)
         }
     }
     
     func joinedThenPresentCallVC() {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in
+                self?.joinedThenPresentCallVC()
+            }
+            return
+        }
         UIApplication.shared.isIdleTimerDisabled = true
         if let call = self.callInfo {
             switch call.type  {
@@ -1719,9 +1787,12 @@ extension CallKitManager: CallMessageService {
             self.isVideoExchanged = false
             let result = self.engine?.leaveChannel()
             consoleLogInfo("quitCall leaveChannel result: \(String(describing: result))", type: .debug)
-            if let code = result,code != 0 {
-                for listener in self.listeners.allObjects {
-                    listener.didOccurError?(error: CallError(CallError.RTC(code: AgoraErrorCode(rawValue: Int(code))!, message: "quitCall leaveChannel failed"), module: .rtc))
+            if let result = result, result != 0 {
+                // 未知错误码不应崩溃，与本文件 joinChannel 失败处的写法保持一致
+                if let code = AgoraErrorCode(rawValue: Int(abs(result))) {
+                    self.notifyCallError(CallError(CallError.RTC(code: code, message: "quitCall leaveChannel failed"), module: .rtc))
+                } else {
+                    consoleLogInfo("quitCall leaveChannel failed with unmapped code: \(result)", type: .error)
                 }
             }
             self.engine?.stopPreview()

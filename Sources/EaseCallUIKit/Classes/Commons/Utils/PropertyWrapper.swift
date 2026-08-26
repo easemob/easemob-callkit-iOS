@@ -29,7 +29,7 @@ import Foundation
 }
 
 @propertyWrapper
-public struct CallAtomicUnfairLock<T> {
+public final class CallAtomicUnfairLock<T> {
     private var value: T
     private var lock = os_unfair_lock()
     
@@ -40,7 +40,7 @@ public struct CallAtomicUnfairLock<T> {
     
     // 包装的属性值，自动处理加锁解锁
     public var wrappedValue: T {
-        mutating get {
+        get {
             os_unfair_lock_lock(&lock)
             defer { os_unfair_lock_unlock(&lock) }
             return value
@@ -51,21 +51,25 @@ public struct CallAtomicUnfairLock<T> {
             value = newValue
         }
     }
+
+    public var projectedValue: CallAtomicUnfairLock<T> { self }
     
     /// 原子性修改操作
     /// - Parameter transform: 对值进行修改的闭包
-    mutating func modify(_ transform: (inout T) -> Void) {
+    public func modify<Result>(_ transform: (inout T) throws -> Result) rethrows -> Result {
         os_unfair_lock_lock(&lock)
         defer { os_unfair_lock_unlock(&lock) }
-        transform(&value)
+        return try transform(&value)
     }
     
     /// 原子性读取并处理值
     /// - Parameter transform: 处理值的闭包，返回处理结果
     /// - Returns: 处理结果
-    mutating func withValue<U>(_ transform: (T) -> U) -> U {
+    public func withValue<Result>(_ transform: (T) throws -> Result) rethrows -> Result {
         os_unfair_lock_lock(&lock)
         defer { os_unfair_lock_unlock(&lock) }
-        return transform(value)
+        return try transform(value)
     }
 }
+
+extension CallAtomicUnfairLock: @unchecked Sendable where T: Sendable {}
