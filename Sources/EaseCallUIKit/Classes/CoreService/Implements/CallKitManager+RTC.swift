@@ -271,7 +271,7 @@ extension CallKitManager: AgoraRtcEngineDelegate {
                         let result = engine.renewToken(credential.token)
                         consoleLogInfo("Renewed expired RTC credential for channel: \(channelName) uid: \(credential.uid) userId: \(userId) result: \(result)", type: .info)
                     } else {
-                        consoleLogInfo("RTC token is empty (disableRTCTokenValidation mode); cannot renew.", type: .warning)
+                        consoleLogInfo("RTC token is empty (disableRTCTokenValidation mode); cannot renew.", type: .waring)
                     }
                 } catch {
                     consoleLogInfo("Unable to renew expired RTC credential: \(error.localizedDescription)", type: .error)
