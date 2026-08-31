@@ -35,6 +35,7 @@
   - [3.监听事件和错误](#3监听easecalluikit事件和错误)   
   - [4.创建呼叫页面并调用呼叫Api](#4创建呼叫页面并调用呼叫api) 
   - [5.进阶用法](#5进阶用法)
+    - [5.4 CallTokenProvider（自己提供 RTC AppId / Token / uid 映射）](#54-calltokenprovider自己提供-rtc-appid--token--uid-映射)
 - [常见问题](#常见问题)
 - [自定义](#自定义)
   - [1.修改UI可配置项](#1修改ui可配置项)
@@ -168,6 +169,8 @@ let token: String = <#token#>
 ![](./DocumentationImages/example.png)
 
 注意： 如果想要自定义的头像昵称显示信息，在ViewController.swift中找到loginAction方法后填入您要显示的当前用户id对应的昵称头像`profile.nickname` `profile.avatarURL`信息即可
+
+如果要体验自己签发 RTC Token 的新用法，首页点击 **Token Provider** 进入示例页。先在 `PublicDefines.swift` 填写 `agoraAppId`，生产环境再用自己的服务端下发 Token 和 uid↔userId 映射。详见 [5.4 CallTokenProvider](#54-calltokenprovider自己提供-rtc-appid--token--uid-映射)。
 注意：
    在生产环境中，为了安全考虑，你需要在你的应用服务器集成 获取 App Token API 和 获取用户 Token API 实现获取 Token 的业务逻辑，使你的用户从你的应用服务器获取 Token。
 
@@ -1167,6 +1170,148 @@ extension ViewController: CallUserProfileProvider {
 - 注意：仅限iOS15及其以上系统可用，iOS15设备已测试
 
 详见[PictureInPicture.md](./PictureInPicture.md)
+
+### 5.4 CallTokenProvider（自己提供 RTC AppId / Token / uid 映射）
+
+首页 Example 是旧用法：`CallKitManager.shared.setup(config)`，登录 IM 后由 IM SDK 下发 RTC AppId、Token、uid 以及 uid↔userId 映射。
+
+新用法适合你已经有自己的声网 App ID，并且要在自己的应用服务器上签发 RTC Token、维护 IM userId 与 RTC uid 映射的场景。Example 首页点 **Token Provider** 可进入完整可运行示例，源码见 `Example/EaseCallUIKit/TokenProviderViewController.swift`。
+
+两种路径只能选一种。RTC 引擎创建后不能再切换凭证来源。如果先在首页登录，再进 Token Provider 页，需要重启 App 后先进入该页。
+
+和旧用法的差别：
+
+| | 旧用法 | 新用法（CallTokenProvider） |
+| --- | --- | --- |
+| IM SDK | 用自己的 AppKey 初始化 | 同样用自己的 AppKey 初始化 |
+| CallKit 初始化 | `setup(config)` | `setup(config, tokenProvider:)` |
+| RTC App ID | 登录后从 IM SDK `options.appId` 读取 | `CallTokenProvider.getAppId()` |
+| RTC Token / uid | 登录后向 IM SDK 要 | `CallTokenProvider.getRTCToken(withChannel:)` |
+| uid → IM userId | 向 IM SDK 要 | `CallTokenProvider.getRelations(rtc:)` |
+
+#### 第一步：用自己的 AppKey 初始化 IM SDK
+
+这一步和旧用法相同。RTC App ID 不要写进 IM Options，留给 `CallTokenProvider.getAppId()`。
+
+<details>
+<summary>点击展开/收起 IM SDK 初始化</summary>
+
+```Swift
+let option = ChatSDKOptions(appkey: AppKey)
+option.enableConsoleLog = true
+option.isAutoLogin = false
+ChatClient.shared().initializeSDK(with: option)
+```
+
+</details>
+
+#### 第二步：用 CallTokenProvider 初始化 CallKit
+
+`setup(_:tokenProvider:)` 时会立刻调用 `getAppId()` 创建 RTC 引擎。之后登录、进房、Token 续期都不再向 IM SDK 要 RTC 凭证。
+
+<details>
+<summary>点击展开/收起 CallKit 初始化</summary>
+
+```Swift
+let config = CallKitConfig()
+config.enablePIPOn1V1VideoScene = true
+CallKitManager.shared.setup(config, tokenProvider: self)
+CallKitManager.shared.profileProvider = self
+CallKitManager.shared.addListener(self)
+```
+
+</details>
+
+#### 第三步：实现 CallTokenProvider
+
+CallKit 会在这些时机回调，你只需要向自己的服务端拿数据并返回：
+
+- `getAppId()`：创建 RTC 引擎时读取，必须是稳定的声网 App ID，不要返回环信 IM AppKey。
+- `getRTCToken(withChannel:)`：登录后、进房前、Token 即将过期、回到前台时读取。当前 `channelName` 固定传 `nil`，请签发对所有频道有效的应用级 Token。
+- `getRelations(rtc:)`：远端用户进房后，把 RTC uid 解析成 IM userId，用来显示头像昵称。
+
+返回值约束：
+
+- uid 必须大于 0，同一用户应尽量保持稳定。
+- `expiration` 为 Unix 秒；传 `0` 表示不过期。有效 Token 会在过期前约 5 分钟自动续期。
+- 除非把 `CallKitConfig.disableRTCTokenValidation` 设为 `true`，否则 token 不能为空。
+- 登出 IM 时请调用 `CallKitManager.shared.cleanUserDefaults()`，清理本机缓存的 Token 和 uid 映射。
+
+<details>
+<summary>点击展开/收起 CallTokenProvider 示例</summary>
+
+```Swift
+final class ExampleCallTokenProvider: CallTokenProvider {
+
+    func getAppId() -> String {
+        agoraAppId
+    }
+
+    func getRTCToken(withChannel channelName: String?) async throws -> CallRTCTokenInfo {
+        // channelName 当前为 nil，服务端应按应用级 Token 签发。
+        // 建议服务端返回：{ "uid": 123456, "token": "007eJx...", "expiration": 1710000000 }
+        let currentUserId = ChatClient.shared().currentUsername ?? ""
+        var request = URLRequest(url: URL(string: "https://your-server.com/rtc/token")!)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "userId": currentUserId,
+            "channelName": channelName as Any
+        ])
+        let (data, _) = try await URLSession.shared.data(for: request)
+        let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        return CallRTCTokenInfo(
+            uid: (object?["uid"] as? NSNumber)?.uint32Value ?? 0,
+            token: object?["token"] as? String ?? "",
+            expiration: (object?["expiration"] as? NSNumber)?.int64Value ?? 0
+        )
+    }
+
+    func getRelations(rtc uids: [UInt32]) async throws -> [UInt32: String] {
+        // 建议服务端返回：{ "123456": "userA", "234567": "userB" }
+        var request = URLRequest(url: URL(string: "https://your-server.com/rtc/relations")!)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "uids": uids.map { NSNumber(value: $0) }
+        ])
+        let (data, _) = try await URLSession.shared.data(for: request)
+        let object = try JSONSerialization.jsonObject(with: data) as? [String: String] ?? [:]
+        return object.reduce(into: [UInt32: String]()) { result, item in
+            guard let uid = UInt32(item.key), uid > 0, !item.value.isEmpty else { return }
+            result[uid] = item.value
+        }
+    }
+}
+```
+
+</details>
+
+#### 第四步：登录 IM 后按旧用法呼叫
+
+IM 登录仍使用环信用户 Token。RTC Token 不会在登录时获取，而是由 CallTokenProvider 在进房或续期时按需回调。呼叫 API 与旧用法相同。
+
+<details>
+<summary>点击展开/收起登录与呼叫</summary>
+
+```Swift
+ChatClient.shared().login(withUsername: userId, token: token) { userId, error in
+    if error == nil, !userId.isEmpty {
+        let profile = CallUserProfile()
+        profile.id = userId
+        profile.nickname = "\(userId)昵称"
+        CallKitManager.shared.currentUserInfo = profile
+    }
+}
+
+CallKitManager.shared.call(with: peerUserId, type: .singleAudio)
+// 或
+CallKitManager.shared.groupCall(groupId: groupId)
+```
+
+</details>
+
+Example 里可在 `PublicDefines.swift` 填写 `agoraAppId`。本地调试也可临时填写 `agoraRTCUid` / `agoraRTCToken`，示例页会跳过网络请求直接交给 CallKit；生产环境必须从自己的应用服务器获取。
 
 # 常见问题 
 

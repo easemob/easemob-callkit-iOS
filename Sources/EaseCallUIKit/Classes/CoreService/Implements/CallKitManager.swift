@@ -11,12 +11,12 @@ import AVKit
 import AVFAudio
 import PushKit
 
-public let CallKitVersion = "4.18.1"
+public let CallKitVersion = "4.16.4"
 
 @objcMembers public class CallKitManager: NSObject {
     /// Cache for user profiles
     @CallAtomicUnfairLock public var usersCache: [String: CallProfileProtocol] = [:]
-    
+
     /// CallKitManager shared instance
     public static let shared = CallKitManager()
     
@@ -27,7 +27,7 @@ public let CallKitVersion = "4.18.1"
     public var profileProviderOC: CallUserProfileProviderOC?
     
     /// Provider for call token
-    public private(set) var tokenProvider: CallTokenProvider?
+    @nonobjc public var tokenProvider: CallTokenProvider?
     
     /// Current call information
     public internal(set) var callInfo : CallInfo? = nil
@@ -58,11 +58,52 @@ public let CallKitVersion = "4.18.1"
         }
     }
     
-    /// Current user token for AgoraRTC SDK
-    @CallUserDefault("CallKitManager.token", defaultValue: "") public var token: String
-    
-    /// Current user RTC UID
-    @CallUserDefault("CallKitManager.currentUserRTCUID", defaultValue: UInt32(0)) public var currentUserRTCUID
+    @nonobjc lazy var rtcPersistenceStore = RTCPersistenceStore()
+    @nonobjc @CallAtomicUnfairLock var rtcCredentialCache: RTCCredentialRecord?
+    @nonobjc @CallAtomicUnfairLock var rtcUserIdCache: [UInt: String] = [:]
+    @nonobjc @CallAtomicUnfairLock var rtcCacheAppID: String = ""
+    @nonobjc @CallAtomicUnfairLock var loadedCredentialKeys: Set<String> = []
+    @nonobjc @CallAtomicUnfairLock var loadedRelationAppIDs: Set<String> = []
+    @nonobjc @CallAtomicUnfairLock var rtcCredentialGeneration: UInt64 = 0
+    @nonobjc @CallAtomicUnfairLock var rtcCredentialRequest: RTCCredentialRequestState?
+    @nonobjc @CallAtomicUnfairLock var rtcRelationRequests: [UInt: Task<RTCRelationResolution, Never>] = [:]
+    /// UID -> IM userId 解析失败的时间戳。用于负缓存，避免帧回调等高频路径对同一个失败 uid 反复发起网络请求。
+    @nonobjc @CallAtomicUnfairLock var rtcRelationFailures: [UInt: Date] = [:]
+    /// 解析失败后的静默期，静默期内不再对同一个 uid 发起请求。
+    @nonobjc static let rtcRelationFailureTTL: TimeInterval = 30
+    @nonobjc @CallAtomicUnfairLock var rtcRefreshTask: Task<Void, Never>?
+    @nonobjc private var notificationObservers: [NSObjectProtocol] = []
+
+    /// Current user token for AgoraRTC SDK. Runtime access is memory-only.
+    public private(set) var token: String {
+        get { $rtcCredentialCache.withValue { $0?.token ?? "" } }
+        set {
+            guard tokenProvider == nil else {
+                consoleLogInfo("RTC token is managed by CallTokenProvider and cannot be set directly.", type: .error)
+                return
+            }
+            let identity = (appID, ChatClient.shared().currentUsername ?? "")
+            $rtcCredentialCache.modify { current in
+                let uid = current?.uid ?? 0
+                current = RTCCredentialRecord(appID: identity.0, userID: identity.1, uid: uid, token: newValue, expiration: current?.expiration ?? 0, generation: current?.generation ?? 0)
+            }
+        }
+    }
+
+    /// Current user RTC UID. Runtime access is memory-only.
+    public private(set) var currentUserRTCUID: UInt32 {
+        get { $rtcCredentialCache.withValue { $0?.uid ?? 0 } }
+        set {
+            guard tokenProvider == nil else {
+                consoleLogInfo("RTC UID is managed by CallTokenProvider and cannot be set directly.", type: .error)
+                return
+            }
+            let identity = (appID, ChatClient.shared().currentUsername ?? "")
+            $rtcCredentialCache.modify { current in
+                current = RTCCredentialRecord(appID: identity.0, userID: identity.1, uid: newValue, token: current?.token ?? "", expiration: current?.expiration ?? 0, generation: current?.generation ?? 0)
+            }
+        }
+    }
     
     var hadJoinedChannel: Bool = false
     
@@ -74,14 +115,17 @@ public let CallKitVersion = "4.18.1"
     
     /// Popup view for call notifications
     public internal(set) var popup: CallPopupView?
-    
     /// Application ID for Agora SDK
     public var appID: String = ""
     
     /// The throttler for RTC callbacks
     let rtcThrottler = RTCCallbackThrottler()
     
+    /// Configuration for CallKitManager
     public private(set) var config: CallKitConfig = CallKitConfig()
+
+    /// Whether compatible with older versions of user information transmission or not.
+    public var compatibilityModeForUserInfo = false
 
     private override init() {
         super.init()
@@ -90,41 +134,27 @@ public let CallKitVersion = "4.18.1"
     
     /// Sets up the CallKitManager with an optional token provider.
     @objc public func setup(_ config: CallKitConfig? = nil) {
+        ChatClient.shared().removeDelegate(self)
         ChatClient.shared().add(self, delegateQueue: nil)
+        ChatClient.shared().chatManager?.remove(self)
         ChatClient.shared().chatManager?.add(self, delegateQueue: .main)
         if let config = config {
             self.config = config
         }
-        if tokenProvider != nil {
-            self.appID = tokenProvider!.getAppId()
-            if self.appID.isEmpty {
-//                return CallError.error(code: ChatErrorCode.invalidAppkey.rawValue, message: "App ID is not set. Please configure the App ID in CallTokenProvider.")
-            }
-            
-//            self.tokenProvider = tokenProvider
-//            if let currentUserId = ChatClient.shared().currentUsername {
-//                tokenProvider?.fetchCallToken { [weak self] uid, token, expiration in
-//                    if let token = token, !token.isEmpty {
-//                        self?.token = token
-//                        self?.tokenExpired = expiration
-//                        self?.currentUserRTCUID = uid
-//                        consoleLogInfo("Call token fetched successfully: \(token)", type: .info)
-//                    } else {
-//                        consoleLogInfo("Failed to fetch call token", type: .error)
-//                    }
-//                }
-//            }
-//            let error = self.setupEngine()
-//            if error != nil {
-//                return error
-//            }
+        if let tokenProvider = tokenProvider {
+            initializeRTCWithProvider(tokenProvider)
+        } else if ChatClient.shared().isConnected {
+            initializeRTCFromIMSDKAfterConnection()
         }
         _ = AudioPlayerManager.shared
         consoleLogInfo("CallKitManager setup completed", type: .info)
         if #available(iOS 17.4, *),self.config.enableVOIP {
             LiveCommunicationManager.shared.setupPushKit()
         }
-        NotificationCenter.default.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { [weak self] _ in
+        guard notificationObservers.isEmpty else { return }
+        let foregroundObserver = NotificationCenter.default.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.hydrateRTCCachesIfNeeded()
+            self?.refreshRTCCredentialIfNeeded(.foreground)
             if let info = self?.callInfo, info.state == .ringing {
                 if let controller = UIViewController.currentController {
                     if self?.callInfo?.calleeId == ChatClient.shared().currentUsername {
@@ -135,10 +165,82 @@ public let CallKitVersion = "4.18.1"
                 }
             }
         }
-        NotificationCenter.default.addObserver(forName: UIApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
+        let backgroundObserver = NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
+            guard let self = self, self.tokenProvider != nil else { return }
+            let hasRequest = self.$rtcCredentialRequest.withValue { $0 != nil }
+            let taskID = hasRequest ? UIApplication.shared.beginBackgroundTask(withName: "CallKit RTC credential") : .invalid
+            Task {
+                await self.rtcPersistenceStore.flush()
+                if taskID != .invalid {
+                    await MainActor.run { UIApplication.shared.endBackgroundTask(taskID) }
+                }
+            }
+        }
+        let terminateObserver = NotificationCenter.default.addObserver(forName: UIApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
             self?.hangup()
         }
+        notificationObservers = [foregroundObserver, backgroundObserver, terminateObserver]
 //        return nil
+    }
+
+    private func initializeRTCWithProvider(_ tokenProvider: CallTokenProvider) {
+        let resolvedAppID = tokenProvider.getAppId()
+        guard !resolvedAppID.isEmpty else {
+            handleBusinessError(CallError.CallBusiness(error: .param, message: "RTC App ID from CallTokenProvider is empty."))
+            return
+        }
+        guard engine == nil || appID.isEmpty || appID == resolvedAppID else {
+            handleBusinessError(CallError.CallBusiness(error: .state, message: "RTC App ID cannot change after the RTC engine is created."))
+            return
+        }
+        appID = resolvedAppID
+        if let engineError = setupEngine() {
+            handleError(engineError)
+            return
+        }
+        guard hydrateRTCCachesIfNeeded() else {
+            handleBusinessError(CallError.CallBusiness(error: .state, message: "Failed to initialize CallTokenProvider RTC caches."))
+            return
+        }
+        if ChatClient.shared().isConnected,
+           let currentUserID = ChatClient.shared().currentUsername,
+           !currentUserID.isEmpty {
+            refreshRTCCredentialIfNeeded(.imConnected)
+        }
+    }
+
+    private func initializeRTCFromIMSDKAfterConnection() {
+        guard tokenProvider == nil, ChatClient.shared().isConnected else {
+            handleError(ChatError(description: "RTC initialization failed because CallTokenProvider is configured or IM SDK is not connected.", code: .userNotLogin))
+            return
+        }
+        let resolvedAppID = ChatClient.shared().options.appId ?? ""
+        guard !resolvedAppID.isEmpty else {
+            handleError(ChatError(description: "App ID is not set.", code: .invalidAppkey))
+            return
+        }
+        guard engine == nil || appID.isEmpty || appID == resolvedAppID else {
+            handleBusinessError(CallError.CallBusiness(error: .state, message: "RTC App ID changed after the RTC engine was created."))
+            return
+        }
+        appID = resolvedAppID
+        if let engineError = setupEngine() {
+            handleError(engineError)
+            return
+        }
+        refreshRTCCredentialIfNeeded(.imConnected)
+    }
+
+    /// Sets up CallKit with an async RTC provider.
+    @nonobjc public func setup(_ config: CallKitConfig? = nil, tokenProvider: CallTokenProvider) {
+        if engine != nil {
+            guard self.tokenProvider === tokenProvider, appID == tokenProvider.getAppId() else {
+                consoleLogInfo("RTC credential source cannot switch after the RTC engine is created.", type: .error)
+                return
+            }
+        }
+        self.tokenProvider = tokenProvider
+        setup(config)
     }
     
     @objc func setupEngine() -> ChatError? {
@@ -150,8 +252,13 @@ public let CallKitVersion = "4.18.1"
             }
             return nil
         }
-        self.engine?.setParameters("{\"che.audio.mix_with_others\":false}")
+        if self.tokenProvider == nil, !ChatClient.shared().isConnected {
+            return ChatError(description: "The IM SDK must be connected before initializing the RTC engine.", code: .userNotLogin)
+        }
         if self.appID.isEmpty {
+            if self.tokenProvider != nil {
+                return ChatError(description: "RTC App ID from CallTokenProvider is empty.", code: .invalidAppkey)
+            }
             self.appID = ChatClient.shared().options.appId ?? ""
         }
         if self.appID.isEmpty {
@@ -159,10 +266,11 @@ public let CallKitVersion = "4.18.1"
         } else {
             self.engine = AgoraRtcEngineKit.sharedEngine(withAppId: self.appID, delegate: self)
         }
+        self.engine?.setParameters("{\"che.audio.mix_with_others\":false}")
         let configuration = AgoraVideoEncoderConfiguration()
         configuration.orientationMode = .fixedPortrait
         configuration.dimensions = CGSize(width: 1280, height: 720)
-        configuration.frameRate = 30
+        configuration.frameRate = 60
         self.engine?.setVideoEncoderConfiguration(configuration)
         
         let cameraConfig = AgoraCameraCapturerConfiguration()
@@ -245,18 +353,35 @@ public let CallKitVersion = "4.18.1"
     
     /// Tears down the CallKitManager, releasing resources and stopping the player.Notice that this method should be called when the application is about to terminate or when the CallKitManager is no longer needed.
     @objc public func tearDown() {
+        $rtcRefreshTask.modify { task in task?.cancel(); task = nil }
+        $rtcCredentialRequest.modify { state in state?.task.cancel(); state = nil }
+        $rtcRelationRequests.modify { requests in requests.values.forEach { $0.cancel() }; requests.removeAll() }
+        $rtcRelationFailures.modify { $0.removeAll() }
+        if tokenProvider != nil { Task { await rtcPersistenceStore.flush() } }
+        self.quitCall()
         self.itemsCache.removeAll()
         self.canvasCache.removeAll()
         self.usersCache.removeAll()
         self.listeners.removeAllObjects()
         AgoraRtcEngineKit.destroy()
+        self.engine = nil
         do {
             try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         } catch {
             consoleLogInfo("Failed to deactivate audio session: \(error.localizedDescription)", type: .error)
         }
-        self.quitCall()
+        ChatClient.shared().removeDelegate(self)
         ChatClient.shared().chatManager?.remove(self)
+        notificationObservers.forEach { NotificationCenter.default.removeObserver($0) }
+        notificationObservers.removeAll()
+        $rtcCredentialCache.modify { $0 = nil }
+        $rtcUserIdCache.modify { $0.removeAll() }
+        $rtcCacheAppID.modify { $0 = "" }
+        $loadedCredentialKeys.modify { $0.removeAll() }
+        $loadedRelationAppIDs.modify { $0.removeAll() }
+        $rtcCredentialGeneration.modify { $0 = 0 }
+        self.tokenProvider = nil
+        self.appID = ""
         AudioPlayerManager.shared.stopAudio()
     }
     
@@ -309,8 +434,26 @@ public let CallKitVersion = "4.18.1"
     
     /// When you logout IM SDK, you should call this method to clean up the user defaults.
     @objc public func cleanUserDefaults() {
-        self.currentUserRTCUID = 0
-        self.token = ""
+        let appID = self.appID
+        let userID = ChatClient.shared().currentUsername
+        let shouldClearPersistence = tokenProvider != nil
+        UserDefaults.standard.removeObject(forKey: "CallKitManager.token")
+        UserDefaults.standard.removeObject(forKey: "CallKitManager.currentUserRTCUID")
+        $rtcCredentialCache.modify { $0 = nil }
+        $rtcUserIdCache.modify { $0.removeAll() }
+        $rtcCacheAppID.modify { $0 = "" }
+        $loadedCredentialKeys.modify { $0.removeAll() }
+        $loadedRelationAppIDs.modify { $0.removeAll() }
+        $rtcRefreshTask.modify { task in task?.cancel(); task = nil }
+        $rtcCredentialRequest.modify { state in state?.task.cancel(); state = nil }
+        $rtcRelationRequests.modify { requests in requests.values.forEach { $0.cancel() }; requests.removeAll() }
+        $rtcRelationFailures.modify { $0.removeAll() }
+        if shouldClearPersistence {
+            Task {
+                await rtcPersistenceStore.clear(appID: appID.isEmpty ? nil : appID, userID: userID)
+                await rtcPersistenceStore.flush()
+            }
+        }
     }
     
     private func validateItemsCache() {
@@ -333,33 +476,21 @@ public let CallKitVersion = "4.18.1"
 extension CallKitManager: ChatClientListener {
     public func connectionStateDidChange(_ aConnectionState: ConnectionState) {
         if aConnectionState == .connected {//IM SDK connected successfully
+            if self.tokenProvider == nil {
+                self.initializeRTCFromIMSDKAfterConnection()
+                return
+            }
+            guard self.hydrateRTCCachesIfNeeded() else {
+                self.handleBusinessError(CallError.CallBusiness(error: .state, message: "Failed to initialize CallTokenProvider RTC caches."))
+                return
+            }
             let engineError = self.setupEngine()//Set up Agora engine
             if let error = engineError {
                 self.handleError(error)
                 consoleLogInfo("Failed to setup engine: \(String(describing: error.errorDescription))", type: .error)
                 return
             }
-            if self.token.isEmpty {//When the token is empty.First we need to fetch it from the IM SDK.
-                if let currentUserId = ChatClient.shared().currentUsername,!currentUserId.isEmpty {
-                    if self.tokenProvider != nil {
-//                        self.tokenProvider?.fetchCallToken{ [weak self] uid, token, expiration in
-//                            if let token = token, !token.isEmpty {
-//                                self?.token = token
-//                                self?.tokenExpired = expiration
-//                                self?.currentUserRTCUID = uid
-//                                consoleLogInfo("Call token fetched successfully: \(token)", type: .info)
-//                            } else {
-//                                consoleLogInfo("Failed to fetch call token", type: .error)
-//                            }
-//                        }
-                    } else {
-                        self.getRTCTokenFromIMSDK()
-                    }
-                } else {
-                    consoleLogInfo("Current user ID is empty, cannot fetch call token", type: .error)
-                    self.handleError(ChatError(description: "Current user ID is empty, cannot fetch call token", code: .invalidAppkey))
-                }
-            }
+            self.refreshRTCCredentialIfNeeded(.imConnected)
         }
     }
     
@@ -383,19 +514,17 @@ extension CallKitManager: ChatClientListener {
     }
     
     func getRTCTokenFromIMSDK(_ refreshRTCToken: Bool = false) {
-        ChatClient.shared().getRTCToken(withChannel: nil) { [weak self] uid, token, expiration, error in
-            if let error = error {
-                self?.token = ""
-                self?.handleError(error)
-                consoleLogInfo("Failed to fetch call token: \(String(describing: error.errorDescription))", type: .error)
-            } else {
-                let rtcToken = token ?? ""
-                self?.token = rtcToken
-                self?.currentUserRTCUID = UInt32(uid)
-                if refreshRTCToken {
-                    self?.engine?.renewToken(rtcToken)
-                }
-                consoleLogInfo("Call token fetched successfully: \(String(describing: token))", type: .info)
+        guard tokenProvider == nil else {
+            consoleLogInfo("Skip IM SDK RTC credential request because CallTokenProvider is configured.", type: .info)
+            return
+        }
+        Task { [weak self] in
+            guard let self = self else { return }
+            do {
+                let record = try await self.credentialForUse(reason: refreshRTCToken ? .rtcWillExpire : .imConnected)
+                if refreshRTCToken { _ = self.engine?.renewToken(record.token) }
+            } catch {
+                consoleLogInfo("Failed to fetch call token: \(error.localizedDescription)", type: .error)
             }
         }
     }
