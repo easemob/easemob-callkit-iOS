@@ -72,6 +72,8 @@ public let CallKitVersion = "5.0.0"
     /// 解析失败后的静默期，静默期内不再对同一个 uid 发起请求。
     @nonobjc static let rtcRelationFailureTTL: TimeInterval = 30
     @nonobjc @CallAtomicUnfairLock var rtcRefreshTask: Task<Void, Never>?
+    /// token 过期重进频道的防重入标记。`rtcEngineRequestToken` 与 `connectionChangedTo(.reasonTokenExpired)` 可能对同一次过期先后触发。
+    @nonobjc @CallAtomicUnfairLock var rtcRejoinInFlight = false
     @nonobjc private var notificationObservers: [NSObjectProtocol] = []
 
     /// Current user token for AgoraRTC SDK. Runtime access is memory-only.
@@ -357,6 +359,7 @@ public let CallKitVersion = "5.0.0"
         $rtcCredentialRequest.modify { state in state?.task.cancel(); state = nil }
         $rtcRelationRequests.modify { requests in requests.values.forEach { $0.cancel() }; requests.removeAll() }
         $rtcRelationFailures.modify { $0.removeAll() }
+        $rtcRejoinInFlight.modify { $0 = false }
         if tokenProvider != nil { Task { await rtcPersistenceStore.flush() } }
         self.quitCall()
         self.itemsCache.removeAll()
@@ -448,6 +451,7 @@ public let CallKitVersion = "5.0.0"
         $rtcCredentialRequest.modify { state in state?.task.cancel(); state = nil }
         $rtcRelationRequests.modify { requests in requests.values.forEach { $0.cancel() }; requests.removeAll() }
         $rtcRelationFailures.modify { $0.removeAll() }
+        $rtcRejoinInFlight.modify { $0 = false }
         if shouldClearPersistence {
             Task {
                 await rtcPersistenceStore.clear(appID: appID.isEmpty ? nil : appID, userID: userID)
