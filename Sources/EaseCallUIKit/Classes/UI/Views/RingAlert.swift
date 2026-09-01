@@ -381,7 +381,7 @@ public class CallPopupView: UIView {
         if let touch = touches.first {
             let location = touch.location(in: self)
             if !callCardView.frame.contains(location) {
-                // 点击背景区域时dismiss（可选）
+                self.dismiss()
                 self.callCardAction?(.other)
             }
         }

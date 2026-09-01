@@ -38,23 +38,28 @@ public protocol CallUserProfileProvider { //去掉user
     func fetchGroupProfiles(profileIds: [String],completion: @escaping ([CallProfileProtocol]) -> Void)
 }
 
-@objc public protocol CallTokenProvider: NSObjectProtocol {    
+public struct CallRTCTokenInfo: Sendable {
+    public let uid: UInt32
+    public let token: String
+    public let expiration: Int64
+
+    public init(uid: UInt32, token: String, expiration: Int64) {
+        self.uid = uid
+        self.token = token
+        self.expiration = expiration
+    }
+}
+
+public protocol CallTokenProvider: AnyObject {
     
     /// Get the App ID of the Agora SDK.
     /// - Returns: The App ID as a string.
     func getAppId() -> String
     
-    /// Need to obtain the call token.
-    func fetchCallToken(completion: @escaping (UInt32, String?, Int64) -> Void)
+    /// Asynchronously obtains an app-wide RTC credential.
+    /// EaseCallUIKit passes `nil` because the returned token is expected to be valid for all channels.
+    func getRTCToken(withChannel channelName: String?) async throws -> CallRTCTokenInfo
     
-    /// Get the call token synchronously.
-    /// - Parameter uids: The user ID array.
-    /// - Returns: A dictionary where keys are user IDs and values are the corresponding tokens.
-    func getRelations(rtc uids: [UInt32]) -> [UInt32:String]
-    
-    /// Asynchronously get the call token.
-    /// - Parameters:
-    ///   - uids: The user ID array.
-    ///   - completion: Callback, returns a dictionary where keys are user IDs and values are the corresponding tokens.
-    func getRelationsAsync(rtc uids: [UInt32],completion: @escaping ([UInt32:String]) -> Void)
+    /// Asynchronously resolves RTC UIDs to IM user IDs.
+    func getRelations(rtc uids: [UInt32]) async throws -> [UInt32:String]
 }

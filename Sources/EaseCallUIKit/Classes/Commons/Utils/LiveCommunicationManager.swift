@@ -188,6 +188,8 @@ extension LiveCommunicationManager: PKPushRegistryDelegate {
         CallKitManager.shared.callInfo?.calleeId = calleeID
         CallKitManager.shared.callInfo?.state = .ringing
         CallKitManager.shared.callInfo?.extensionInfo = custom?[kUserInfo] as? [String: Any]
+        CallKitManager.shared.hydrateRTCCachesIfNeeded()
+        CallKitManager.shared.refreshRTCCredentialIfNeeded(.join)
         if let msgId = payload.dictionaryPayload["m"] as? String {
             CallKitManager.shared.callInfo?.inviteMessageId = msgId
         }
@@ -273,8 +275,16 @@ extension LiveCommunicationManager: ConversationManagerDelegate
                 }
             }
             
-            CallKitManager.shared.accept()
-            action.fulfill()
+            Task {
+                do {
+                    _ = try await CallKitManager.shared.credentialForUse(reason: .join)
+                    CallKitManager.shared.accept()
+                    action.fulfill()
+                } catch {
+                    consoleLogInfo("[LiveCommunicationManager] RTC credential unavailable: \(error.localizedDescription)", type: .error)
+                    action.fail()
+                }
+            }
         } else {
             consoleLogInfo("[LiveCommunicationManager] do not have call info", type: .error)
             action.fail()
