@@ -1634,6 +1634,8 @@ extension CallKitManager: CallMessageService {
                     let leaveResult = self.engine?.leaveChannel()
                     if leaveResult != 0 {
                         consoleLogInfo("leaveChannel result: \(String(describing: leaveResult)) channelName:\(channelName)", type: .error)
+                        // 离开旧频道失败时清理通话状态，避免残留 hadJoinedChannel 等状态
+                        self.quitCall()
                         DispatchQueue.main.async {
                             completion(false)
                         }

@@ -433,28 +433,53 @@ extension CallKitManager {
         }
         let missing = uniqueUIDs.filter { $0 > 0 && result[$0] == nil && !suppressed.contains($0) }
         var lastError: ChatError?
-        for uid in missing {
-            let relationAppID = appID
-            let task = $rtcRelationRequests.modify { requests -> Task<RTCRelationResolution, Never> in
-                if let existing = requests[uid] { return existing }
-                let created = Task<RTCRelationResolution, Never> { [weak self] in
-                    guard let self = self else { return RTCRelationResolution(userID: nil, error: nil) }
-                    let fetched = await self.fetchRTCRelations([UInt32(uid)])
-                    guard !Task.isCancelled, self.appID == relationAppID else {
-                        return RTCRelationResolution(userID: nil, error: nil)
-                    }
-                    guard let userID = fetched.relations[UInt32(uid)], !userID.isEmpty else {
-                        return RTCRelationResolution(userID: nil, error: fetched.error)
-                    }
-                    self.$rtcUserIdCache.modify { $0[uid] = userID }
-                    if self.tokenProvider != nil {
-                        self.rtcPersistenceStore.scheduleMergeRelations([uid: userID], appID: relationAppID)
-                    }
-                    return RTCRelationResolution(userID: userID, error: nil)
+        guard !missing.isEmpty else { return (result, nil) }
+        let relationAppID = appID
+        // 复用 in-flight 任务；其余缺失 uid 合并为一次批量请求，避免逐个串行网络往返
+        var awaitTasks: [UInt: Task<RTCRelationResolution, Never>] = [:]
+        $rtcRelationRequests.modify { requests in
+            var newUIDs: [UInt] = []
+            for uid in missing {
+                if let existing = requests[uid] {
+                    awaitTasks[uid] = existing
+                } else {
+                    newUIDs.append(uid)
                 }
-                requests[uid] = created
-                return created
             }
+            guard !newUIDs.isEmpty else { return }
+            let batchUIDs = newUIDs
+            let batch = Task<[UInt: RTCRelationResolution], Never> { [weak self] in
+                guard let self = self else { return [:] }
+                let fetched = await self.fetchRTCRelations(batchUIDs.map { UInt32($0) })
+                guard !Task.isCancelled, self.appID == relationAppID else { return [:] }
+                var resolutions: [UInt: RTCRelationResolution] = [:]
+                var resolved: [UInt: String] = [:]
+                for uid in batchUIDs {
+                    if let userID = fetched.relations[UInt32(uid)], !userID.isEmpty {
+                        resolved[uid] = userID
+                        resolutions[uid] = RTCRelationResolution(userID: userID, error: nil)
+                    } else {
+                        resolutions[uid] = RTCRelationResolution(userID: nil, error: fetched.error)
+                    }
+                }
+                if !resolved.isEmpty {
+                    self.$rtcUserIdCache.modify { $0.merge(resolved) { _, new in new } }
+                    if self.tokenProvider != nil {
+                        self.rtcPersistenceStore.scheduleMergeRelations(resolved, appID: relationAppID)
+                    }
+                }
+                return resolutions
+            }
+            // 每个 uid 注册一个批任务切片，保持并发调用者按 uid 去重的语义
+            for uid in batchUIDs {
+                let slice = Task<RTCRelationResolution, Never> {
+                    (await batch.value)[uid] ?? RTCRelationResolution(userID: nil, error: nil)
+                }
+                requests[uid] = slice
+                awaitTasks[uid] = slice
+            }
+        }
+        for (uid, task) in awaitTasks {
             let resolution = await task.value
             _ = $rtcRelationRequests.modify { $0.removeValue(forKey: uid) }
             if let userID = resolution.userID {

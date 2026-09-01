@@ -262,18 +262,36 @@ extension CallKitManager: AgoraRtcEngineDelegate {
     
     public func rtcEngineRequestToken(_ engine: AgoraRtcEngineKit) {// This method is called when the token was expired
         if let channelName = self.callInfo?.channelName,let userId = ChatClient.shared().currentUsername {
+            // 防重入：同一次过期可能由本回调与 connectionChangedTo 先后触发，只 rejoin 一次
+            let alreadyRejoining = $rtcRejoinInFlight.modify { flag -> Bool in
+                if flag { return true }
+                flag = true
+                return false
+            }
+            if alreadyRejoining {
+                consoleLogInfo("RTC rejoin already in flight for channel: \(channelName); skip duplicate trigger.", type: .info)
+                return
+            }
             Task { [weak self] in
                 guard let self = self else { return }
                 do {
                     let credential = try await self.credentialForUse(reason: .rtcExpired)
-                    // 仅在 token 非空时续期，避免 Agora SDK 错误
-                    if !credential.token.isEmpty {
-                        let result = engine.renewToken(credential.token)
-                        consoleLogInfo("Renewed expired RTC credential for channel: \(channelName) uid: \(credential.uid) userId: \(userId) result: \(result)", type: .info)
-                    } else {
-                        consoleLogInfo("RTC token is empty (disableRTCTokenValidation mode); cannot renew.", type: .waring)
+                    // Agora 要求：token 过期断连后 renewToken 无效，必须携带新 token 重新入会
+                    self.hadJoinedChannel = false
+                    self.joinChannel(channelName: channelName) { [weak self] success in
+                        guard let self = self else { return }
+                        self.$rtcRejoinInFlight.modify { $0 = false }
+                        if success {
+                            self.callInfo?.state = .answering
+                            self.joinedThenPresentCallVC()
+                            consoleLogInfo("Rejoined channel after RTC token expired: \(channelName) uid: \(credential.uid) userId: \(userId)", type: .info)
+                        } else {
+                            consoleLogInfo("Failed to rejoin channel after RTC token expired: \(channelName) userId: \(userId)", type: .error)
+                            self.quitCall()
+                        }
                     }
                 } catch {
+                    self.$rtcRejoinInFlight.modify { $0 = false }
                     consoleLogInfo("Unable to renew expired RTC credential: \(error.localizedDescription)", type: .error)
                 }
             }
