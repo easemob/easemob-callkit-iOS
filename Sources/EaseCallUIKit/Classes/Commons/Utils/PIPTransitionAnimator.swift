@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import UIKit
 
 // MARK: - 画中画转场动画器
 class PIPTransitionAnimator: NSObject, UIViewControllerAnimatedTransitioning {

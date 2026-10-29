@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import UIKit
 import PushKit
 import AVFAudio
 #if canImport(LiveCommunicationKit)

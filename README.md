@@ -1,6 +1,6 @@
 # EaseCallUIKit for iOS
 
-本指南将介绍环信新EaseCallUIKit（基于环信IMSDK V4.16.0及其以上）。新EaseCallUIKit致力于为开发者提供高效集成、功能全面、设计美观的通话场景，轻松满足即时通信呼叫绝大多数场景。请下载示例进行体验。
+本指南将介绍环信新EaseCallUIKit（当前依赖环信IM SDK 4.26.0和声网RTC SDK 4.6.2）。新EaseCallUIKit致力于为开发者提供高效集成、功能全面、设计美观的通话场景，轻松满足即时通信呼叫绝大多数场景。请下载示例进行体验。
 
 # 示例Demo
 
@@ -23,6 +23,7 @@
 - [开发环境](#开发环境)
 - [安装](#安装)
   - [CocoaPods](#cocoapods)
+  - [Swift Package Manager](#swift-package-manager)
 - [结构](#结构)
 - [运行示例项目](#运行示例项目)
 - [快速开始](#快速开始)
@@ -55,13 +56,22 @@
 - Xcode 16.0及以上版本 
 - 最低支持系统：iOS 15.0
 - 请确保您的项目已设置有效的开发者签名
-- cocoapods v1.14.3 above
+- 使用 CocoaPods 集成时，需要 CocoaPods 1.14.3 及以上版本；使用 Swift Package Manager 时无需安装 CocoaPods
 
 # 安装
 
-您可以使用 CocoaPods 安装 EaseCallUIKit 作为 Xcode 项目的依赖项。
+您可以使用 CocoaPods 或 Swift Package Manager（SPM）安装 EaseCallUIKit。两种方式共用 `Sources/EaseCallUIKit/Classes` 中的源码和 `Resources/CallResource.bundle` 中的图片、铃声与本地化资源，业务代码均使用 `import EaseCallUIKit`。
 
-CocoaPods 是 iOS 和 macOS 项目的依赖管理工具。它允许您轻松地将第三方库集成到您的项目中，并自动处理依赖关系。安装方法请自行询问AI或者搜索引擎。
+两种方式均自动获取官方依赖，并固定为以下版本：
+
+| 依赖 | CocoaPods | SPM | 版本 |
+| :--- | :--- | :--- | :--- |
+| 环信 IM SDK | `HyphenateChat` | [HyphenateChat_iOS](https://github.com/easemob/HyphenateChat_iOS) 的 `HyphenateChat` product | 4.26.0 |
+| 声网 RTC SDK | `ShengwangRtcEngine_iOS/RtcBasic` | [ShengwangRtcEngine_iOS](https://github.com/Shengwang-Lab/ShengwangRtcEngine_iOS) 的 `RtcBasic` product | 4.6.2 |
+
+共同依赖 `ShengwangInfra_iOS` 由官方 SDK 的依赖声明解析：RTC 4.6.2 的 CocoaPods 声明固定为 1.3.5，SPM 声明允许 1.3.5 及以上的兼容版本，因此两端的底层依赖版本可能不同。
+
+请为 EaseCallUIKit 及其 IM、RTC 依赖选择同一种包管理方式，避免通过 CocoaPods 和 SPM 重复引入这些 SDK。资源会随依赖自动打包，无需手动复制；两种方式均支持通过 `CallAppearance.resourceBundle` 优先使用自定义资源包，详见[自定义](#自定义)。
 
 ## CocoaPods
 
@@ -103,6 +113,15 @@ end
 
 > 如果`pod install`失败报错 RuntimeError - `PBXGroup` attempted to initialize an object with unknown ISA `PBXFileSystemSynchronizedRootGroup` from attributes: `{"isa"=>"PBXFileSystemSynchronizedRootGroup"`，请尝试升级pod版本为1.14.3
  Xcode16及其以下版本打开会报错 `Adjust the project format using a compatible version of Xcode to allow it to be opened by this version of Xcode.`
+
+## Swift Package Manager
+
+1. 在 Xcode 中选择 **File → Add Package Dependencies…**。
+2. 输入仓库地址 `https://github.com/easemob/easemob-callkit-iOS`。
+3. 选择包含根目录 `Package.swift` 的版本、分支或提交，等待 Xcode 解析依赖。
+4. 选择 **EaseCallUIKit** product，添加到应用 target，然后在代码中使用 `import EaseCallUIKit`。
+
+旧版本标签可能尚未包含 SPM 清单。验证本地修改时，可在上述窗口选择 **Add Local…**，选中包含 `Package.swift` 的本仓库根目录，再将 **EaseCallUIKit** product 添加到应用 target。现有 `Example` 项目继续使用 CocoaPods；本地 SPM 验证请使用独立的 iOS 应用工程。
 
 # 结构
 
@@ -188,7 +207,7 @@ let token: String = <#token#>
 
 - [创建IM用户并获取token](https://v2-console.easemob.com/app/operation/management/micro/app/im-service/operative-service/user),这里建议创建两个用户。![](./DocumentationImages/createUser.png).
 
-- 使用`pod init`创建podfile文件,添加依赖`pod 'EaseCallUIKit'`，然后执行`pod install`命令
+- 按照[安装](#安装)章节，通过 CocoaPods 或 Swift Package Manager 将 EaseCallUIKit 添加到应用 target
 
 注意：
    在生产环境中，为了安全考虑，你需要在你的应用服务器集成 获取 App Token API 和 获取用户 Token API 实现获取 Token 的业务逻辑，使你的用户从你的应用服务器获取 Token。
@@ -1352,6 +1371,8 @@ Example 里可在 `PublicDefines.swift` 填写 `agoraAppId`。本地调试也可
 ```
 
 ## 2.修改原有资源
+
+两种集成方式均使用同一份 `Sources/EaseCallUIKit/Classes/Resources/CallResource.bundle`。通过 `CallAppearance.resourceBundle` 指定自定义 bundle 时，会优先从该 bundle 加载资源；请保留所需文件名与本地化目录结构。设为 `nil` 可恢复使用库内置的资源包。
 
 主要包含以下资源类型：
 
