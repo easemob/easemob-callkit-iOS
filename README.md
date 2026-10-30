@@ -123,6 +123,8 @@ end
 
 旧版本标签可能尚未包含 SPM 清单。验证本地修改时，可在上述窗口选择 **Add Local…**，选中包含 `Package.swift` 的本仓库根目录，再将 **EaseCallUIKit** product 添加到应用 target。现有 `Example` 项目继续使用 CocoaPods；本地 SPM 验证请使用独立的 iOS 应用工程。
 
+EaseCallUIKit 依赖 UIKit，仅支持 iOS。macOS 上直接执行 `swift build` 或 `swift test` 会构建 macOS 目标，并报 `no such module 'UIKit'`；`platforms: [.iOS(.v15)]` 声明的是最低 iOS 版本，不会自动切换目标平台。CI 使用 `.github/workflows/swift.yml` 中的 `xcodebuild` 命令，明确选择 iOS 真机架构和 iOS 模拟器进行编译、测试。
+
 # 结构
 
 ### EaseCallUIKit 基本项目结构
