@@ -7,19 +7,8 @@
 
 import Foundation
 
-/**
- A type extension to provide a computed property for ChatroomResourceBundle.
- 
- This extension provides a computed property `chatBundle` of type `Bundle` to access the ChatroomResourceBundle. If the ChatroomResourceBundle is already initialized, it returns the existing instance. Otherwise, it initializes the ChatroomResourceBundle with the path of the "ChatRoomResource.bundle" file in the main bundle. If the bundle is not found, it returns the main bundle.
- */
-fileprivate var CallResourceBundle: Bundle?
-
 public extension Bundle {
-    /**
-     A computed property to access the ChatroomResourceBundle.
-     
-     This computed property returns the ChatroomResourceBundle. If the ChatroomResourceBundle is already initialized, it returns the existing instance. Otherwise, it initializes the ChatroomResourceBundle with the path of the "ChatRoomResource.bundle" file in the main bundle. If the bundle is not found, it returns the main bundle.
-     */
+    /// The custom resource bundle, or the packaged CallResource.bundle for the integration method.
     class var callBundle: Bundle {
         if CallAppearance.resourceBundle != nil {
             return CallAppearance.resourceBundle!
@@ -31,6 +20,8 @@ public extension Bundle {
                 .flatMap { Bundle(url: $0) }!
 #elseif SWIFT_PACKAGE
             return Bundle.module
+                .url(forResource: "CallResource", withExtension: "bundle")
+                .flatMap(Bundle.init(url:))!
 #elseif STATIC_LIBRARY
             return Bundle.main
                 .url(forResource: "EaseCallUIKit.bundle/CallResource", withExtension: "bundle")
@@ -41,4 +32,3 @@ public extension Bundle {
         }
     }
 }
-

@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import UIKit
 
 /// An object containing visual configurations for the whole application.
 @objcMembers final public class CallAppearance: NSObject {
