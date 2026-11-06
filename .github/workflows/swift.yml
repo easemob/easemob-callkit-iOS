@@ -1,0 +1,76 @@
+name: Swift
+
+on:
+  push:
+    branches: ["dev"]
+  pull_request:
+    branches: ["dev"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare iOS package and simulator
+        run: |
+          xcodebuild -version
+          # The root _Pods.xcodeproj symlink can make Xcode select the Pods project.
+          # Build the checked-out package in isolation with the same sources/tests.
+          mkdir -p "$RUNNER_TEMP/EaseCallUIKit-SPM"
+          cp -R Package.swift Sources Tests "$RUNNER_TEMP/EaseCallUIKit-SPM/"
+          xcrun simctl list devices available --json > "$RUNNER_TEMP/simulators.json"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          devices = json.loads((Path(os.environ["RUNNER_TEMP"]) / "simulators.json").read_text())["devices"]
+          simulator_id = next((
+              device["udid"]
+              for runtime, runtime_devices in devices.items()
+              if ".iOS-" in runtime
+              for device in runtime_devices
+              if device["isAvailable"] and device["name"].startswith("iPhone")
+          ), None)
+          if simulator_id is None:
+              raise SystemExit("No available iPhone simulator. Install an iOS simulator runtime in Xcode.")
+          with open(os.environ["GITHUB_ENV"], "a") as environment:
+              environment.write(f"SIMULATOR_ID={simulator_id}\n")
+          print(f"Using iOS simulator {simulator_id}")
+          PY
+
+      - name: Build for iOS devices
+        working-directory: ${{ runner.temp }}/EaseCallUIKit-SPM
+        run: |
+          xcodebuild \
+            -scheme EaseCallUIKit \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/EaseCallUIKit-DerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Test on iOS Simulator
+        working-directory: ${{ runner.temp }}/EaseCallUIKit-SPM
+        run: |
+          xcodebuild \
+            -scheme EaseCallUIKit \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+            -derivedDataPath "$RUNNER_TEMP/EaseCallUIKit-DerivedData" \
+            -resultBundlePath "$RUNNER_TEMP/EaseCallUIKit-tests.xcresult" \
+            -parallel-testing-enabled NO \
+            CODE_SIGNING_ALLOWED=NO \
+            test
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-test-results
+          path: ${{ runner.temp }}/EaseCallUIKit-tests.xcresult
+          if-no-files-found: ignore
