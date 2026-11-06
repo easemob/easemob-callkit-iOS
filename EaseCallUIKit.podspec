@@ -42,6 +42,11 @@ TODO: Add long description of the pod here.
   # s.public_header_files = 'Pod/Classes/**/*.h'
   s.frameworks = 'UIKit', 'Foundation', 'Combine', 'AudioToolbox', 'AVFoundation','AVKit', 'CoreMedia', 'CoreVideo', 'CoreGraphics'
   
-  s.dependency 'HyphenateChat','>=4.19.0'
-  s.dependency 'ShengwangRtcEngine_iOS/RtcBasic', '>=4.6.0'
+  s.dependency 'HyphenateChat', '4.26.0'
+  s.dependency 'ShengwangRtcEngine_iOS/RtcBasic', '4.6.2'
+
+  s.test_spec 'Resources' do |test_spec|
+    test_spec.source_files = 'Tests/EaseCallUIKitTests/**/*.swift'
+    test_spec.frameworks = 'XCTest', 'AVFoundation', 'UIKit'
+  end
 end

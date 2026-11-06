@@ -2,3 +2,7 @@
 /Example/EaseCallUIKit.xcworkspace/xcuserdata
 /Example/Pods
 .omx/
+.build/
+.swiftpm/
+/Package.resolved
+!/Example/Podfile.lock
